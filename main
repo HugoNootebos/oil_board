@@ -1,0 +1,1215 @@
+import pygame as pg
+import numpy as np
+from matplotlib import path as pth
+
+def transform_coordinates(point, zoom, xoffset, yoffset):
+    return int((point[0] + xoffset)*zoom + 0.5*WIDTH), int((point[1] + yoffset)*zoom + 0.5*HEIGHT)
+
+def screen_to_coordinates(point, zoom, xoffset, yoffset):
+    return int((point[0] - 0.5*WIDTH)/zoom - xoffset), int((point[1] - 0.5*HEIGHT)/zoom - yoffset)
+
+def show_die(eyes, x, y):
+    if eyes == 1:
+        pg.draw.circle(screen, (0,0,0), (x, y), 3)
+    elif eyes == 2:
+        pg.draw.circle(screen, (0,0,0), (x - 12, y + 12), 3)
+        pg.draw.circle(screen, (0,0,0), (x + 12, y - 12), 3)
+    elif eyes == 3:
+        pg.draw.circle(screen, (0,0,0), (x - 12, y + 12), 3)
+        pg.draw.circle(screen, (0,0,0), (x + 12, y - 12), 3)
+        pg.draw.circle(screen, (0,0,0), (x, y), 3)
+    elif eyes == 4:
+        pg.draw.circle(screen, (0,0,0), (x - 12, y + 12), 3)
+        pg.draw.circle(screen, (0,0,0), (x + 12, y - 12), 3)
+        pg.draw.circle(screen, (0,0,0), (x + 12, y + 12), 3)
+        pg.draw.circle(screen, (0,0,0), (x - 12, y - 12), 3)
+    elif eyes == 5:
+        pg.draw.circle(screen, (0,0,0), (x - 12, y + 12), 3)
+        pg.draw.circle(screen, (0,0,0), (x + 12, y - 12), 3)
+        pg.draw.circle(screen, (0,0,0), (x + 12, y + 12), 3)
+        pg.draw.circle(screen, (0,0,0), (x - 12, y - 12), 3)
+        pg.draw.circle(screen, (0,0,0), (x, y), 3)
+    elif eyes == 6:
+        pg.draw.circle(screen, (0,0,0), (x - 12, y + 12), 3)
+        pg.draw.circle(screen, (0,0,0), (x + 12, y - 12), 3)
+        pg.draw.circle(screen, (0,0,0), (x + 12, y + 12), 3)
+        pg.draw.circle(screen, (0,0,0), (x - 12, y - 12), 3)
+        pg.draw.circle(screen, (0,0,0), (x - 12, y), 3)
+        pg.draw.circle(screen, (0,0,0), (x + 12, y), 3)
+
+
+class Player:
+    def __init__(self, name, cards = [0,2,1,1,1,1,2,2], food = 45, wood = 100, steel = 100, nuclear = 100, oil = 100, color = None, troops = 0, start_ship = True):
+        self.name = name
+        self.cards = cards
+        self.food = food
+        self.wood = wood
+        self.steel = steel
+        self.nuclear = nuclear
+        self.oil = oil
+        self.color = color
+        self.troops = troops
+        self.attack = 6
+        self.subattack = 0
+        self.start_ship = start_ship
+        if self.color is None:
+            self.color = 255*np.random.rand(3)
+
+default_player = Player("mouse", color = (200,200,200))
+
+class Country:
+    
+    def __init__(self, name, polygon, food = 0, wood = 0, steel = 0, nuclear = 0, oil = 0, owner = default_player, troops = 0, units = 2, ships = 0, planes = 0, tanks = 0, fort_lvl = 0, radioactive = 0, developed = False):
+        self.polygon = polygon
+        self.name = name
+        self.food = food
+        self.wood = wood
+        self.steel = steel
+        self.nuclear = nuclear
+        self.oil = oil
+        self.owner = owner
+        self.troops = troops
+        self.units = units
+        self.ships = ships
+        self.planes = planes
+        self.tanks = tanks
+        self.fort_lvl = fort_lvl
+        self.radioactive = radioactive
+        self.developed = developed
+        center = np.average(np.array([np.average(p, axis = 0) for p in polygon]), axis = 0)
+        if name in ["Sri Lanka", "Japan", "Cuba", "Pearl Harbor"]:
+            center += np.array([0, 20])
+        if name == "IJsland":
+            center += np.array([-10, 10])
+        if name == "Canada":
+            center += np.array([-30,30])
+        self.mass_center = (int(center[0]), int(center[1]))
+        
+class Connection:
+    def __init__(self, connection, kind, rails = False):
+        self.connection = connection
+        self.kind = kind
+        self.rails = rails
+    def __contains__(self, other):
+        return other in self.connection
+
+
+countries = [i for i in range(42)]
+countries[0] = Country("Redneck", [[(111, 150),(110, 169),(112, 187),(112, 201),(117, 207),(120, 207),(124, 212),(128, 207),(141, 205),(145, 207),(145, 204),(151, 203),(153, 192),(158, 182),(164, 174),(163, 165),(159, 164),(159, 170),(156, 173),(153, 170),(161, 159),(157, 156),(153, 159),(149, 157),(151, 152)]]
+                                , troops = 3
+                                , units = 1)
+countries[1] = Country("Madagaskar", [[(365, 396), (358, 422), (365, 424), (377, 398), (376, 388)]]
+                                   , food = 1
+                                   , troops = 1
+                                   , wood = 2)
+countries[2] = Country ("Zuid-Afrika", [[(298, 365),(342, 365),(342, 354),(356, 354),(350, 370),(352, 394),(349, 401),(340, 407),(338, 420),(334, 424),(333, 433),(323, 450),(305, 454),(300, 452),(303, 442),(298, 430),(297, 415),(292, 400),(297, 388),(297, 372)]]
+                                     , food = 1
+                                     , troops = 2
+                                     , units = 1)
+countries[3] = Country("Belgisch Congo", [[(288, 351),(303, 351),(303, 320),(322, 320),(342, 320),(342, 354),(342, 365),(298, 365)]]
+                                       , troops = 3
+                                       , steel = 1)
+countries[4] = Country("Somalië", [[(356, 354),(342, 354),(342, 320),(322, 320),(322, 299),(358, 299),(365, 310),(362, 312),(369, 314),(382, 310),(380, 314),(379, 321),(368, 341)]]
+                                , troops = 3
+                                , wood = 1)
+countries[5] = Country("Nigeria", [[(238, 299),(322, 299),(322, 320),(303, 320),(303, 351),(288, 351),(292, 346),(293, 333),(279, 327),(255, 331)]]
+                                , troops = 3
+                                , wood = 1)
+countries[6] = Country("Sahara", [[(298, 234),(307, 237),(309, 243),(315, 243),(319, 236),(335, 243),(345, 245),(345, 251),(350, 266),(355, 281),(358, 299),(322, 299),(238, 299),(243, 286),(240, 272),(247, 268),(245, 261),(256, 250),(258, 238),(267, 228),(298, 223)]]
+                               , troops = 2
+                               , oil = 1
+                               , nuclear = 1)
+countries[7] = Country("IJsland", [[(280, 103), (271, 103), (260, 103), (262, 112), (270, 113), (281, 108)]]
+                                , troops = 1
+                                , wood = 2
+                                , oil = 1)
+countries[8] = Country("Viking", [[(331, 119),(339, 109),(337, 94),(335, 80),(340, 70),(336, 69),(338, 64),(334, 62),(323, 63),(304, 81),(299, 97),(287, 113),(288, 126),(294, 130),(298, 125),(303, 138),(301, 144),(306, 143),(309, 137),(314, 121),(312, 110),(321, 94),(326, 93),(326, 99),(321, 107),(320, 120)]]
+                               , food = 2
+                               , wood = 1
+                               , oil = 1)
+countries[9] = Country("Sovjet-Rusland", [[(344, 181),(345, 188),(352, 187),(350, 182),(359, 179),(356, 186),(356, 191),(361, 191),(364, 200),(378, 210),(381, 205),(376, 200),(375, 186),(370, 164),(377, 155),(402, 155),(406, 153),(407, 149),(406, 142),(404, 123),(402, 95),(408, 86),(410, 76),(398, 71),(399, 77),
+                                          (389, 77),(371, 87),(370, 80),(365, 80),(367, 90),(360, 101),(350, 100),(352, 95),(344, 90),(344, 86),(348, 88),(360, 86),(359, 79),(344, 67),(340, 70),(335, 80),(337, 94),(339, 109),(331, 119),(336, 124),(348, 127),(358, 138),(359, 158),(355, 172),(332, 182),(337, 187)]]
+                                       , troops = 3
+                                       , wood = 1
+                                       , oil = 1)
+countries[10] = Country("Belarus", [[(322, 133),(326, 135),(325, 126),(336, 124),(348, 127),(358, 138),(359, 158),(355, 172),(332, 182),(319, 175),(323, 160),(320, 147)]]
+                                     , food = 4
+                                     , wood = 1)
+countries[11] = Country("Nazi-Duitsland", [[(274, 179),(270, 175),(282, 169),(291, 153),(295, 149),(293, 138),(297, 133),(299, 139),(298, 147),(307, 149),(320, 147),(323, 160),(319, 175),(306, 174),(300, 177),(293, 177),(290, 185),(277, 189)]]
+                                        , food = 1
+                                        , troops = 1
+                                        , steel = 2)
+countries[12] = Country("Romeinse Rijk", [[(334, 196),(330, 200),(329, 208),(325, 208),(327, 216),(323, 223),(318, 203),(306, 187),(305, 195),(313, 202),(318, 211),(313, 209),(315, 215),(310, 219),(310, 211),(297, 191),(291, 196),(290, 185),(293, 177),(300, 177),(306, 174),(319, 175),(332, 182),(337, 187)]]
+                                , food = 4)
+countries[13] = Country("Spanje", [[(280, 203),(281, 216),(268, 224),(259, 222),(258, 197),(261, 194),(271, 194),(277, 189),(290, 185),(291, 196),(284, 197)]]
+                                        , food = 2
+                                        , troops = 1
+                                        , units = 1)
+countries[14] = Country("Londen", [[(271, 131),(270, 143),(273, 141),(274, 153),(270, 153),(269, 161),(273, 161),(265, 168),(266, 170),(282, 164),(285, 157),(281, 157),(283, 154),(279, 146),(277, 140),(281, 135),(278, 133),(275, 134),(278, 127)],[(262, 145),(260, 156),(259, 163),(267, 158),(267, 152),(270, 148),(267, 144)]]
+                                , food = 2
+                                , wood = 1
+                                , units = 1)
+countries[15] = Country("Siberië", [[(410, 137),(410, 104),(408, 99),(409, 93),(414, 87),(413, 77),(415, 68),(423, 74),(419, 80),(424, 86),(424, 96),(418, 101),(427, 98),(428, 90),(431, 95),(435, 92),(431, 86),(427, 85),(425, 77),(427, 73),(433, 79),(436, 80),(441, 82),(439, 72),(435, 68),(439, 65),(441, 67),(457, 56),
+                                     (467, 56),(467, 52),(473, 49),(479, 56),(488, 54),(489, 60),(475, 70),(488, 66),(508, 68),(507, 64),(520, 65),(519, 70),(526, 73),(539, 71),(535, 66),(567, 72),(572, 75),(576, 75),(578, 78),(596, 79),(593, 74),(613, 78),(623, 87),(631, 90),(628, 95),(627, 98),(622, 98),(622, 94),(614, 89),(613, 95),(607, 96),(614, 103),
+                                     (612, 106),(609, 104),(600, 114),(593, 112),(586, 120),(589, 126),(588, 134),(585, 133),(585, 145),(581, 146),(577, 140),(575, 126),(587, 112),(588, 108),(591, 105),(585, 105),(581, 113),(579, 108),(573, 109),(573, 119),(568, 120),(563, 117),(549, 118),(539, 133),(546, 137),(547, 134),(552, 140),(554, 151),(553, 164),
+                                     (540, 157),(522, 165),(519, 156),(489, 149),(459, 149),(435, 155),(426, 143),(413, 140)]]
+                                 , food = 1
+                                 , steel = 1
+                                 , oil = 1
+                                 , units = 1)
+countries[16] = Country("Kazachstan", [[(392, 219),(400, 217),(405, 227),(422, 218),(441, 221),(432, 215),(429, 198),(437, 194),(449, 173),(435, 155),(426, 143),(413, 140),(414, 154),(406, 161),(389, 160),(380, 162),(376, 170),(379, 175),(379, 183),(382, 180),(388, 181),(388, 188),(385, 186),(384, 194),(387, 196),(388, 202),(390, 197),
+                                      (391, 203),(389, 205),(388, 211),(391, 213)]]
+                                    , food = 1
+                                    , troops = 1
+                                    , oil = 1
+                                    , nuclear = 1)
+countries[17] = Country("China", [[(518, 197),(513, 182),(504, 190),(460, 179),(449, 173),(437, 194),(429, 198),(432, 215),(441, 221),(441, 235),(462, 250),(471, 247),(477, 237),(481, 241),(485, 241),(484, 254),(489, 254),(495, 246),(499, 252),(507, 251),(509, 253),(520, 244),(526, 236),(530, 221),(523, 208),(530, 203),(521, 204)]]
+                               , food = 8
+                               , units = 3)
+countries[18] = Country("Mongolië", [[(522, 165),(519, 156),(489, 149),(459, 149),(435, 155),     (449, 173),(460, 179),(504, 190),(513, 182)]]
+                                  , food = 1
+                                  , troops = 1
+                                  , steel = 1
+                                  , units = 1)
+countries[19] = Country("Noord-Korea", [[(553, 164),(540, 157),(522, 165),(513, 182),(518, 197),(526, 190),(528, 196),(533, 194),(539, 206),(546, 200),(537, 189),(545, 179)]]
+                                     , troops = 2
+                                     , units = 1)
+countries[20] = Country("Maleisië", [[(472, 267),(478, 257),(481, 241),(485, 241),(484, 254),(489, 254),(495, 246),(499, 252),(495, 262),(501, 269),(501, 280),(493, 289),(491, 282),(484, 276),(481, 284),(483, 290),(490, 296),(490, 308),(483, 303),(482, 295),(478, 290),(478, 275)]]
+                                  , food = 1
+                                  , wood = 2
+                                  , units = 1)
+countries[21] = Country("Sri Lanka", [[(442, 320), (442, 328), (450, 327), (450, 319), (445, 314)]]
+                                   , food = 1
+                                   , troops = 1
+                                   , wood = 2)
+countries[22] = Country("India", [[(408, 262),(407, 245),(405, 227),(422, 218),(441, 221),(441, 235),(462, 250),(471, 247),(477, 237),(481, 241),(478, 257),(472, 267),(458, 271),(451, 284),(446, 302),(441, 313),(440, 319),(435, 315),(430, 297),(428, 274),(416, 262)]]
+                               , food = 1
+                               , troops = 1
+                               , wood = 1
+                               , units = 1)
+countries[23] = Country("Ottomaanse Rijk", [[(401, 263),(399, 258),(393, 261),(386, 256),(383, 246),(376, 249),(365, 242),(353, 240),(351, 223),(332, 224),(330, 216),(330, 210),(335, 199),(337, 203),(343, 200),(354, 200),(354, 204),(360, 204),(364, 205),(370, 213),(374, 216),(378, 215),(379, 220),(386, 221),(392, 219),
+                                             (400, 217),(405, 227),(407, 245),(408, 262)]]
+                                         , food = 2
+                                         , troops = 1
+                                         , oil = 1)
+countries[24] = Country("Arabië", [[(353, 240),(365, 242),(376, 249),(384, 263),(387, 261),(386, 266),(387, 269),(397, 263),(403, 274),(398, 286),(395, 285),(394, 292),(369, 306),(362, 284),(357, 277),(357, 270),(348, 243)]]
+                                , oil = 5)
+countries[25] = Country("Japan", [[(563, 187),(561, 193),(554, 197),(549, 205),(559, 199),(568, 198),(568, 189),(566, 176)],[(546, 209), (548, 217), (552, 213), (551, 208)],[(555, 208), (560, 202), (553, 206)],[(561, 173), (568, 174), (571, 170), (566, 166)],[(566, 152), (561, 146), (556, 135), (556, 148), (562, 165)],
+                                  [(539, 271), (552, 280), (552, 274), (545, 267), (548, 262), (542, 255)],[(542, 277), (544, 289), (547, 280)]]
+                               , food = 1
+                               , wood = 1
+                               , steel = 1
+                               , units = 1)
+countries[26] = Country("Nederlands-Indië", [[(521, 345), (529, 341), (514, 341)],[(471, 309),(481, 332),(490, 343),(508, 345),(511, 340),(495, 337),(480, 313)],
+                                             [(505, 313),(513, 302),(517, 306),(514, 319),(507, 331),(497, 329),(497, 318)],[(520, 322), (520, 331), (512, 334), (518, 318), (529, 317)]]
+                                          , food = 1
+                                          , wood = 2
+                                          , steel = 1)
+countries[27] = Country("Outback", [[(534, 367),(537, 361),(528, 358),(519, 364),(520, 367),(516, 368),(515, 364),(508, 368),(503, 376),(487, 384),(487, 388),(483, 386),(484, 399),(481, 398),(486, 418),(484, 421),(489, 426),(504, 418),(509, 421),(513, 414),(521, 415),(523, 411),(530, 413),(533, 420),(537, 418),(540, 414),(540, 424),(549, 421),(556, 405),(552, 392),(545, 382),(546, 372)]]
+                                 , food = 1
+                                 , steel = 3
+                                 , nuclear = 1)
+countries[28] = Country("Gold Coast", [[(546, 372),(545, 382),(552, 392),(556, 405),(549, 421),(540, 424),(543, 431),(553, 434),(567, 429),(570, 420),(575, 413),(577, 405),(576, 394),(568, 388),(563, 379),(558, 377),(557, 366),(553, 366),(549, 357)],[(604, 399), (603, 411), (594, 423), (592, 428), (582, 419), (600, 395)],
+                                       [(606, 394),(607, 401),(615, 393),(614, 385),(608, 387),(601, 376),(603, 386),(601, 391)],[(549, 439), (552, 447), (556, 446), (558, 438)]]
+                                    , food = 1
+                                    , troops = 1
+                                    , steel = 2)
+countries[29] = Country("Papoea Nieuw Guinea", [[(573, 329),(565, 325),(562, 331),(558, 328),(560, 324),(557, 322),(553, 325),(553, 333),(561, 335),(563, 340),(570, 346),(573, 341),(587, 350),(580, 340),(581, 337)]]
+                                             , food = 1
+                                             , troops = 1
+                                             , wood = 1
+                                             , steel = 1)
+countries[30] = Country("Argentinië", [[(140, 435),(147, 453),(158, 462),(171, 464),(159, 453),(158, 444),(163, 417),(167, 418),(168, 410),(177, 410),(179, 404),(175, 396),(184, 397),(196, 381),(181, 380),(173, 374),(164, 362),(152, 358),(145, 352)]]
+                                    , food = 1
+                                    , steel = 2
+                                    , units = 1)
+countries[31] = Country("Venezuela", [[(160, 262),(155, 263),(149, 261),(147, 263),(145, 267),(143, 263),(144, 259),(131, 263),(129, 267),(126, 268),(127, 271),(124, 272),(123, 266),(119, 274),(121, 282),(118, 295),(127, 296),(136, 303),(144, 293),(157, 285),(175, 291),(194, 284),(180, 278),(175, 277),(174, 273),(168, 273),(166, 265)]]
+                                   , troops = 1
+                                   , steel = 3
+                                   , nuclear = 1)
+countries[32] = Country("Brazilië", [[(196, 372),(204, 364),(213, 362),(221, 351),(222, 330),(229, 325),(233, 311),(203, 297),(198, 300),(192, 300),(195, 292),(194, 284),(175, 291),(157, 285),(144, 293),(136, 303),(134, 311),(129, 316),(136, 325),(141, 321),(144, 329),(152, 323),(166, 334),(176, 351),(174, 358),(182, 363),(173, 374),(181, 380),(196, 381)]]
+                              , steel = 1
+                              , wood = 3)
+countries[33] = Country("Peru", [[(117, 308),(113, 303),(118, 295),(127, 296),(136, 303),(134, 311),(129, 316),(136, 325),(141, 321),(144, 329),(152, 323),(166, 334),(176, 351),(174, 358),(182, 363),(173, 374),(164, 362),(152, 358),(145, 352),(136, 348),(129, 343),(124, 333),(114, 315)]]
+                                  , steel = 3
+                                  , food = 1
+                                  , troops = 1)
+countries[34] = Country("Alaska", [[(43, 70),(39, 66),(31, 69),(20, 76),(24, 83),(27, 83),(25, 87),(19, 83),(15, 91),(25, 92),(21, 98),(12, 98),(11, 107),(16, 109),(16, 115),(25, 115),(22, 120),(12, 126),(25, 122),(41, 106),(44, 106),(39, 112),(48, 110),(47, 105),(61, 115),(69, 118),(74, 131),(78, 131),(77, 122),(68, 109),(65, 75)]]
+                                , food = 1
+                                , troops = 1
+                                , steel = 1
+                                , oil = 1)
+countries[35] = Country("New York", [[(191, 163),(193, 158),(200, 158),(199, 166),(189, 172),(189, 176),(184, 177),(176, 184),(178, 189),(174, 190),(165, 197),(163, 205),(164, 214),(161, 219),(158, 218),(158, 204),(156, 204),(154, 206),(151, 203),(153, 192),(158, 182),(164, 174),(179, 167),(178, 164)]]
+                                  , food = 4)
+countries[36] = Country("Californië", [[(89, 156),(85, 156),(83, 170),(85, 183),(90, 198),(98, 198),(103, 203),(112, 201),(112, 187),(110, 169),(111, 150),(86, 150)]]
+                                    , food = 2
+                                    , troops = 1
+                                    , wood = 1)
+countries[37] = Country("Canada", [[(81, 77),(107, 74),(120, 80),(118, 82),(130, 84),(132, 80),(138, 80),(140, 82),(149, 81),(147, 76),(152, 76),(153, 80),(156, 79),(155, 74),(158, 64),(168, 57),(170, 61),(163, 65),(161, 70),(163, 76),(171, 84),(174, 80),(180, 80),(180, 88),(176, 91),(169, 91),(166, 95),(161, 92),(164, 97),(151, 107),(149, 115),(152, 124),(164, 132),(171, 132),(170, 139),
+                                    (174, 144),(178, 140),(177, 133),(180, 132),(185, 127),(183, 119),(185, 117),(188, 107),(197, 107),(202, 114),(200, 116),(204, 121),(210, 117),(211, 113),(214, 112),(214, 121),(219, 132),(224, 137),(225, 142),(214, 148),(202, 149),(195, 153),(207, 153),(206, 160),(208, 162),(212, 160),(212, 163),(205, 167),(203, 171),(198, 171),(204, 165),(199, 166),
+                                    (200, 158),(193, 158),(191, 163),(178, 164),(166, 170),(167, 163),(170, 165),(170, 160),(164, 158),(163, 153),(159, 150),(151, 152),(111, 150),(86, 150),(78, 131),(77, 122),(68, 109),(65, 75)],
+                                    [(123, 80),(119, 74),(113, 74),(112, 69),(120, 68),(116, 62),(121, 59),(135, 67),(140, 61),(144, 74)],[(146, 65), (148, 69), (156, 64), (153, 60)],[(140, 55), (140, 49), (128, 52), (125, 47), (116, 49), (124, 56)],[(100, 63), (116, 57), (112, 54)],[(146, 49), (145, 53), (151, 54), (155, 51), (154, 47)],
+                                    [(155, 40), (164, 53), (178, 55), (180, 50), (167, 50), (155, 35)],[(166, 22),(191, 25),(169, 27),(169, 31),(173, 31),(174, 38),(163, 40),(183, 46),(190, 39),(217, 23),(219, 18),(196, 15),(172, 16)],
+                                    [(170, 68),(175, 76),(189, 78),(196, 91),(185, 96),(194, 98),(203, 105),(207, 103),(206, 90),(212, 95),(206, 85),(200, 72),(188, 69),(186, 62),(180, 70),(176, 69),(179, 62)],[(165, 106), (171, 102), (176, 104), (170, 96)],[(215, 155), (227, 158), (226, 146)]]
+                                , wood = 2
+                                , oil = 1
+                                , nuclear = 1)
+countries[38] = Country("Mexico", [[(94, 206),(98, 211),(98, 213),(96, 214),(98, 217),(101, 218),(102, 222),(105, 221),(98, 206),(101, 205),(108, 221),(104, 225),(105, 228),(109, 227),(112, 231),(118, 234),(126, 241),(127, 253),(131, 259),(135, 257),(131, 253),(139, 245),(139, 242),(135, 241),(143, 233),(138, 229),(135, 232),(127, 231),(123, 225),(124, 212),(120, 207),(117, 207),(112, 201),
+                                    (103, 203),(98, 198),(90, 198)]]
+                                , food = 1
+                                , troops = 1
+                                , wood = 1
+                                , units = 1)
+countries[39] = Country("Groenland", [[(189, 49),(192, 56),(205, 55),(221, 75),(223, 89),(217, 97),(219, 114),(233, 127),(244, 100),(254, 100),(278, 87),(279, 77),(284, 85),(287, 82),(283, 70),(290, 71),(291, 45),(304, 31),(277, 32),(291, 26),(261, 14),(254, 14),(247, 20),(234, 27),(217, 29),(201, 38)]]
+                                   , food = 2
+                                   , oil = 1
+                                   , units = 1)
+countries[40] = Country("Cuba", [[(169, 226),(173, 226),(179, 229),(186, 231),(190, 237),(185, 235),(174, 235),(174, 230),(169, 230),(167, 226),(162, 227),(158, 223),(168, 221)]]
+                              , food = 2
+                              , troops = 1
+                              , wood = 1)
+countries[41] = Country("Pearl Harbor", [[(30, 225),(36, 224),(39, 220),(42, 221),(43, 224),(47, 220),(43, 218),(43, 215),(35, 212)]]
+                                      , troops = 2
+                                      , units = 1)
+
+connections = []
+connections += [Connection((30,32),'land')]
+connections += [Connection((30,33),'land')]
+connections += [Connection((32,33),'land')]
+connections += [Connection((32,31),'land')]
+connections += [Connection((33,31),'land')]
+connections += [Connection((32,5),'sea')]
+connections += [Connection((5,3),'land')]
+connections += [Connection((3,4),'land')]
+connections += [Connection((4,5),'land')]
+connections += [Connection((5,2),'land')]
+connections += [Connection((2,1),'sea')]
+connections += [Connection((2,3),'land')]
+connections += [Connection((1,21),'sea')]
+connections += [Connection((1,4),'sea')]
+connections += [Connection((4,24),'sea')]
+connections += [Connection((4,6),'land')]
+connections += [Connection((24,6),'land')]
+connections += [Connection((24,22),'sea')]
+connections += [Connection((21,22),'sea')]
+connections += [Connection((22,16),'land')]
+connections += [Connection((16,23),'land')]
+connections += [Connection((24,23),'land')]
+connections += [Connection((23,6),'sea')]
+connections += [Connection((5,13),'sea')]
+connections += [Connection((6,13),'sea')]
+connections += [Connection((6,12),'sea')]
+connections += [Connection((11,13),'land')]
+connections += [Connection((11,12),'land')]
+connections += [Connection((10,12),'land')]
+connections += [Connection((13,14),'sea')]
+connections += [Connection((11,14),'sea')]
+connections += [Connection((14,8),'sea')]
+connections += [Connection((11,8),'sea')]
+connections += [Connection((8,7),'sea')]
+connections += [Connection((14,7),'sea')]
+connections += [Connection((12,23),'land')]
+connections += [Connection((11,10),'land')]
+connections += [Connection((23,10),'land')]
+connections += [Connection((16,18),'land')]
+connections += [Connection((16,9),'land')]
+connections += [Connection((18,9),'land')]
+connections += [Connection((9,15),'land')]
+connections += [Connection((18,17),'land')]
+connections += [Connection((22,17),'land')]
+connections += [Connection((17,19),'land')]
+connections += [Connection((17,25),'sea')]
+connections += [Connection((19,25),'sea')]
+connections += [Connection((25,15),'sea')]
+connections += [Connection((17,20),'land')]
+connections += [Connection((20,22),'sea')]
+connections += [Connection((20,26),'sea')]
+connections += [Connection((26,27),'sea')]
+connections += [Connection((27,28),'land')]
+connections += [Connection((29,28),'sea')]
+connections += [Connection((29,25),'sea')]
+connections += [Connection((34,15),'sea')]
+connections += [Connection((34,37),'land')]
+connections += [Connection((36,34),'sea')]
+connections += [Connection((36,41),'sea')]
+connections += [Connection((25,41),'sea')]
+connections += [Connection((36,0),'land')]
+connections += [Connection((37,39),'sea')]
+connections += [Connection((0,37),'land')]
+connections += [Connection((35,0),'land')]
+connections += [Connection((37,35),'sea')]
+connections += [Connection((35,14),'sea')]
+connections += [Connection((7,39),'sea')]
+connections += [Connection((35,40),'sea')]
+connections += [Connection((40,31),'sea')]
+connections += [Connection((36,38),'land')]
+connections += [Connection((36,37),'land')]
+connections += [Connection((0,38),'land')]
+connections += [Connection((38,31),'land')]
+connections += [Connection((8,9),'sea')]
+connections += [Connection((9,10),'land')]
+
+pg.init()
+
+pg.font.init()
+myfont = pg.font.SysFont('Times New Roman', 20)
+
+WIDTH = 960
+HEIGHT = 640
+
+zoom = 1.21
+xoffset = -401
+yoffset = -240
+mouse_position = (0, 0)
+mouse_state = (0, 0, 0)
+
+screen = pg.display.set_mode([WIDTH, HEIGHT])
+
+#–––––––––––––––––––––––––– change the directories depending on user ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+
+spr_nuclear = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/nuclear.png")
+spr_nuclear.convert()
+spr_food = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/food.png")
+spr_food.convert()
+spr_troops = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/troops.png")
+spr_troops.convert()
+spr_wood = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/wood.png")
+spr_wood.convert()
+spr_oil = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/oil.png")
+spr_oil.convert()
+spr_steel = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/steel.png")
+spr_steel.convert()
+spr_nuclear = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/nuclear.png")
+spr_nuclear.convert()
+spr_shop = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/shop.png")
+spr_shop.convert()
+spr_cards = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/cards.png")
+spr_cards.convert()
+spr_card0 = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/card0.png")
+spr_card0.convert()
+spr_card1 = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/card1.png")
+spr_card1.convert()
+spr_card2 = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/card2.png")
+spr_card2.convert()
+spr_bridge = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/bridge.png")
+spr_bridge.convert()
+spr_ship = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/ship.png")
+spr_ship.convert()
+spr_plane = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/plane.png")
+spr_plane.convert()
+spr_tank = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/tank.png")
+spr_tank.convert()
+spr_rails = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/rails.png")
+spr_rails.convert()
+spr_fort = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/fort.png")
+spr_fort.convert()
+spr_nuke = pg.image.load("/Users/hugo.nootebos019/Desktop/oil_app/oil_images/nuke.png")
+spr_nuke.convert()
+
+#–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+
+#colour settings
+card_background = (240,240,240)
+card_selected = (200,200,200)
+red_button = (245,150,150)
+green_button = (150,245,150)
+
+
+
+running = True
+
+players = []
+reinforcements = 0
+all_reinforcements_deployed = True
+checked = False
+attacked = []
+turn_num = 0
+card_limit = 0
+defaultTrue = input("Play default? ")
+if defaultTrue == "yes" or defaultTrue == "y" or defaultTrue == "Y" or defaultTrue == "YES":
+    player_num = 3
+    players = [Player("Hugo"), Player("Joeri"), Player("Tètè")]
+else:
+    player_num = int(input("How many players? "))
+    for i in range(player_num):
+        players += [Player(input("Player " + str(i + 1) + "'s name? "))]
+
+turn = np.random.randint(player_num)
+
+i = 0
+for country in np.random.choice(countries, player_num, replace = False):
+    country.owner = players[i]
+    country.units = 15
+    i += 1
+
+while running:
+    screen.fill((200, 200, 255))
+    for event in pg.event.get():
+        if event.type == pg.QUIT:
+            running = False
+        if event.type == pg.MOUSEBUTTONDOWN and event.button == 5:
+            zoom /= 1.1
+        if event.type == pg.MOUSEBUTTONDOWN and event.button == 4:
+            zoom *= 1.1
+            
+    previous_mouse_state = mouse_state
+    mouse_state = pg.mouse.get_pressed()
+    left_pressed = not previous_mouse_state[0] and mouse_state[0]
+    previous_mouse_position = mouse_position
+    mouse_position = pg.mouse.get_pos()
+    transformed_mouse_position = screen_to_coordinates(mouse_position, zoom, xoffset, yoffset)
+    transformed_previous_mouse_position = screen_to_coordinates(previous_mouse_position, zoom, xoffset, yoffset)
+    
+    if mouse_state[1]:
+        xoffset += transformed_mouse_position[0] - transformed_previous_mouse_position[0]
+        yoffset += transformed_mouse_position[1] - transformed_previous_mouse_position[1]
+    
+    hover_country = -1
+    for i in range(42):
+        for p in countries[i].polygon:
+            transformed_coordinates = [transform_coordinates(v, zoom, xoffset, yoffset) for v in p]
+            if players[turn].attack == 1 and players[turn].subattack == 1:
+                if not countries[i].owner == players[turn] and np.any([attack_from in connection and i in connection for connection in connections]):
+                    pg.draw.polygon(screen, np.clip(countries[i].owner.color + np.array([50, 50, 50]), 0, 255), transformed_coordinates)
+                else:
+                    pg.draw.polygon(screen, np.clip(countries[i].owner.color - np.array([50, 50, 50]), 0, 255), transformed_coordinates)
+            elif players[turn].attack == 1 and players[turn].subattack > 1:
+                if countries[i] == countries[attack_from] or countries[i] == countries[defence_country]:
+                    pg.draw.polygon(screen, np.clip(countries[i].owner.color + np.array([50, 50, 50]), 0, 255), transformed_coordinates)
+                else:
+                    pg.draw.polygon(screen, np.clip(countries[i].owner.color - np.array([50, 50, 50]), 0, 255), transformed_coordinates)
+            elif players[turn].attack == 2 and players[turn].subattack == 1:
+                if countries[i].owner == players[turn]:# and countries[i] in finished_list:           #does not work yet, always takes else
+                    pg.draw.polygon(screen, np.clip(countries[i].owner.color + np.array([50, 50, 50]), 0, 255), transformed_coordinates)
+                else:
+                    pg.draw.polygon(screen, np.clip(countries[i].owner.color - np.array([50, 50, 50]), 0, 255), transformed_coordinates)
+            else:
+                pg.draw.polygon(screen, countries[i].owner.color, transformed_coordinates)
+            pg.draw.polygon(screen, (0,0,0), transformed_coordinates, 2)
+            if pth.Path(p).contains_point(transformed_mouse_position):
+                hover_country = i
+        
+    for connection in connections:
+        if connection.connection == (34, 15):
+            pg.draw.line(screen, (0, 0, 0), transform_coordinates(countries[34].mass_center, zoom, xoffset, yoffset), transform_coordinates((0, countries[34].mass_center[1]), zoom, xoffset, yoffset), 5)
+            pg.draw.line(screen, (0, 0, 0), transform_coordinates(countries[15].mass_center, zoom, xoffset, yoffset), transform_coordinates((640, countries[15].mass_center[1]), zoom, xoffset, yoffset), 5)
+            pg.draw.line(screen, (0, 150, 235), transform_coordinates(countries[34].mass_center, zoom, xoffset, yoffset), transform_coordinates((0, countries[34].mass_center[1]), zoom, xoffset, yoffset), 3)
+            pg.draw.line(screen, (0, 150, 235), transform_coordinates(countries[15].mass_center, zoom, xoffset, yoffset), transform_coordinates((640, countries[15].mass_center[1]), zoom, xoffset, yoffset), 3)
+        else:
+            if connection.connection == (25, 41):
+                pg.draw.line(screen, (0, 0, 0), transform_coordinates(countries[41].mass_center, zoom, xoffset, yoffset), transform_coordinates((0, countries[41].mass_center[1]), zoom, xoffset, yoffset), 5)
+                pg.draw.line(screen, (0, 0, 0), transform_coordinates(countries[25].mass_center, zoom, xoffset, yoffset), transform_coordinates((640, countries[25].mass_center[1]), zoom, xoffset, yoffset), 5)
+                pg.draw.line(screen, (0, 150, 235), transform_coordinates(countries[41].mass_center, zoom, xoffset, yoffset), transform_coordinates((0, countries[41].mass_center[1]), zoom, xoffset, yoffset), 3)
+                pg.draw.line(screen, (0, 150, 235), transform_coordinates(countries[25].mass_center, zoom, xoffset, yoffset), transform_coordinates((640, countries[25].mass_center[1]), zoom, xoffset, yoffset), 3)
+            else:
+                pg.draw.line(screen, (0, 0, 0) , transform_coordinates(countries[connection.connection[0]].mass_center, zoom, xoffset, yoffset), transform_coordinates(countries[connection.connection[1]].mass_center, zoom, xoffset, yoffset), 5)
+                pg.draw.line(screen, (0, 155, 0) if connection.kind == 'land' else (0, 150, 235), transform_coordinates(countries[connection.connection[0]].mass_center, zoom, xoffset, yoffset), transform_coordinates(countries[connection.connection[1]].mass_center, zoom, xoffset, yoffset), 3)
+        
+    for country in countries:
+        pos = transform_coordinates(country.mass_center, zoom, xoffset, yoffset)
+        pg.draw.circle(screen, (0,0,0), pos, 14, 1)
+        pg.draw.circle(screen, (255, 255, 255), pos, 12)
+        screen.blit(myfont.render(str(country.units), False, (0, 0, 0)), (pos[0] - 9, pos[1] - 10))
+        if country.ships > 0:
+            screen.blit(spr_ship, (pos[0] - 19, pos[1] - 20))
+        if country.tanks > 0:
+            screen.blit(spr_tank, (pos[0] - 14, pos[1] - 10))
+        if country.planes > 0:
+            screen.blit(spr_plane, (pos[0] - 9, pos[1]))
+        if country.fort_lvl > 0:
+            screen.blit(spr_fort, (pos[0] - 4, pos[1] + 10))
+        if country.radioactive > 0:
+            screen.blit(spr_nuclear, (pos[0] + 1, pos[1] + 20))
+        
+    pg.draw.rect(screen, (200, 200, 200), pg.Rect(WIDTH  - 210, 0, 210, HEIGHT - 400))
+    pg.draw.rect(screen, (150, 150, 150), pg.Rect(WIDTH  - 210, HEIGHT - 400, 210, HEIGHT))
+    
+    if not hover_country == -1:
+        txt = myfont.render(countries[hover_country].name, False, (0, 0, 0))
+        screen.blit(txt, (WIDTH - 200, 0))
+        pos = -20
+        for i in range(countries[hover_country].food):
+            if i % 4 == 0:
+                pos += 50
+            screen.blit(spr_food, (WIDTH - 200 + (i % 4)*50, pos))
+        for i in range(countries[hover_country].troops):
+            if i % 4 == 0:
+                pos += 50
+            screen.blit(spr_troops, (WIDTH - 200 + (i % 4)*50, pos))
+        for i in range(countries[hover_country].wood):
+            if i % 4 == 0:
+                pos += 50
+            screen.blit(spr_wood, (WIDTH - 200 + (i % 4)*50, pos))
+        for i in range(countries[hover_country].steel):
+            if i % 4 == 0:
+                pos += 50
+            screen.blit(spr_steel, (WIDTH - 200 + (i % 4)*50, pos))
+        for i in range(countries[hover_country].oil):
+            if i % 4 == 0:
+                pos += 50
+            screen.blit(spr_oil, (WIDTH - 200 + (i % 4)*50, pos))
+        for i in range(countries[hover_country].nuclear):
+            if i % 4 == 0:
+                pos += 50
+            screen.blit(spr_nuclear, (WIDTH - 200 + (i % 4)*50, pos))
+            
+    pg.draw.rect(screen, players[turn].color, pg.Rect(WIDTH - 210, HEIGHT - 400, 210, 20))
+    screen.blit(myfont.render(players[turn].name, False, (0, 0, 0)), (WIDTH - 200, HEIGHT - 400))
+    screen.blit(spr_troops, (WIDTH - 200, HEIGHT - 370))
+    screen.blit(myfont.render("X " + str(players[turn].troops), False, (0, 0, 0)), (WIDTH - 150, HEIGHT - 360))
+    screen.blit(spr_food, (WIDTH - 200, HEIGHT - 320))
+    screen.blit(myfont.render("X " + str(players[turn].food), False, (0, 0, 0)), (WIDTH - 150, HEIGHT - 310))
+    screen.blit(spr_wood, (WIDTH - 200, HEIGHT - 270))
+    screen.blit(myfont.render("X " + str(players[turn].wood), False, (0, 0, 0)), (WIDTH - 150, HEIGHT - 260))
+    screen.blit(spr_steel, (WIDTH - 200, HEIGHT - 220))
+    screen.blit(myfont.render("X " + str(players[turn].steel), False, (0, 0, 0)), (WIDTH - 150, HEIGHT - 210))
+    screen.blit(spr_oil, (WIDTH - 200, HEIGHT - 170))
+    screen.blit(myfont.render("X " + str(players[turn].oil), False, (0, 0, 0)), (WIDTH - 150, HEIGHT - 160))
+    screen.blit(spr_nuclear, (WIDTH - 200, HEIGHT - 120))
+    screen.blit(myfont.render("X " + str(players[turn].nuclear), False, (0, 0, 0)), (WIDTH - 150, HEIGHT - 110))
+    pg.draw.rect(screen, (224, 224, 0), pg.Rect(WIDTH - 200, HEIGHT - 50, 60, 40))
+    pg.draw.rect(screen, (255, 80, 79), pg.Rect(WIDTH - 130, HEIGHT - 50, 60, 40))
+    pg.draw.rect(screen, (255, 165, 0), pg.Rect(WIDTH - 60, HEIGHT - 50, 60, 40))
+    pg.draw.rect(screen, (0, 0, 0), pg.Rect(WIDTH - 200 + 70*players[turn].attack, HEIGHT - 50, 60, 40), 2)
+
+    pg.draw.rect(screen, (170,230,170), pg.Rect(WIDTH - 950, HEIGHT - 630, 60, 60))
+    screen.blit(spr_shop, (WIDTH - 946, HEIGHT - 626))
+    
+    if players[turn].attack == 0:      #reinforcement phase
+        if players[turn].subattack == 0:
+            card_limit = 0
+            initial_units = []
+            for i in range(len(countries)):
+                initial_units += [countries[i].units]
+            units = 0
+            players[turn].troops = 0
+            new_food = 0
+            starved = 0
+            for i in range(len(countries)):
+                if countries[i].owner == players[turn]:
+                    units += countries[i].units
+                    if countries[i].radioactive == 0:
+                        players[turn].troops += countries[i].troops
+                        players[turn].food += countries[i].food
+                        new_food += countries[i].food
+                        players[turn].wood += countries[i].wood
+                        players[turn].steel += countries[i].steel
+                        players[turn].oil += countries[i].oil
+                        players[turn].nuclear += countries[i].nuclear
+                    else:
+                        countries[i].radioactive -= 1
+            players[turn].food -= units
+            if units == 0:
+                turn = (turn + 1) % player_num
+            elif players[turn].food - new_food < 0:
+                starved = -(players[turn].food - new_food)
+                players[turn].food = 0
+            reinforcements = int((players[turn].troops - players[turn].troops%3)/3 + 3) - starved   #rounding down
+            all_reinforcements_deployed = False
+            attacked = []
+            players[turn].subattack = 1
+        pg.draw.rect(screen, (230,170,170), pg.Rect(WIDTH - 880, HEIGHT - 630, 60, 60))
+        screen.blit(spr_cards, (WIDTH - 875, HEIGHT - 626))
+        pg.draw.rect(screen, (0,170,0), pg.Rect(WIDTH - 935, HEIGHT - 270, 50, 50))
+        screen.blit(myfont.render("+ "+str(reinforcements), False, (0, 0, 0)), (WIDTH - 920, HEIGHT - 200))
+        pg.draw.rect(screen, (170,0,0), pg.Rect(WIDTH - 935, HEIGHT - 160, 50, 50))
+        reward = 0
+        if left_pressed and mouse_position[0] >= WIDTH - 880 and mouse_position[0] <= WIDTH - 820 and mouse_position[1] >= HEIGHT - 630 and mouse_position[1] <= HEIGHT - 570:
+            attack = players[turn].attack
+            subattack = players[turn].subattack
+            players[turn].attack = 4
+            players[turn].subattack = 0
+        if players[turn].subattack == 1:    #adding units to countries
+            if players[turn].start_ship and not checked:
+                players[turn].attack = 6
+                players[turn].subattack = 0
+            pg.draw.rect(screen, (0,0,0), pg.Rect(25, HEIGHT - 270, 50, 50), 3)
+            pg.draw.rect(screen, (0,0,0), pg.Rect(25, HEIGHT - 160, 50, 50), 1)
+            if reinforcements <= 0:
+                all_reinforcements_deployed = True
+            if left_pressed and not hover_country == -1:
+                if countries[hover_country].owner == players[turn] and all_reinforcements_deployed == False:
+                    countries[hover_country].units += 1
+                    reinforcements -= 1
+            elif left_pressed and mouse_position[0] >= 25 and mouse_position[0] <= 75 and mouse_position[1] >= HEIGHT - 160 and mouse_position[1] <= HEIGHT - 110:
+                players[turn].subattack = 2
+        elif players[turn].subattack == 2:     #removing units from countries
+            pg.draw.rect(screen, (0,0,0), pg.Rect(25, HEIGHT - 270, 50, 50), 1)
+            pg.draw.rect(screen, (0,0,0), pg.Rect(25, HEIGHT - 160, 50, 50), 3)
+            if left_pressed and not hover_country == -1:
+                if countries[hover_country].owner == players[turn] and countries[hover_country].units > initial_units[hover_country]:
+                    countries[hover_country].units -= 1
+                    reinforcements += 1
+                    if all_reinforcements_deployed:
+                        all_reinforcements_deployed = False
+            elif left_pressed and mouse_position[0] >= 25 and mouse_position[0] <= 75 and mouse_position[1] >= HEIGHT - 270 and mouse_position[1] <= HEIGHT - 220:
+                players[turn].subattack = 1
+
+    elif players[turn].attack == 1:      #attack phase
+        if players[turn].subattack in [0,1,5]:
+            pg.draw.rect(screen, (230,170,170), pg.Rect(WIDTH - 880, HEIGHT - 630, 60, 60))
+            screen.blit(spr_cards, (WIDTH - 875, HEIGHT - 626))
+            if left_pressed and mouse_position[0] >= WIDTH - 880 and mouse_position[0] <= WIDTH - 820 and mouse_position[1] >= HEIGHT - 630 and mouse_position[1] <= HEIGHT - 570:
+                attack = players[turn].attack
+                subattack = players[turn].subattack
+                players[turn].attack = 4
+                players[turn].subattack = 0
+        if left_pressed and not hover_country == -1:
+            if players[turn].subattack == 0:
+                if countries[hover_country].owner == players[turn]:
+                    players[turn].subattack = 1
+                    attack_from = hover_country
+            elif players[turn].subattack == 1:
+                if hover_country == attack_from:
+                    players[turn].subattack = 0
+                if not countries[hover_country].owner == players[turn]:
+                    if np.any([attack_from in connection and hover_country in connection and connection.kind == "land" for connection in connections]):
+                        transport = [countries[attack_from].ships, countries[attack_from].planes]
+                        attack_dice = np.zeros(min(countries[attack_from].units, 3))
+                        defence_country = hover_country
+                        defence_dice = np.zeros(min(countries[defence_country].units, 2))
+                        players[turn].subattack = 2
+                    elif np.any([attack_from in connection and hover_country in connection and connection.kind == "sea" for connection in connections]):
+                        if countries[attack_from].ships > 0 or countries[attack_from].planes > 0:
+                            transport = [countries[attack_from].ships, countries[attack_from].planes]
+                            attack_dice = np.zeros(min(countries[attack_from].units, 3))
+                            defence_country = hover_country
+                            defence_dice = np.zeros(min(countries[defence_country].units, 2))
+                            players[turn].subattack = 2
+        if players[turn].subattack == 2:
+            if np.all(attack_dice):
+                players[turn].subattack = 0
+            pg.draw.rect(screen, (100,100,100), pg.Rect(25, HEIGHT - 50, 200, 40))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(25, HEIGHT - 50, 200, 40), 3)
+            for i in range(len(attack_dice)):
+                pg.draw.rect(screen, (255, 50, 50), pg.Rect(WIDTH*0.5 - 200 + 80*i, HEIGHT - 200 + 40*attack_dice[i], 70, 70))
+                pg.draw.rect(screen, (0, 0, 0), pg.Rect(WIDTH*0.5 - 200 + 80*i, HEIGHT - 200 + 40*attack_dice[i], 70, 70), 3)
+                if left_pressed and mouse_position[0] >= WIDTH*0.5 - 200 + 80*i and mouse_position[0] <= WIDTH*0.5 - 200 + 80*i + 70 and mouse_position[1] >= HEIGHT - 200 + 40*attack_dice[i] and mouse_position[1] <= HEIGHT - 200 + 40*attack_dice[i] + 70:
+                    attack_dice[i] = not attack_dice[i]
+            if mouse_position[0] >= 25 and mouse_position[0] <= 225 and mouse_position[1] >= HEIGHT - 50 and mouse_position[1] <= HEIGHT - 10 and left_pressed:       #cast dice button location, to be determined
+                for i in range(len(attack_dice)):
+                    attack_dice[i] = (not attack_dice[i])*np.random.randint(1,7)
+                players[turn].subattack = 3
+        elif players[turn].subattack == 3:
+            pg.draw.rect(screen, (100,100,100), pg.Rect(25, HEIGHT - 50, 200, 40))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(25, HEIGHT - 50, 200, 40), 3)
+            for i in range(len(attack_dice)):
+                if attack_dice[i] > 0:
+                    pg.draw.rect(screen, (255, 50, 50), pg.Rect(WIDTH*0.5 - 200 + 80*i, 20, 70, 70))
+                    pg.draw.rect(screen, (0, 0, 0), pg.Rect(WIDTH*0.5 - 200 + 80*i, 20, 70, 70), 3)
+                    show_die(attack_dice[i], int(WIDTH*0.5) - 200 + 80*i + 35, 20 + 35)
+            for i in range(len(defence_dice)):
+                pg.draw.rect(screen, (0, 100, 255), pg.Rect(WIDTH*0.5 - 200 + 80*i, HEIGHT - 200 + 40*defence_dice[i], 70, 70))
+                pg.draw.rect(screen, (0, 0, 0), pg.Rect(WIDTH*0.5 - 200 + 80*i, HEIGHT - 200 + 40*defence_dice[i], 70, 70), 3)
+                if countries[defence_country].owner != default_player and left_pressed and mouse_position[0] >= WIDTH*0.5 - 200 + 80*i and mouse_position[0] <= WIDTH*0.5 - 200 + 80*i + 70 and mouse_position[1] >= HEIGHT - 200 + 40*defence_dice[i] and mouse_position[1] <= HEIGHT - 200 + 40*defence_dice[i] + 70:
+                    defence_dice[i] = not defence_dice[i]
+            if countries[defence_country].owner == default_player or (mouse_position[0] >= 25 and mouse_position[0] <= 225 and mouse_position[1] >= HEIGHT - 50 and mouse_position[1] <= HEIGHT - 10 and left_pressed and sum(not d for d in defence_dice) != 0):       #cast dice button location, to be determined
+                for i in range(len(defence_dice)):
+                    defence_dice[i] = (not defence_dice[i])*np.random.randint(1,7)
+                players[turn].subattack = 4
+                timer = 0
+        elif players[turn].subattack == 4:
+            for i in range(len(attack_dice)):
+                if attack_dice[i] > 0:
+                    pg.draw.rect(screen, (255, 50, 50), pg.Rect(WIDTH*0.5 - 200 + 80*i, 20, 70, 70))
+                    pg.draw.rect(screen, (0, 0, 0), pg.Rect(WIDTH*0.5 - 200 + 80*i, 20, 70, 70), 3)
+                    show_die(attack_dice[i], int(WIDTH*0.5) - 200 + 80*i + 35, 20 + 35)
+            for i in range(len(defence_dice)):
+                if defence_dice[i] > 0:
+                    pg.draw.rect(screen, (0, 100, 255), pg.Rect(WIDTH*0.5 - 200 + 80*i, 100, 70, 70))
+                    pg.draw.rect(screen, (0, 0, 0), pg.Rect(WIDTH*0.5 - 200 + 80*i, 100, 70, 70), 3)
+                    show_die(defence_dice[i], int(WIDTH*0.5) - 200 + 80*i + 35, 100 + 35)
+            if left_pressed:
+                timer = 150
+            if timer == 150:
+                D = np.sort(defence_dice[defence_dice > 0]) + countries[defence_country].fort_lvl
+                A = np.sort(attack_dice[attack_dice > 0])
+                A[-1] += countries[attack_from].tanks   #still need a prompt for using tanks
+                if not defence_country in attacked:
+                    players[turn].oil -= countries[attack_from].tanks
+                attacked += [defence_country]
+                attack_loss = [A[-1-i] <= D[-1-i] for i in range(min(len(D), len(A)))]
+                countries[attack_from].units -= sum(attack_loss)
+                countries[defence_country].units -= sum(not a for a in attack_loss)
+                if countries[defence_country].units == 0:
+                    if countries[defence_country].owner != default_player and card_limit == 0:
+                        card_drawn = np.random.randint(0,42)
+                        for i in range(4):
+                            if card_drawn >= 13*i and card_drawn < 13 + 13*i:
+                                players[turn].cards += [i]
+                                card_limit += 1
+                                break
+                    if np.any([transport[i] > 0 for i in range(2)]):
+                        countries[defence_country].ships = countries[attack_from].ships   #would be better if this gave an option to leave ships/planes behind
+                        countries[defence_country].planes = countries[attack_from].planes
+                    if countries[defence_country].owner != default_player:
+                        elimination = True
+                        for i in range(len(countries)):
+                            if countries[i].owner == countries[defence_country].owner and i != defence_country:
+                                elimination = False
+                                break
+                        if elimination:
+                            players[turn].wood += countries[defence_country].owner.wood
+                            players[turn].steel += countries[defence_country].owner.steel
+                            players[turn].nuclear += countries[defence_country].owner.nuclear
+                            players[turn].oil += countries[defence_country].owner.oil
+                            players[turn].cards += countries[defence_country].owner.cards
+                            countries[defence_country].owner.wood = 0
+                            countries[defence_country].owner.steel = 0
+                            countries[defence_country].owner.nuclear = 0
+                            countries[defence_country].owner.oil = 0
+                            countries[defence_country].owner.cards = []
+                    countries[defence_country].fort_lvl = 0
+                    countries[defence_country].ships = countries[attack_from].ships
+                    countries[defence_country].planes = countries[attack_from].planes
+                    countries[defence_country].owner = players[turn]
+                    countries[defence_country].units += len(A)
+                    countries[attack_from].units -= len(A)
+                    players[turn].subattack = 5
+                else:
+                    players[turn].subattack = 1
+                    if countries[attack_from].units == 0:
+                        countries[attack_from].units = 2
+                        countries[attack_from].owner = default_player
+            timer += 1
+        elif players[turn].subattack == 5:
+            pg.draw.rect(screen, (100,100,100), pg.Rect(25, HEIGHT - 50, 200, 40))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(25, HEIGHT - 50, 200, 40), 3)
+            if left_pressed and not hover_country == -1:
+                total_units = countries[defence_country].units + countries[attack_from].units
+                if countries[hover_country] == countries[defence_country]:
+                    if countries[defence_country].units + 1 > total_units or countries[attack_from].units - 1 < 0:
+                        countries[defence_country].units = len(A)
+                        countries[attack_from].units = total_units - len(A)
+                    else:
+                        countries[defence_country].units += 1
+                        countries[attack_from].units -= 1
+                if countries[hover_country] == countries[attack_from]:
+                    if countries[defence_country].units - 1 < len(A) or countries[attack_from].units + 1 > total_units - len(A):
+                        countries[defence_country].units = total_units
+                        countries[attack_from].units = 0
+                    else:
+                        countries[defence_country].units -= 1
+                        countries[attack_from].units += 1
+            if mouse_position[0] >= 25 and mouse_position[0] <= 225 and mouse_position[1] >= HEIGHT - 50 and mouse_position[1] <= HEIGHT - 10 and left_pressed:
+                players[turn].subattack = 0
+                if countries[attack_from].units == 0:
+                    countries[attack_from].units = 2
+                    countries[attack_from].owner = default_player
+
+    elif players[turn].attack == 2:       #movement phase
+        if players[turn].subattack == 0:
+            pg.draw.rect(screen, (230,170,170), pg.Rect(WIDTH - 880, HEIGHT - 630, 60, 60))
+            screen.blit(spr_cards, (WIDTH - 875, HEIGHT - 626))
+            if left_pressed and not hover_country == -1 and countries[hover_country].owner == players[turn]:
+                origin_country = hover_country
+                finished_list = [origin_country]
+                while True:
+                    oldlen = len(finished_list)
+                    for country_ix in finished_list:
+                        finished_list = np.union1d(finished_list, [l for l in set(np.array([list(con.connection) for con in connections if country_ix in con]).flatten()) if countries[l].owner == players[turn]])
+                    if len(finished_list) == oldlen:
+                        break
+                players[turn].subattack = 1
+            elif left_pressed and mouse_position[0] >= WIDTH - 880 and mouse_position[0] <= WIDTH - 820 and mouse_position[1] >= HEIGHT - 630 and mouse_position[1] <= HEIGHT - 570:
+                attack = players[turn].attack
+                subattack = players[turn].subattack
+                players[turn].attack = 4
+                players[turn].subattack = 0
+        elif left_pressed and players[turn].subattack == 1:
+            if hover_country in finished_list and hover_country != origin_country:
+                target_country = hover_country
+                total_units = countries[origin_country].units + countries[target_country].units + 1
+                initial_origin = countries[origin_country].units
+                initial_target = countries[target_country].units
+                players[turn].subattack = 2
+            elif hover_country == origin_country:
+                players[turn].subattack = 0
+        elif players[turn].subattack == 2:
+            pg.draw.rect(screen, (170,0,0), pg.Rect(25, HEIGHT - 50, 100, 40))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(25, HEIGHT - 50, 100, 40), 3)
+            if left_pressed and countries[hover_country] == countries[origin_country]:
+                countries[origin_country].units = np.mod(countries[origin_country].units + 1, total_units)
+                countries[target_country].units = np.mod(countries[target_country].units - 1, total_units)
+            elif left_pressed and countries[hover_country] == countries[target_country]:
+                countries[origin_country].units = np.mod(countries[origin_country].units - 1, total_units)
+                countries[target_country].units = np.mod(countries[target_country].units + 1, total_units)
+            elif mouse_position[0] >= 25 and mouse_position[0] <= 125 and mouse_position[1] >= HEIGHT - 50 and mouse_position[1] <= HEIGHT - 10 and left_pressed:
+                players[turn].subattack = 0
+                countries[origin_country].units = initial_origin
+                countries[target_country].units = initial_target
+            elif mouse_position[0] >= WIDTH - 200 + 70*min(players[turn].attack + 1, 2) and mouse_position[0] <= WIDTH - 200 + 70*min(players[turn].attack + 1, 2) + 60 and mouse_position[1] >= HEIGHT - 50 and mouse_position[1] <= HEIGHT - 10 and left_pressed:
+                if countries[origin_country].units == 0:
+                    countries[origin_country].units = 2
+                    countries[origin_country].owner = default_player
+                elif countries[target_country].units == 0:
+                    countries[target_country].units = 2
+                    countries[target_country].owner = default_player
+    if left_pressed and not players[turn].attack == 3 and mouse_position[0] >= WIDTH - 950 and mouse_position[0] <= WIDTH - 890 and mouse_position[1] >= HEIGHT - 630 and mouse_position[1] <= HEIGHT - 570:
+        attack = players[turn].attack
+        subattack = players[turn].subattack
+        players[turn].attack = 3
+        players[turn].subattack = 0
+
+    if players[turn].attack == 3:       #shop
+        if attack == 0 or attack == 4:
+            pg.draw.rect(screen, (230,170,170), pg.Rect(WIDTH - 880, HEIGHT - 630, 60, 60))
+            screen.blit(spr_cards, (WIDTH - 875, HEIGHT - 626))
+            pg.draw.rect(screen, (0,170,0), pg.Rect(WIDTH - 935, HEIGHT - 270, 50, 50))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 935, HEIGHT - 270, 50, 50), 3)
+            screen.blit(myfont.render("+ "+str(reinforcements), False, (0, 0, 0)), (WIDTH - 920, HEIGHT - 200))
+            pg.draw.rect(screen, (170,0,0), pg.Rect(WIDTH - 935, HEIGHT - 160, 50, 50))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 935, HEIGHT - 160, 50, 50), 1)
+            if left_pressed and mouse_position[0] >= WIDTH - 880 and mouse_position[0] <= WIDTH - 820 and mouse_position[1] >= HEIGHT - 630 and mouse_position[1] <= HEIGHT - 570:
+                players[turn].attack = 4
+                players[turn].subattack = 0
+        if players[turn].subattack < 8:
+            if left_pressed and mouse_position[0] >= WIDTH - 300 and mouse_position[0] <= WIDTH - 270 and mouse_position[1] >= HEIGHT - 590 and mouse_position[1] <= HEIGHT - 560:
+                players[turn].attack = attack
+                players[turn].subattack = subattack
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 950, HEIGHT - 630, 60, 60), 2)
+            pg.draw.rect(screen, (170,230,170), pg.Rect(WIDTH - 900, HEIGHT - 600, 640, 560))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 900, HEIGHT - 600, 640, 560),3)
+            pg.draw.rect(screen, (255,120,120), pg.Rect(WIDTH - 300, HEIGHT - 590, 30, 30))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 300, HEIGHT - 590, 30, 30), 3)
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 870, HEIGHT - 570, 130, 235), 3)   #bridge
+            pg.draw.rect(screen, card_background, pg.Rect(WIDTH - 870, HEIGHT - 570, 130, 235))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 720, HEIGHT - 570, 130, 235), 3)   #rails
+            pg.draw.rect(screen, card_background, pg.Rect(WIDTH - 720, HEIGHT - 570, 130, 235))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 570, HEIGHT - 570, 130, 235), 3)   #nuke
+            pg.draw.rect(screen, card_background, pg.Rect(WIDTH - 570, HEIGHT - 570, 130, 235))
+            if players[turn].wood >= 10 and left_pressed and mouse_position[0] >= WIDTH - 870 and mouse_position[0] <= WIDTH - 740 and mouse_position[1] >= HEIGHT - 570 and mouse_position[1] <= HEIGHT - 335:
+                if players[turn].subattack == 1:
+                    players[turn].subattack = 0
+                else:
+                    players[turn].subattack = 1
+            elif players[turn].wood >= 2 and players[turn].steel >= 1 and left_pressed and mouse_position[0] >= WIDTH - 720 and mouse_position[0] <= WIDTH - 590 and mouse_position[1] >= HEIGHT - 570 and mouse_position[1] <= HEIGHT - 335:
+                if players[turn].subattack == 2:
+                    players[turn].subattack = 0
+                else:
+                    players[turn].subattack = 2
+            elif players[turn].nuclear >= 5 and left_pressed and mouse_position[0] >= WIDTH - 570 and mouse_position[0] <= WIDTH - 440 and mouse_position[1] >= HEIGHT - 570 and mouse_position[1] <= HEIGHT - 335:
+                if players[turn].subattack == 3:
+                    players[turn].subattack = 0
+                else:
+                    players[turn].subattack = 3
+            if players[turn].subattack == 1:
+                pg.draw.rect(screen, card_selected, pg.Rect(WIDTH - 870, HEIGHT - 570, 130, 235))
+            elif players[turn].subattack == 2:
+                pg.draw.rect(screen, card_selected, pg.Rect(WIDTH - 720, HEIGHT - 570, 130, 235))
+            elif players[turn].subattack == 3:
+                pg.draw.rect(screen, card_selected, pg.Rect(WIDTH - 570, HEIGHT - 570, 130, 235))
+            if attack == 0 or attack == 4:
+                if players[turn].wood >= 15 and left_pressed and mouse_position[0] >= WIDTH - 870 and mouse_position[0] <= WIDTH - 740 and mouse_position[1] >= HEIGHT - 305 and mouse_position[1] <= HEIGHT - 70:
+                    if players[turn].subattack == 4:
+                        players[turn].subattack = 0
+                    else:
+                        players[turn].subattack = 4
+                elif players[turn].steel >= 10 and left_pressed and mouse_position[0] >= WIDTH - 720 and mouse_position[0] <= WIDTH - 590 and mouse_position[1] >= HEIGHT - 305 and mouse_position[1] <= HEIGHT - 70:
+                    if players[turn].subattack == 5:
+                        players[turn].subattack = 0
+                    else:
+                        players[turn].subattack = 5
+                elif players[turn].steel >= 20 and left_pressed and mouse_position[0] >= WIDTH - 570 and mouse_position[0] <= WIDTH - 440 and mouse_position[1] >= HEIGHT - 305 and mouse_position[1] <= HEIGHT - 70:
+                    if players[turn].subattack == 6:
+                        players[turn].subattack = 0
+                    else:
+                        players[turn].subattack = 6
+                elif players[turn].wood >= 10 and left_pressed and mouse_position[0] >= WIDTH - 420 and mouse_position[0] <= WIDTH - 290 and mouse_position[1] >= HEIGHT - 305 and mouse_position[1] <= HEIGHT - 70:
+                    if players[turn].subattack == 7:
+                        players[turn].subattack = 0
+                    else:
+                        players[turn].subattack = 7
+                pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 870, HEIGHT - 305, 130, 235), 3)   #ship
+                pg.draw.rect(screen, card_background, pg.Rect(WIDTH - 870, HEIGHT - 305, 130, 235))
+                pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 720, HEIGHT - 305, 130, 235), 3)   #plane
+                pg.draw.rect(screen, card_background, pg.Rect(WIDTH - 720, HEIGHT - 305, 130, 235))
+                pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 570, HEIGHT - 305, 130, 235), 3)   #tank
+                pg.draw.rect(screen, card_background, pg.Rect(WIDTH - 570, HEIGHT - 305, 130, 235))
+                pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 420, HEIGHT - 305, 130, 235), 3)   #fort
+                pg.draw.rect(screen, card_background, pg.Rect(WIDTH - 420, HEIGHT - 305, 130, 235))
+                if players[turn].subattack == 4:
+                    pg.draw.rect(screen, card_selected, pg.Rect(WIDTH - 870, HEIGHT - 305, 130, 235))
+                elif players[turn].subattack == 5:
+                    pg.draw.rect(screen, card_selected, pg.Rect(WIDTH - 720, HEIGHT - 305, 130, 235))
+                elif players[turn].subattack == 6:
+                    pg.draw.rect(screen, card_selected, pg.Rect(WIDTH - 570, HEIGHT - 305, 130, 235))
+                elif players[turn].subattack == 7:
+                    pg.draw.rect(screen, card_selected, pg.Rect(WIDTH - 420, HEIGHT - 305, 130, 235))
+                screen.blit(spr_ship, (WIDTH - 865, HEIGHT - 300))
+                screen.blit(myfont.render("X 15 ", False, (0, 0, 0)), (WIDTH - 795, HEIGHT - 140))
+                screen.blit(spr_wood, (WIDTH - 835, HEIGHT - 140))
+                screen.blit(spr_plane, (WIDTH - 715, HEIGHT - 300))
+                screen.blit(myfont.render("X 10 ", False, (0, 0, 0)), (WIDTH - 645, HEIGHT - 140))
+                screen.blit(spr_steel, (WIDTH - 685, HEIGHT - 140))
+                screen.blit(spr_tank, (WIDTH - 565, HEIGHT - 300))
+                screen.blit(myfont.render("X 20 ", False, (0, 0, 0)), (WIDTH - 495, HEIGHT - 140))
+                screen.blit(spr_steel, (WIDTH - 535, HEIGHT - 140))
+                screen.blit(spr_fort, (WIDTH - 415, HEIGHT - 300))
+                screen.blit(myfont.render("X 10/15/20 ", False, (0, 0, 0)), (WIDTH - 400, HEIGHT - 120))
+                screen.blit(spr_wood, (WIDTH - 390, HEIGHT - 170))
+            screen.blit(spr_bridge, (WIDTH - 865, HEIGHT - 565))
+            screen.blit(myfont.render("X 10 ", False, (0, 0, 0)), (WIDTH - 795, HEIGHT - 405))
+            screen.blit(spr_wood, (WIDTH - 835, HEIGHT - 405))
+            screen.blit(spr_rails, (WIDTH - 715, HEIGHT - 565))
+            screen.blit(myfont.render("X 2 ", False, (0, 0, 0)), (WIDTH - 645, HEIGHT - 435))
+            screen.blit(spr_wood, (WIDTH - 685, HEIGHT - 435))
+            screen.blit(myfont.render("X 1 ", False, (0, 0, 0)), (WIDTH - 645, HEIGHT - 385))
+            screen.blit(spr_steel, (WIDTH - 685, HEIGHT - 385))
+            screen.blit(spr_nuke, (WIDTH - 565, HEIGHT - 565))
+            screen.blit(myfont.render("X 5 ", False, (0, 0, 0)), (WIDTH - 495, HEIGHT - 405))
+            screen.blit(spr_nuclear, (WIDTH - 535, HEIGHT - 405))
+        if players[turn].subattack > 0 and players[turn].subattack < 8:
+            pg.draw.rect(screen, (100,100,255), pg.Rect(WIDTH - 935, HEIGHT - 85, 120, 60))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 935, HEIGHT - 85, 120, 60), 3)
+            if left_pressed and mouse_position[0] >= WIDTH - 935 and mouse_position[0] <= WIDTH - 815 and mouse_position[1] >= HEIGHT - 85 and mouse_position[1] <= HEIGHT - 25:
+                players[turn].subattack += 8
+        elif players[turn].subattack == 9:   #building bridge
+            if left_pressed and countries[hover_country].owner == players[turn]:
+                origin_country = hover_country
+                players[turn].subattack = 16
+        elif players[turn].subattack == 16:
+            if left_pressed and hover_country == origin_country:
+                players[turn].subattack = 9
+            elif left_pressed:
+                for i in range(len(connections)):
+                    if (hover_country, origin_country) == connections[i].connection or (origin_country, hover_country) == connections[i].connection and connections[i].kind == "sea":
+                        connections[i].kind = "land"
+                        players[turn].wood -= 10
+                        players[turn].attack = attack
+                        players[turn].subattack = subattack
+                        break
+        elif players[turn].subattack == 10:   #building rails
+            if left_pressed and countries[hover_country].owner == players[turn]:
+                origin_country = hover_country
+                players[turn].subattack = 17
+        elif players[turn].subattack == 17:
+            if left_pressed and hover_country == origin_country:
+                players[turn].subattack = 10
+            elif left_pressed and countries[hover_country].owner == players[turn]:
+                for i in range(len(connections)):
+                    if connections[i].connection == (origin_country,hover_country) or connections[i].connection == (hover_country,origin_country) and connections[i].kind == "land":
+                        connections[i].rails = True
+                        players[turn].wood -= 2
+                        players[turn].steel -= 1
+                        players[turn].attack = attack
+                        players[turn].subattack = subattack
+                        break
+        elif players[turn].subattack == 11:   #building nuke
+            if left_pressed and countries[hover_country].owner == players[turn]:
+                origin_country = hover_country
+                players[turn].subattack = 18
+        elif players[turn].subattack == 18:
+            if left_pressed and hover_country == origin_country:
+                players[turn].subattack = 11
+            elif left_pressed and countries[hover_country].owner != players[turn] and np.any([origin_country in connection and hover_country in connection for connection in connections]):
+                countries[hover_country].radioactive += 3
+                countries[hover_country].units = int(np.round(countries[hover_country].units/2))
+                if countries[hover_country].units == 0 and countries[hover_country].owner == default_player:
+                    countries[hover_country].units = 2
+                players[turn].nuclear -= 5
+                players[turn].attack = attack
+                players[turn].subattack = subattack
+                
+        elif players[turn].subattack == 12:   #building ship
+            if left_pressed and countries[hover_country].owner == players[turn]:
+                countries[hover_country].ships += 1
+                players[turn].wood -= 15
+                players[turn].attack = attack
+                players[turn].subattack = subattack
+        elif players[turn].subattack == 13:   #building plane
+            if left_pressed and countries[hover_country].owner == players[turn]:
+                countries[hover_country].planes += 1
+                players[turn].steel -= 10
+                players[turn].attack = attack
+                players[turn].subattack = subattack
+        elif players[turn].subattack == 14:   #building tank
+            if left_pressed and countries[hover_country].owner == players[turn]:
+                countries[hover_country].tanks += 1
+                players[turn].steel -= 20
+                players[turn].attack = attack
+                players[turn].subattack = subattack
+        elif players[turn].subattack == 15:   #building fort
+            if left_pressed and countries[hover_country].owner == players[turn] and countries[hover_country].fort_lvl <= 2 and players[turn].wood >= 10 + 5*countries[hover_country].fort_lvl:
+                players[turn].wood -= 10 + 5*countries[hover_country].fort_lvl
+                countries[hover_country].fort_lvl += 1
+                players[turn].attack = attack
+                players[turn].subattack = subattack
+        if players[turn].subattack > 8:
+            pg.draw.rect(screen, (250,100,100), pg.Rect(WIDTH - 935, HEIGHT - 155, 120, 60))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 935, HEIGHT - 155, 120, 60), 3)
+            if left_pressed and mouse_position[0] >= WIDTH - 935 and mouse_position[0] <= WIDTH - 815 and mouse_position[1] >= HEIGHT - 155 and mouse_position[1] <= HEIGHT - 95:
+                players[turn].attack = attack
+                players[turn].subattack = subattack
+
+    elif players[turn].attack == 4:   #cards menu
+        if players[turn].subattack == 0:
+            pg.draw.rect(screen, (230,170,170), pg.Rect(WIDTH - 880, HEIGHT - 630, 60, 60))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 880, HEIGHT - 630, 60, 60), 2)
+            screen.blit(spr_cards, (WIDTH - 875, HEIGHT - 626))
+            if attack == 0:
+                pg.draw.rect(screen, (0,170,0), pg.Rect(WIDTH - 935, HEIGHT - 270, 50, 50))
+                pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 935, HEIGHT - 270, 50, 50), 3)
+                screen.blit(myfont.render("+ "+str(reinforcements), False, (0, 0, 0)), (WIDTH - 920, HEIGHT - 200))
+                pg.draw.rect(screen, (170,0,0), pg.Rect(WIDTH - 935, HEIGHT - 160, 50, 50))
+                pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 935, HEIGHT - 160, 50, 50), 1)
+            if left_pressed and mouse_position[0] >= WIDTH - 300 and mouse_position[0] <= WIDTH - 270 and mouse_position[1] >= HEIGHT - 590 and mouse_position[1] <= HEIGHT - 560:
+                players[turn].attack = attack
+                players[turn].subattack = subattack
+            pg.draw.rect(screen, (230,170,170), pg.Rect(WIDTH - 900, HEIGHT - 600, 640, 340))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 900, HEIGHT - 600, 640, 340),3)
+            pg.draw.rect(screen, (255,120,120), pg.Rect(WIDTH - 300, HEIGHT - 590, 30, 30))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 300, HEIGHT - 590, 30, 30), 3)
+            if warning:
+                screen.blit(myfont.render("WARNING", False, (0, 0, 0)), (WIDTH - 622, HEIGHT - 585))
+                screen.blit(myfont.render("You currently have too many cards", False, (0, 0, 0)), (WIDTH - 720, HEIGHT - 565))
+            for i in range(len(players[turn].cards)):
+                pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 876 + i*76, HEIGHT - 522, 67, 136), 4)
+                pg.draw.rect(screen, (250,250,250), pg.Rect(WIDTH - 876 + i*76, HEIGHT - 522, 67, 136))
+                if players[turn].cards[i] == 0:
+                    screen.blit(spr_card0, (WIDTH - 860 + i*76, HEIGHT - 490))
+                elif players[turn].cards[i] == 1:
+                    screen.blit(spr_card1, (WIDTH - 860 + i*76, HEIGHT - 490))
+                elif players[turn].cards[i] == 2:
+                    screen.blit(spr_card2, (WIDTH - 860 + i*76, HEIGHT - 490))
+                elif players[turn].cards[i] == 3:
+                    screen.blit(spr_card0, (WIDTH - 860 + i*76, HEIGHT - 515))
+                    screen.blit(spr_card1, (WIDTH - 860 + i*76, HEIGHT - 472))
+                    screen.blit(spr_card2, (WIDTH - 860 + i*76, HEIGHT - 420))
+                if mouse_position[0] <= WIDTH - 876 + i*76 or mouse_position[0] >= WIDTH - 800 + i*76 or mouse_position[1] <= HEIGHT - 522 or mouse_position[1] >= HEIGHT - 386:
+                    pg.draw.rect(screen, (150,150,150), pg.Rect(WIDTH - 876 + i*76, HEIGHT - 522, 67, 136))
+            if (attack == 0 and len(players[turn].cards) >= 3) or warning:
+                if set(players[turn].cards) in [{0,1,2,3}, {0,1,2}, {0,1,3}, {0,2,3}, {1,2,3}, {0,3}, {1,3}, {2,3}, {3}] and players[turn].cards.count(3) >= 3 - len(set(players[turn].cards) & {0,1,2}):
+                    reward = 10
+                    jokers = 3 - len(set(players[turn].cards) & {0,1,2})
+                else:
+                    for j in range(4):
+                        for i in range(3):
+                                if players[turn].cards.count(i) >= 3 - j:
+                                    reward = 4 + 2*i
+                                    jokers = j
+                        break
+            if reward in [10,8,6,4]:
+                pg.draw.rect(screen, (50,240,50), pg.Rect(WIDTH - 640, HEIGHT - 340, 120, 60))
+                pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 640, HEIGHT - 340, 120, 60),3)
+                screen.blit(myfont.render("Exchange", False, (0, 0, 0)), (WIDTH - 621, HEIGHT - 325))
+                if left_pressed and mouse_position[0] <= WIDTH - 520 and mouse_position[0] >= WIDTH - 640 and mouse_position[1] <= HEIGHT - 280 and mouse_position[1] >= HEIGHT - 340:
+                    highlight = -1
+                    players[turn].subattack = 1
+        if players[turn].subattack == 1:
+            pg.draw.rect(screen, (230,170,170), pg.Rect(WIDTH - 900, HEIGHT - 600, 640, 560))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 900, HEIGHT - 600, 640, 560),3)
+            pg.draw.rect(screen, (255,120,120), pg.Rect(WIDTH - 300, HEIGHT - 590, 30, 30))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 300, HEIGHT - 590, 30, 30), 3)
+            if left_pressed and mouse_position[0] >= WIDTH - 300 and mouse_position[0] <= WIDTH - 270 and mouse_position[1] >= HEIGHT - 590 and mouse_position[1] <= HEIGHT - 560:
+                players[turn].attack = attack
+                players[turn].subattack = subattack
+            for i in range(6):
+                pg.draw.rect(screen, card_background, pg.Rect(WIDTH - 810, HEIGHT - 550 + 80*i, 400, 70))
+                pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 810, HEIGHT - 550 + 80*i, 400, 70),3)
+                if left_pressed and mouse_position[0] >= WIDTH - 810 and mouse_position[0] <= WIDTH - 410 and mouse_position[1] >= HEIGHT - 550 + 80*i and mouse_position[1] <= HEIGHT - 480 + 80*i:
+                    if highlight == i:
+                        highlight = -1
+                    else:
+                        highlight = i
+            if highlight != -1:
+                pg.draw.rect(screen, card_selected, pg.Rect(WIDTH - 810, HEIGHT - 550 + 80*highlight, 400, 70))
+                pg.draw.rect(screen, green_button, pg.Rect(WIDTH - 500, HEIGHT - 535 + 80*highlight, 80, 40))
+                pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 500, HEIGHT - 535 + 80*highlight, 80, 40),1)
+                if left_pressed and mouse_position[0] >= WIDTH - 500 and mouse_position[0] <= WIDTH - 420 and mouse_position[1] >= HEIGHT - 535 + 80*highlight and mouse_position[1] <= HEIGHT - 495 + 80*highlight:
+                    if highlight == 0:
+                        reinforcements += int(reward*1.5)
+                        if warning and players[turn].attack != 0:
+                            all_reinforcements_deployed = False
+                            attack = 0
+                            subattack = 1
+                    elif highlight == 1:
+                        players[turn].food += int(reward*3)
+                    elif highlight == 2:
+                        players[turn].wood += int(reward*2.5)
+                    elif highlight == 3:
+                        players[turn].steel += int(reward*2)
+                    elif highlight == 4:
+                        players[turn].oil += int(reward*2)
+                    elif highlight == 5:
+                        players[turn].nuclear += int(reward)
+                    if reward == 10:
+                        for i in range(3-jokers):
+                            players[turn].cards.remove(i)
+                    elif reward == 8:
+                        for i in range(3-jokers):
+                            players[turn].cards.remove(2)
+                    elif reward == 6:
+                        for i in range(3-jokers):
+                            players[turn].cards.remove(1)
+                    elif reward == 4:
+                        for i in range(3-jokers):
+                            players[turn].cards.remove(0)
+                    for i in range(jokers):
+                        players[turn].cards.remove(3)
+                    reward = 0
+                    warning = False
+                        
+                    players[turn].subattack = subattack
+                    players[turn].attack = attack
+            screen.blit(myfont.render(str(int(reward*1.5))+" X", False, (0, 0, 0)), (WIDTH - 720, HEIGHT - 520))
+            screen.blit(myfont.render(str(int(reward*3))+" X", False, (0, 0, 0)), (WIDTH - 720, HEIGHT - 520 + 80))
+            screen.blit(myfont.render(str(int(reward*2.5))+" X", False, (0, 0, 0)), (WIDTH - 720, HEIGHT - 520 + 80*2))
+            screen.blit(myfont.render(str(int(reward*2))+" X", False, (0, 0, 0)), (WIDTH - 720, HEIGHT - 520 + 80*3))
+            screen.blit(myfont.render(str(int(reward*2))+" X", False, (0, 0, 0)), (WIDTH - 720, HEIGHT - 520 + 80*4))
+            screen.blit(myfont.render(str(int(reward))+" X", False, (0, 0, 0)), (WIDTH - 720, HEIGHT - 520 + 80*5))
+            screen.blit(spr_troops, (WIDTH - 660, HEIGHT - 510))
+            screen.blit(spr_food, (WIDTH - 660, HEIGHT - 510 + 80))
+            screen.blit(spr_wood, (WIDTH - 660, HEIGHT - 510 + 80*2))
+            screen.blit(spr_steel, (WIDTH - 660, HEIGHT - 510 + 80*3))
+            screen.blit(spr_oil, (WIDTH - 660, HEIGHT - 510 + 80*4))
+            screen.blit(spr_nuclear, (WIDTH - 660, HEIGHT - 510 + 80*5))
+
+    elif players[turn].attack == 6:   #start_ship placement
+        if players[turn].subattack == 0:
+            pg.draw.rect(screen, (230,170,170), pg.Rect(WIDTH - 800, HEIGHT - 460, 440, 240))
+            screen.blit(myfont.render("You have 1 ship in storage.", False, (0, 0, 0)), (WIDTH - 690, HEIGHT - 410))
+            screen.blit(myfont.render("Deploy ship?", False, (0, 0, 0)), (WIDTH - 640, HEIGHT - 350))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 800, HEIGHT - 460, 440, 240),3)
+            pg.draw.rect(screen, (170,0,0), pg.Rect(WIDTH - 670, HEIGHT - 290, 75, 50))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 670, HEIGHT - 290, 75, 50), 2)
+            pg.draw.rect(screen, (0,170,0), pg.Rect(WIDTH - 565, HEIGHT - 290, 75, 50))
+            pg.draw.rect(screen, (0,0,0), pg.Rect(WIDTH - 565, HEIGHT - 290, 75, 50), 2)
+            if left_pressed and mouse_position[0] >= WIDTH - 670 and mouse_position[0] <= WIDTH - 595 and mouse_position[1] >= HEIGHT - 290 and mouse_position[1] <= HEIGHT - 240:
+                checked = True
+                if turn_num < player_num:
+                    players[turn].attack = 1
+                else:
+                    players[turn].attack = 0
+            elif left_pressed and mouse_position[0] >= WIDTH - 565 and mouse_position[0] <= WIDTH - 490 and mouse_position[1] >= HEIGHT - 290 and mouse_position[1] <= HEIGHT - 240:
+                players[turn].subattack = 1
+        if players[turn].subattack == 1:
+            if left_pressed and not hover_country == -1 and countries[hover_country].owner == players[turn]:
+                countries[hover_country].ships += 1
+                players[turn].start_ship = False
+                if turn_num < player_num:
+                    players[turn].subattack = 0
+                    players[turn].attack = 1
+                else:
+                    players[turn].subattack = 1
+                    players[turn].attack = 0
+
+    elif (players[turn].attack  == 0 and players[turn].subattack == 1 or players[turn].attack == 1) and len(players[turn].cards) >= 5:   #WARNING
+        attack = players[turn].attack
+        subattack = players[turn].subattack
+        players[turn].attack = 4
+        players[turn].subattack = 0
+        warning = True
+
+    if players[turn].attack != 6 and mouse_position[0] >= WIDTH - 200 + 70*min(players[turn].attack + 1, 2) and mouse_position[0] <= WIDTH - 200 + 70*min(players[turn].attack + 1, 2) + 60 and mouse_position[1] >= HEIGHT - 50 and mouse_position[1] <= HEIGHT - 10 and left_pressed and all_reinforcements_deployed:
+        players[turn].attack = (players[turn].attack + 1) % 3
+        players[turn].subattack = 0
+        if players[turn].attack == 0:
+            turn = (turn + 1) % player_num
+            turn_num += 1
+            checked = False
+            
+    pg.display.flip()
+
+pg.quit()
+
