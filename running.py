@@ -2,10 +2,10 @@ import pygame as pg
 import numpy as np
 from matplotlib import path as pth
 
-import init
+import initialize
 import board
 
-init.init()
+initialize.init()
 countries = board.countries()
 connections = board.connections()
 
