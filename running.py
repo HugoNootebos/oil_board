@@ -1,36 +1,11 @@
-import pygame as pg
-import numpy as np
-from matplotlib import path as pth
+from engine import Engine
 
-import initialize
-import board
+# Initialize app
+app = Engine()
 
-initialize.init()
-countries = board.countries()
-connections = board.connections()
+
 
 while running:
-    screen.fill((200, 200, 255))
-    for event in pg.event.get():
-        if event.type == pg.QUIT:
-            running = False
-        if event.type == pg.MOUSEBUTTONDOWN and event.button == 5:
-            zoom /= 1.1
-        if event.type == pg.MOUSEBUTTONDOWN and event.button == 4:
-            zoom *= 1.1
-            
-    previous_mouse_state = mouse_state
-    mouse_state = pg.mouse.get_pressed()
-    left_pressed = not previous_mouse_state[0] and mouse_state[0]
-    previous_mouse_position = mouse_position
-    mouse_position = pg.mouse.get_pos()
-    transformed_mouse_position = screen_to_coordinates(mouse_position, zoom, xoffset, yoffset)
-    transformed_previous_mouse_position = screen_to_coordinates(previous_mouse_position, zoom, xoffset, yoffset)
-    
-    if mouse_state[1]:
-        xoffset += transformed_mouse_position[0] - transformed_previous_mouse_position[0]
-        yoffset += transformed_mouse_position[1] - transformed_previous_mouse_position[1]
-    
     hover_country = -1
     for i in range(42):
         for p in countries[i].polygon:
@@ -55,92 +30,8 @@ while running:
             pg.draw.polygon(screen, (0,0,0), transformed_coordinates, 2)
             if pth.Path(p).contains_point(transformed_mouse_position):
                 hover_country = i
-        
-    for connection in connections:
-        if connection.connection == (34, 15):
-            pg.draw.line(screen, (0, 0, 0), transform_coordinates(countries[34].mass_center, zoom, xoffset, yoffset), transform_coordinates((0, countries[34].mass_center[1]), zoom, xoffset, yoffset), 5)
-            pg.draw.line(screen, (0, 0, 0), transform_coordinates(countries[15].mass_center, zoom, xoffset, yoffset), transform_coordinates((640, countries[15].mass_center[1]), zoom, xoffset, yoffset), 5)
-            pg.draw.line(screen, (0, 150, 235), transform_coordinates(countries[34].mass_center, zoom, xoffset, yoffset), transform_coordinates((0, countries[34].mass_center[1]), zoom, xoffset, yoffset), 3)
-            pg.draw.line(screen, (0, 150, 235), transform_coordinates(countries[15].mass_center, zoom, xoffset, yoffset), transform_coordinates((640, countries[15].mass_center[1]), zoom, xoffset, yoffset), 3)
-        else:
-            if connection.connection == (25, 41):
-                pg.draw.line(screen, (0, 0, 0), transform_coordinates(countries[41].mass_center, zoom, xoffset, yoffset), transform_coordinates((0, countries[41].mass_center[1]), zoom, xoffset, yoffset), 5)
-                pg.draw.line(screen, (0, 0, 0), transform_coordinates(countries[25].mass_center, zoom, xoffset, yoffset), transform_coordinates((640, countries[25].mass_center[1]), zoom, xoffset, yoffset), 5)
-                pg.draw.line(screen, (0, 150, 235), transform_coordinates(countries[41].mass_center, zoom, xoffset, yoffset), transform_coordinates((0, countries[41].mass_center[1]), zoom, xoffset, yoffset), 3)
-                pg.draw.line(screen, (0, 150, 235), transform_coordinates(countries[25].mass_center, zoom, xoffset, yoffset), transform_coordinates((640, countries[25].mass_center[1]), zoom, xoffset, yoffset), 3)
-            else:
-                pg.draw.line(screen, (0, 0, 0) , transform_coordinates(countries[connection.connection[0]].mass_center, zoom, xoffset, yoffset), transform_coordinates(countries[connection.connection[1]].mass_center, zoom, xoffset, yoffset), 5)
-                pg.draw.line(screen, (0, 155, 0) if connection.kind == 'land' else (0, 150, 235), transform_coordinates(countries[connection.connection[0]].mass_center, zoom, xoffset, yoffset), transform_coordinates(countries[connection.connection[1]].mass_center, zoom, xoffset, yoffset), 3)
-        
-    for country in countries:
-        pos = transform_coordinates(country.mass_center, zoom, xoffset, yoffset)
-        pg.draw.circle(screen, (0,0,0), pos, 14, 1)
-        pg.draw.circle(screen, (255, 255, 255), pos, 12)
-        screen.blit(myfont.render(str(country.units), False, (0, 0, 0)), (pos[0] - 9, pos[1] - 10))
-        if country.ships > 0:
-            screen.blit(spr_ship, (pos[0] - 19, pos[1] - 20))
-        if country.tanks > 0:
-            screen.blit(spr_tank, (pos[0] - 14, pos[1] - 10))
-        if country.planes > 0:
-            screen.blit(spr_plane, (pos[0] - 9, pos[1]))
-        if country.fort_lvl > 0:
-            screen.blit(spr_fort, (pos[0] - 4, pos[1] + 10))
-        if country.radioactive > 0:
-            screen.blit(spr_nuclear, (pos[0] + 1, pos[1] + 20))
-        
-    pg.draw.rect(screen, (200, 200, 200), pg.Rect(WIDTH  - 210, 0, 210, HEIGHT - 400))
-    pg.draw.rect(screen, (150, 150, 150), pg.Rect(WIDTH  - 210, HEIGHT - 400, 210, HEIGHT))
-    
-    if not hover_country == -1:
-        txt = myfont.render(countries[hover_country].name, False, (0, 0, 0))
-        screen.blit(txt, (WIDTH - 200, 0))
-        pos = -20
-        for i in range(countries[hover_country].food):
-            if i % 4 == 0:
-                pos += 50
-            screen.blit(spr_food, (WIDTH - 200 + (i % 4)*50, pos))
-        for i in range(countries[hover_country].troops):
-            if i % 4 == 0:
-                pos += 50
-            screen.blit(spr_troops, (WIDTH - 200 + (i % 4)*50, pos))
-        for i in range(countries[hover_country].wood):
-            if i % 4 == 0:
-                pos += 50
-            screen.blit(spr_wood, (WIDTH - 200 + (i % 4)*50, pos))
-        for i in range(countries[hover_country].steel):
-            if i % 4 == 0:
-                pos += 50
-            screen.blit(spr_steel, (WIDTH - 200 + (i % 4)*50, pos))
-        for i in range(countries[hover_country].oil):
-            if i % 4 == 0:
-                pos += 50
-            screen.blit(spr_oil, (WIDTH - 200 + (i % 4)*50, pos))
-        for i in range(countries[hover_country].nuclear):
-            if i % 4 == 0:
-                pos += 50
-            screen.blit(spr_nuclear, (WIDTH - 200 + (i % 4)*50, pos))
-            
-    pg.draw.rect(screen, players[turn].color, pg.Rect(WIDTH - 210, HEIGHT - 400, 210, 20))
-    screen.blit(myfont.render(players[turn].name, False, (0, 0, 0)), (WIDTH - 200, HEIGHT - 400))
-    screen.blit(spr_troops, (WIDTH - 200, HEIGHT - 370))
-    screen.blit(myfont.render("X " + str(players[turn].troops), False, (0, 0, 0)), (WIDTH - 150, HEIGHT - 360))
-    screen.blit(spr_food, (WIDTH - 200, HEIGHT - 320))
-    screen.blit(myfont.render("X " + str(players[turn].food), False, (0, 0, 0)), (WIDTH - 150, HEIGHT - 310))
-    screen.blit(spr_wood, (WIDTH - 200, HEIGHT - 270))
-    screen.blit(myfont.render("X " + str(players[turn].wood), False, (0, 0, 0)), (WIDTH - 150, HEIGHT - 260))
-    screen.blit(spr_steel, (WIDTH - 200, HEIGHT - 220))
-    screen.blit(myfont.render("X " + str(players[turn].steel), False, (0, 0, 0)), (WIDTH - 150, HEIGHT - 210))
-    screen.blit(spr_oil, (WIDTH - 200, HEIGHT - 170))
-    screen.blit(myfont.render("X " + str(players[turn].oil), False, (0, 0, 0)), (WIDTH - 150, HEIGHT - 160))
-    screen.blit(spr_nuclear, (WIDTH - 200, HEIGHT - 120))
-    screen.blit(myfont.render("X " + str(players[turn].nuclear), False, (0, 0, 0)), (WIDTH - 150, HEIGHT - 110))
-    pg.draw.rect(screen, (224, 224, 0), pg.Rect(WIDTH - 200, HEIGHT - 50, 60, 40))
-    pg.draw.rect(screen, (255, 80, 79), pg.Rect(WIDTH - 130, HEIGHT - 50, 60, 40))
-    pg.draw.rect(screen, (255, 165, 0), pg.Rect(WIDTH - 60, HEIGHT - 50, 60, 40))
-    pg.draw.rect(screen, (0, 0, 0), pg.Rect(WIDTH - 200 + 70*players[turn].attack, HEIGHT - 50, 60, 40), 2)
 
-    pg.draw.rect(screen, (170,230,170), pg.Rect(WIDTH - 950, HEIGHT - 630, 60, 60))
-    screen.blit(spr_shop, (WIDTH - 946, HEIGHT - 626))
+
     
     if players[turn].attack == 0:      #reinforcement phase
         if players[turn].subattack == 0:
