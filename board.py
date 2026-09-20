@@ -220,7 +220,7 @@ def get_countries(default_player):
                  (523, 208), (530, 203), (521, 204)]
             ],
             food=8,
-            units=3,
+            units=2,
             owner=default_player,
         ),
         "Mongolië": Country(
@@ -622,7 +622,7 @@ def get_connections():
         Connection({"Noord-Korea", "Japan"}, 'sea'),
         Connection({"Japan", "Siberië"}, 'sea'),
         Connection({"China", "Maleisië"}, 'land'),
-        Connection({"Maleisië", "India"}, 'sea'),
+        Connection({"Maleisië", "India"}, 'land'),
         Connection({"Maleisië", "Nederlands-Indië"}, 'sea'),
         Connection({"Nederlands-Indië", "Outback"}, 'sea'),
         Connection({"Outback", "Gold Coast"}, 'land'),
