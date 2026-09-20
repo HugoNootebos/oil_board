@@ -193,23 +193,33 @@ class Country:
 
     def draw_assets(self, view, img_ship, img_tank, img_plane, img_fort, img_nuclear):
         pos = self.mass_center.transform_coordinates(view)
-        if self.ships > 0:
-            img_ship.draw(view.screen, pos + Position(-19, -20))
-        if self.tanks > 0:
-            img_tank.draw(view.screen, pos + Position(-14, -10))
-        if self.planes > 0:
-            img_plane.draw(view.screen, pos + Position(-9, 0))
-        if self.fort_lvl > 0:
-            img_fort.draw(view.screen, pos + Position(-4, 10))
-        if self.radioactive > 0:
-            img_nuclear.draw(view.screen, pos + Position(1, 20))
+        # One icon per asset type no matter how many units of it there are
+        # (2, 3, 4 ships all look the same as 1 ship) -- each entry below
+        # is only drawn once, gated on presence rather than count.
+        assets = [
+            (self.ships > 0, img_ship),
+            (self.tanks > 0, img_tank),
+            (self.planes > 0, img_plane),
+            (self.fort_lvl > 0, img_fort),
+            (self.radioactive > 0, img_nuclear),
+        ]
+        present = [img for is_present, img in assets if is_present]
+        y = 30  # comfortably below the troop count circle (radius 14), not obscuring it
+        spacing = 25
+        start_x = -spacing * (len(present) - 1) / 2
+        for i, img in enumerate(present):
+            img.draw(view.screen, pos + Position(int(start_x + i * spacing), y))
 
 
 class Connection:
 
-    def __init__(self, connection, kind):
+    def __init__(self, connection, kind, rails=False):
         self.connection = connection
         self.kind = kind
+        # Whether rails have been built along this connection. Kept separate
+        # from `kind` (which stays "land"/"sea") so existing attack/movement
+        # logic that checks `kind` keeps working once rails go in.
+        self.rails = rails
 
     def __contains__(self, other):
         return other in self.connection
@@ -236,6 +246,9 @@ class Connection:
                 transformed_coordinates[1],
                 (view.WIDTH * swap, transformed_coordinates[1][1]),
             ]
+        # A connection with rails built on it is drawn grey regardless of
+        # whether it's a land or sea link.
+        line_color = connection_colors["rails"] if self.rails else connection_colors[self.kind]
         for pos1, pos2 in zip(transformed_coordinates[0::2], transformed_coordinates[1::2]):
             pg.draw.line(
                 view.screen,
@@ -246,7 +259,7 @@ class Connection:
             )
             pg.draw.line(
                 view.screen,
-                connection_colors[self.kind],
+                line_color,
                 pos1,
                 pos2,
                 line_width - outline_width,
@@ -286,8 +299,10 @@ class Position:
 
 class Image:
 
-    def __init__(self, name):
-        self.image = pg.image.load("./images/{}.png".format(name)).convert()
+    def __init__(self, name, scale=None):
+        self.image = pg.image.load("./images/{}.png".format(name)).convert_alpha()
+        if scale is not None:
+            self.image = pg.transform.scale(self.image, scale)
         self.name = name
 
     def draw(self, screen, pos):
