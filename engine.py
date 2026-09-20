@@ -1,7 +1,8 @@
 import pygame as pg
 import numpy as np
 from board import get_connections, get_countries
-from models import Position, Image, Player, Io, View, Gui, Shop, Button, CardMenu, Kaertske
+from models import Position, Image, Player, Io, View, Gui, Shop, Button, CardMenu
+from phases import TurnManager
 from random import sample
 
 
@@ -46,12 +47,12 @@ class Engine:
             "spr_card1": Image("card1"),
             "spr_card2": Image("card2"),
             "spr_bridge": Image("bridge"),
-            "spr_ship": Image("ship"),
-            "spr_plane": Image("plane"),
-            "spr_tank": Image("tank"),
+            "spr_ship": Image("ship", scale=(30,30)),
+            "spr_plane": Image("plane", scale=(30,30)),
+            "spr_tank": Image("tank", scale=(30,30)),
             "spr_rails": Image("rails"),
             "spr_fort": Image("fort"),
-            "spr_nuke": Image("nuke"),
+            "spr_nuke": Image("nuke", scale=(30,30)),
         }
 
         self.gui = Gui(self.io, outline_color=self.colors["outlines"])
@@ -60,6 +61,12 @@ class Engine:
         self.players = self.get_players()
         self.countries = get_countries(self.default_player)
         self.connections = get_connections()
+
+        # Snapshot of each country's troop count as set up on the board,
+        # before starting-country bonuses are applied below. Used to
+        # restock a country back to its game-start garrison whenever it
+        # ends up abandoned (e.g. emptied out via rail redistribution).
+        self.initial_country_units = {name: country.units for name, country in self.countries.items()}
 
         self.reinforcements = 0
         self.all_reinforcements_deployed = True
@@ -70,10 +77,17 @@ class Engine:
         self.turn = np.random.randint(len(self.players))
 
         self.card_menu = CardMenu(self.view, self.players[self.turn])
+        self.turn_manager = TurnManager(self)
 
-        for index, country in enumerate(sample(self.countries.keys(), len(self.players))):
+        if self.default_game and len(self.players) == 3:
+            starting_countries = sample(["Madagaskar", "Pearl Harbor", "Viking"], 3)
+        else:
+            starting_countries = sample(list(self.countries.keys()), len(self.players))
+
+        for index, country in enumerate(starting_countries):
             self.countries[country].owner = self.players[index]
             self.countries[country].units = 15
+            self.countries[country].ships += 1
 
     def draw_world(self, background_color=(200, 200, 255)):
         self.view.screen.fill(background_color)
@@ -126,7 +140,10 @@ class Engine:
             image=self.images['spr_shop'],
         )
         shop_menu_button.draw(self.view, self.io)
-        shop_menu_button.release_button(lambda: Shop(), self.io)
+        shop_menu_button.release_button(self.turn_manager.open_shop, self.io)
+
+    def update_turn(self):
+        self.turn_manager.update()
 
     def control_card_menu(self):
         self.card_menu.draw_cards()
@@ -140,12 +157,14 @@ class Engine:
     def get_players(self):
         default = input("Play default? ")
         if default in {"yes", "y", "Y", "YES"}:
+            self.default_game = True
             return [
-                Player("Hugo", cards=[Kaertske(np.random.randint(4), images=self.images) for i in range(np.random.randint(6))]),
-                Player("Joeri", cards=[Kaertske(np.random.randint(4), images=self.images) for i in range(np.random.randint(6))]),
-                Player("Tètè", cards=[Kaertske(np.random.randint(4), images=self.images) for i in range(np.random.randint(6))]),
+                Player("Hugo"),
+                Player("Joeri"),
+                Player("Tètè"),
             ]
         else:
+            self.default_game = False
             while True:
                 try:
                     player_num = int(input("How many players? "))
