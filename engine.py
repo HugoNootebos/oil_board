@@ -8,7 +8,7 @@ from random import sample
 
 class Engine:
 
-    def __init__(self, width=960, height=640):
+    def __init__(self, width=960, height=640, mode="prompt"):
         pg.init()
         pg.font.init()
         self.font = pg.font.SysFont('Times New Roman', 20)
@@ -58,7 +58,7 @@ class Engine:
         self.gui = Gui(self.io, outline_color=self.colors["outlines"])
 
         self.default_player = Player("mouse", color=(200, 200, 200))
-        self.players = self.get_players()
+        self.players = self.get_players(mode)
         self.countries = get_countries(self.default_player)
         self.connections = get_connections()
 
@@ -154,7 +154,14 @@ class Engine:
         self.io.update(self.view, self.countries.values())
         self.view.offset = self.io.drag_map(self.view.offset)
 
-    def get_players(self):
+    def get_players(self, mode="prompt"):
+        if mode == "default":
+            self.default_game = True
+            return [
+                Player("Hugo"),
+                Player("Joeri"),
+                Player("Tètè"),
+            ]
         default = input("Play default? ")
         if default in {"yes", "y", "Y", "YES"}:
             self.default_game = True
