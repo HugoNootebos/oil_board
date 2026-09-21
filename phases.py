@@ -75,8 +75,10 @@ class Phase:
         """Hand a country over to the neutral default_player. Nobody is
         left to crew/maintain any ships, tanks, planes, forts or nukes
         sitting there, so they're destroyed along with the ownership
-        change."""
+        change, and its garrison resets to whatever board.py originally
+        put there (some countries start at 1, not the usual 2)."""
         country.owner = self.engine.default_player
+        country.units = self.engine.initial_country_units.get(country.name, 2)
         country.ships = 0
         country.tanks = 0
         country.planes = 0
@@ -190,7 +192,6 @@ class Phase:
                 country = engine.countries[name]
                 if country.units == 0:
                     self.abandon(country)
-                    country.units = engine.initial_country_units.get(name, 2)
             player.subattack = self._rail_return_subattack
             self.rail_network = []
             self.rail_initial_units = {}
@@ -238,6 +239,7 @@ class ReinforcementPhase(Phase):
         manager.reinforcements = int((player.troops - player.troops % 3) / 3 + 3) - starved
         manager.all_reinforcements_deployed = False
         manager.attacked = []
+        manager.conquered_enemy_this_turn = False
         player.subattack = 1
         return True
 
@@ -299,6 +301,19 @@ class AttackPhase(Phase):
         self.selected_planes = 0
         self._init_rail_state()
         self._rail_mode_subattack = 7
+
+    def reset(self):
+        """Clear anything that would otherwise linger visually (mainly the
+        shading _highlight_selection applies) from whoever last used this
+        phase -- AttackPhase is a single shared instance across every
+        player's turn, not one per player."""
+        self.attack_from = None
+        self.defence_country = None
+        self.attack_dice = None
+        self.defence_dice = None
+        self.rail_network = []
+        self.rail_initial_units = {}
+        self.rail_pool = 0
 
     def update(self):
         player = self.player
@@ -613,8 +628,10 @@ class AttackPhase(Phase):
         elif attack_from.units <= 0:
             # Attacker's stack is spent; nothing left to roll with, so back
             # out to re-picking an attacker instead of showing an empty
-            # dice screen.
-            attack_from.units = 2
+            # dice screen. With nobody left there to hold it, the country
+            # they attacked from goes neutral, same as any other country
+            # emptied out to 0.
+            self.abandon(attack_from)
             player.subattack = 0
             self.attack_from = None
             self.defence_country = None
@@ -631,19 +648,21 @@ class AttackPhase(Phase):
         player = self.player
         manager = self.manager
 
-        if defence.owner != engine.default_player and manager.card_limit == 0:
-            card_drawn = np.random.randint(0, 42)
-            for i in range(4):
-                if 13 * i <= card_drawn < 13 + 13 * i:
-                    player.cards.append(Kaertske(i, images=engine.images))
-                    manager.card_limit += 1
-                    break
+        if defence.owner != engine.default_player:
+            manager.conquered_enemy_this_turn = True
 
-        if self.selected_ships > 0 or self.selected_planes > 0:
-            defence.ships = self.selected_ships
-            defence.planes = self.selected_planes
-            attack_from.ships -= self.selected_ships
-            attack_from.planes -= self.selected_planes
+        # Conquest wipes out whatever the previous owner had stationed here
+        # -- ships, tanks, planes, and (already handled below) the fort --
+        # then whatever the attacker brought along replaces it. This has
+        # to be unconditional: previously, bringing along zero of every
+        # asset type left the defender's own assets untouched instead of
+        # destroyed.
+        defence.ships = self.selected_ships
+        defence.planes = self.selected_planes
+        defence.tanks = self.selected_tanks
+        attack_from.ships -= self.selected_ships
+        attack_from.planes -= self.selected_planes
+        attack_from.tanks -= self.selected_tanks
 
         if defence.owner != engine.default_player:
             eliminated = not any(
@@ -700,7 +719,6 @@ class AttackPhase(Phase):
         if self.clicked(25, HEIGHT - 50, 225, HEIGHT - 10):
             self.player.subattack = 0
             if attack_from.units == 0:
-                attack_from.units = 2
                 self.abandon(attack_from)
             self.attack_from = None
             self.defence_country = None
@@ -728,10 +746,26 @@ class MovementPhase(Phase):
         # of sea connections through the player's own territory -- boats
         # can't be moved between them otherwise.
         self.ships_via_sea = False
+        # Whether NO all-land route exists between origin and target, so
+        # troops need an escorting ship or (fuelled) plane to make the
+        # crossing at all.
+        self.troops_require_sea = False
         # Net oil spent moving planes this session, refunded on Cancel.
         self.oil_spent_on_planes = 0
         self._init_rail_state()
         self._rail_mode_subattack = 3
+
+    def reset(self):
+        """Clear anything that would otherwise linger visually (mainly the
+        shading _highlight_selection applies) from whoever last used this
+        phase -- MovementPhase is a single shared instance across every
+        player's turn, not one per player."""
+        self.origin_country = None
+        self.target_country = None
+        self.finished_list = set()
+        self.rail_network = []
+        self.rail_initial_units = {}
+        self.rail_pool = 0
 
     def update(self):
         player = self.player
@@ -761,6 +795,11 @@ class MovementPhase(Phase):
     def _select_origin(self):
         engine = self.engine
         player = self.player
+        if player.repositioned_this_turn:
+            self.blit_text(
+                "Already repositioned this turn", 25, self.view.HEIGHT - 270,
+            )
+            return
         hover = self.io.hover_country
         if self.io.left_pressed and hover is not None and engine.countries[hover].owner == player:
             self.origin_country = hover
@@ -805,6 +844,31 @@ class MovementPhase(Phase):
                 break
         return finished
 
+    def _land_flood_fill(self, origin):
+        """Like _flood_fill, but only hopping along land connections --
+        used to check whether troops can march the whole way unassisted.
+        If a target isn't in here, at least one leg of every route to it
+        crosses open sea, so troops need an escorting ship or plane."""
+        engine = self.engine
+        player = self.player
+        finished = {origin}
+        while True:
+            size_before = len(finished)
+            neighbours = set()
+            for name in finished:
+                for c in engine.connections:
+                    if c.kind == "land" and name in c:
+                        neighbours.update(c.connection)
+            finished |= {n for n in neighbours if engine.countries[n].owner == player}
+            if len(finished) == size_before:
+                break
+        return finished
+
+    def _has_sea_escort(self, target):
+        """Whether a ship or plane has actually been brought along (moved
+        into target during this session) to escort troops across water."""
+        return target.ships > self.initial_target_ships or target.planes > self.initial_target_planes
+
     def _select_target(self):
         engine = self.engine
         player = self.player
@@ -827,6 +891,7 @@ class MovementPhase(Phase):
             self.initial_origin_planes = origin.planes
             self.initial_target_planes = target.planes
             self.ships_via_sea = hover in self._sea_flood_fill(self.origin_country)
+            self.troops_require_sea = hover not in self._land_flood_fill(self.origin_country)
             self.oil_spent_on_planes = 0
             self.move_resource = "units"
             player.subattack = 2
@@ -839,6 +904,8 @@ class MovementPhase(Phase):
             return  # locked: no unbroken sea route between these two
 
         if key == "units":
+            if self.troops_require_sea and not self._has_sea_escort(target):
+                return  # troops can't cross open sea without an escort
             # Same bounded increment/decrement AttackPhase._post_conquest
             # uses while deciding how many troops move into a freshly
             # conquered country: 0 (or the full total) is a deliberate
@@ -924,6 +991,8 @@ class MovementPhase(Phase):
 
         if self.move_resource == "ships" and not self.ships_via_sea:
             self.blit_text("No unbroken sea route -- ships can't move here", 25, HEIGHT - 270)
+        elif self.move_resource == "units" and self.troops_require_sea and not self._has_sea_escort(target):
+            self.blit_text("No land route -- bring a ship or plane to escort troops", 25, HEIGHT - 270)
         elif self.move_resource == "planes":
             self.blit_text("Planes cost 1 oil each to relocate", 25, HEIGHT - 270)
 
@@ -953,11 +1022,11 @@ class MovementPhase(Phase):
             # cycling past 0 via the wraparound) no longer abandons it on
             # the spot.
             if origin.units == 0:
-                origin.units = 2
                 self.abandon(origin)
             elif target.units == 0:
-                target.units = 2
                 self.abandon(target)
+            # Only one confirmed reposition is allowed per turn.
+            self.player.repositioned_this_turn = True
             self.player.subattack = 0
 
 
@@ -1088,10 +1157,13 @@ class ShopPhase(Phase):
             self.player.subattack = next_sub
 
     def _build_link(self, kind_from, kind_to, cost, back):
+        if self.build_origin is not None:
+            self.engine.countries[self.build_origin].shade = 1
         hover = self.io.hover_country
         if not (self.io.left_pressed and hover is not None):
             return
         if hover == self.build_origin:
+            self.build_origin = None
             self.player.subattack = back
             return
         for c in self.engine.connections:
@@ -1152,7 +1224,7 @@ class ShopPhase(Phase):
             target.radioactive += 3
             target.units = int(round(target.units / 2))
             if target.units == 0 and target.owner == self.engine.default_player:
-                target.units = 2
+                target.units = self.engine.initial_country_units.get(hover, 2)
             self.player.nuclear -= 5
             self.manager.close_shop()
 
@@ -1185,7 +1257,10 @@ class TurnManager:
         self.reinforcements = 0
         self.all_reinforcements_deployed = True
         self.attacked = []
-        self.card_limit = 0
+        # Whether the player has conquered at least one non-neutral
+        # (i.e. another player's) territory so far this turn -- checked
+        # when the turn actually ends to award a card.
+        self.conquered_enemy_this_turn = False
         self.turn_num = 0
         self.initial_units = {}
         self.saved_attack = 0
@@ -1226,7 +1301,15 @@ class TurnManager:
                 HEIGHT - 50 <= engine.io.mouse_position.y <= HEIGHT - 10:
             player.attack = (player.attack + 1) % 3
             player.subattack = 0
+            if player.attack == 1:
+                self.phases[1].reset()
+            if player.attack == 2:
+                player.repositioned_this_turn = False
+                self.phases[2].reset()
             if player.attack == 0:
+                if self.conquered_enemy_this_turn:
+                    player.cards.append(Kaertske(int(np.random.randint(0, 4)), images=engine.images))
+                self.conquered_enemy_this_turn = False
                 self.next_turn()
 
     def update(self):
@@ -1246,7 +1329,8 @@ class TurnManager:
             player.attack = 1
             player.subattack = 0
             self.attacked = []
-            self.card_limit = 0
+            self.conquered_enemy_this_turn = False
+            self.phases[1].reset()
 
         # Too many cards: force the (existing) card menu open instead of the
         # legacy attack==4 integer-card phase from running.py.
