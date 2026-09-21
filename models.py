@@ -32,6 +32,9 @@ class Player:
         self.attack = 0
         self.subattack = 0
         self.start_ship = start_ship
+        # Movement phase (repositioning) is limited to one confirmed move
+        # per turn; reset whenever the player re-enters that phase.
+        self.repositioned_this_turn = False
         if self.color is None:
             self.color = 255 * np.random.rand(3)
 
@@ -371,12 +374,18 @@ class Io:
                 self.hover_country = country.name
 
     def drag_map(self, offset):
-        if self.mouse_state[1]:
+        # Either the middle or right mouse button drags (pans) the map
+        # sideways -- right-click is the more commonly expected one, and
+        # is otherwise unused anywhere in the game.
+        if self.mouse_state[1] or self.mouse_state[2]:
             return offset + self.transformed_mouse_position - self.previous_transformed_mouse_position
         return offset
 
 
 class View:
+
+    MIN_ZOOM = 0.3
+    MAX_ZOOM = 6.0
 
     def __init__(self, screen, zoom, offset, WIDTH, HEIGHT):
         self.screen = screen
@@ -384,6 +393,18 @@ class View:
         self.offset = offset
         self.WIDTH = WIDTH
         self.HEIGHT = HEIGHT
+
+    def zoom_at(self, screen_pos, factor):
+        """Multiply zoom by `factor`, adjusting offset so the world point
+        currently under `screen_pos` stays under the cursor, instead of
+        the map appearing to slide off toward a screen corner as it's
+        zoomed (the naive "just change self.zoom" approach)."""
+        world_before = screen_pos.screen_to_coordinates(self)
+        self.zoom = min(max(self.zoom * factor, self.MIN_ZOOM), self.MAX_ZOOM)
+        self.offset = Position(
+            (screen_pos.x - 0.5 * self.WIDTH) / self.zoom - world_before.x,
+            (screen_pos.y - 0.5 * self.HEIGHT) / self.zoom - world_before.y,
+        )
 
 
 class Button:
