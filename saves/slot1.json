@@ -1,0 +1,1752 @@
+{
+  "version": 1,
+  "save_name": "visnet",
+  "default_game": false,
+  "settings": {
+    "assets": false,
+    "sea": true,
+    "land": true,
+    "sea_route": true,
+    "tank": true,
+    "landmarks": true
+  },
+  "turn": {
+    "current_player_index": 1,
+    "turn_num": 17
+  },
+  "manager": {
+    "reinforcements": 5,
+    "all_reinforcements_deployed": false,
+    "attacked": [],
+    "defending_tanks": {},
+    "landmarks_punished": [],
+    "conquered_enemy_this_turn": false,
+    "pending_event_cards": 0,
+    "initial_units": {
+      "Redneck": 3,
+      "Madagaskar": 2,
+      "Zuid-Afrika": 0,
+      "Belgisch Congo": 1,
+      "Somali\u00eb": 2,
+      "Nigeria": 1,
+      "Sahara": 2,
+      "IJsland": 1,
+      "Viking": 2,
+      "Sovjet-Rusland": 2,
+      "Belarus": 2,
+      "Nazi-Duitsland": 2,
+      "Romeinse Rijk": 2,
+      "Spanje": 1,
+      "Londen": 1,
+      "Siberi\u00eb": 1,
+      "Kazachstan": 1,
+      "China": 4,
+      "Mongoli\u00eb": 1,
+      "Noord-Korea": 1,
+      "Maleisi\u00eb": 1,
+      "Sri Lanka": 1,
+      "India": 2,
+      "Ottomaanse Rijk": 2,
+      "Arabi\u00eb": 2,
+      "Japan": 3,
+      "Nederlands-Indi\u00eb": 1,
+      "Outback": 2,
+      "Gold Coast": 1,
+      "Papoea Nieuw Guinea": 1,
+      "Argentini\u00eb": 1,
+      "Venezuela": 5,
+      "Brazili\u00eb": 1,
+      "Peru": 5,
+      "Alaska": 2,
+      "New York": 1,
+      "Los Angeles": 2,
+      "Canada": 4,
+      "Mexico": 2,
+      "Groenland": 1,
+      "Cuba": 1,
+      "Pearl Harbor": 1
+    },
+    "saved_attack": 1,
+    "saved_subattack": 1,
+    "event_turn_index": 17,
+    "event_bag": [
+      "goede economie",
+      "Slavernij",
+      "de nazi's breiden uit",
+      "drugs",
+      "japanse agressie",
+      "Ontwikkelingshulp",
+      "strenge winter",
+      "Einde van de mensheid",
+      "covid",
+      "bedevaart",
+      "kinderarbeid",
+      "storm of zee",
+      "Muur van Trump",
+      "Verkeerde knop",
+      "Eer van de keizer",
+      "klimaatverandering blijkt hoax",
+      "ebola",
+      "nucleaire winter",
+      "plunderingen"
+    ],
+    "event_history": [
+      "maak van de VOC een deel 2",
+      "De Japanners worden gek",
+      "kindsoldaten",
+      "inboorlingen vechten terug"
+    ],
+    "current_event": "inboorlingen vechten terug",
+    "event_state": {
+      "pending": []
+    },
+    "event_pending_players": [],
+    "reveal_pool": [
+      "Hugo",
+      "Joeri"
+    ],
+    "awaiting_gap": false,
+    "event_schedule_pending": false
+  },
+  "players": [
+    {
+      "name": "Hugo",
+      "color": [
+        60.0,
+        110.0,
+        230.0
+      ],
+      "food": 20,
+      "wood": 6,
+      "steel": 0,
+      "nuclear": 3,
+      "oil": 15,
+      "troops": 2,
+      "attack": 0,
+      "boat_to_deploy": false,
+      "repositioned_this_turn": true,
+      "developed_this_turn": false,
+      "eliminated": false,
+      "is_bot": false,
+      "cards": [
+        0
+      ]
+    },
+    {
+      "name": "Joeri",
+      "color": [
+        40.0,
+        160.0,
+        70.0
+      ],
+      "food": 47,
+      "wood": 9,
+      "steel": 7,
+      "nuclear": 3,
+      "oil": 34,
+      "troops": 7,
+      "attack": 0,
+      "boat_to_deploy": false,
+      "repositioned_this_turn": true,
+      "developed_this_turn": false,
+      "eliminated": false,
+      "is_bot": false,
+      "cards": [
+        1,
+        3,
+        3
+      ]
+    },
+    {
+      "name": "Visnet",
+      "color": [
+        210.0,
+        40.0,
+        40.0
+      ],
+      "food": 4,
+      "wood": 6,
+      "steel": 4,
+      "nuclear": 8,
+      "oil": 8,
+      "troops": 4,
+      "attack": 0,
+      "boat_to_deploy": false,
+      "repositioned_this_turn": false,
+      "developed_this_turn": false,
+      "eliminated": false,
+      "is_bot": true,
+      "cards": []
+    }
+  ],
+  "countries": {
+    "Redneck": {
+      "owner": "Joeri",
+      "food": 0,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 3,
+      "units": 3,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Madagaskar": {
+      "owner": "__default_player__",
+      "food": 1,
+      "wood": 2,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": true,
+      "airport": true,
+      "dormant_owner": "Hugo",
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Zuid-Afrika": {
+      "owner": "__default_player__",
+      "food": 1,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 2,
+      "units": 0,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Belgisch Congo": {
+      "owner": "__default_player__",
+      "food": 0,
+      "wood": 0,
+      "steel": 1,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 3,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Somali\u00eb": {
+      "owner": "__default_player__",
+      "food": 0,
+      "wood": 1,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 3,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Nigeria": {
+      "owner": "__default_player__",
+      "food": 0,
+      "wood": 1,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 3,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Sahara": {
+      "owner": "__default_player__",
+      "food": 0,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 1,
+      "oil": 1,
+      "troops": 2,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "IJsland": {
+      "owner": "Joeri",
+      "food": 0,
+      "wood": 2,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 1,
+      "troops": 1,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Viking": {
+      "owner": "__default_player__",
+      "food": 2,
+      "wood": 1,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 1,
+      "troops": 0,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 3,
+      "developed": false,
+      "airport": true,
+      "dormant_owner": null,
+      "bombed_by": "Hugo",
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Sovjet-Rusland": {
+      "owner": "__default_player__",
+      "food": 0,
+      "wood": 1,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 1,
+      "troops": 3,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Belarus": {
+      "owner": "__default_player__",
+      "food": 4,
+      "wood": 1,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 0,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Nazi-Duitsland": {
+      "owner": "__default_player__",
+      "food": 1,
+      "wood": 0,
+      "steel": 2,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Romeinse Rijk": {
+      "owner": "__default_player__",
+      "food": 4,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 0,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Spanje": {
+      "owner": "Joeri",
+      "food": 2,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Londen": {
+      "owner": "Joeri",
+      "food": 2,
+      "wood": 1,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 0,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Siberi\u00eb": {
+      "owner": "Hugo",
+      "food": 1,
+      "wood": 0,
+      "steel": 1,
+      "nuclear": 0,
+      "oil": 1,
+      "troops": 0,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Kazachstan": {
+      "owner": "Hugo",
+      "food": 1,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 1,
+      "oil": 1,
+      "troops": 1,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "China": {
+      "owner": "__default_player__",
+      "food": 8,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 0,
+      "units": 4,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Mongoli\u00eb": {
+      "owner": "__default_player__",
+      "food": 1,
+      "wood": 0,
+      "steel": 1,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Noord-Korea": {
+      "owner": "Hugo",
+      "food": 0,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 2,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Maleisi\u00eb": {
+      "owner": "Hugo",
+      "food": 1,
+      "wood": 2,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 0,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Sri Lanka": {
+      "owner": "Hugo",
+      "food": 1,
+      "wood": 2,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 2,
+      "radioactive": 0,
+      "developed": true,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "India": {
+      "owner": "Hugo",
+      "food": 1,
+      "wood": 1,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 2,
+      "ships": 1,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Ottomaanse Rijk": {
+      "owner": "__default_player__",
+      "food": 2,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 1,
+      "troops": 1,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Arabi\u00eb": {
+      "owner": "__default_player__",
+      "food": 0,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 5,
+      "troops": 0,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Japan": {
+      "owner": "__default_player__",
+      "food": 1,
+      "wood": 1,
+      "steel": 1,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 0,
+      "units": 3,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Nederlands-Indi\u00eb": {
+      "owner": "Hugo",
+      "food": 1,
+      "wood": 2,
+      "steel": 1,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 0,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Outback": {
+      "owner": "__default_player__",
+      "food": 1,
+      "wood": 0,
+      "steel": 3,
+      "nuclear": 1,
+      "oil": 0,
+      "troops": 0,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": true,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Gold Coast": {
+      "owner": "Hugo",
+      "food": 1,
+      "wood": 0,
+      "steel": 2,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": true,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Papoea Nieuw Guinea": {
+      "owner": "__default_player__",
+      "food": 1,
+      "wood": 1,
+      "steel": 1,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Argentini\u00eb": {
+      "owner": "Visnet",
+      "food": 1,
+      "wood": 0,
+      "steel": 2,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 0,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": true,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Venezuela": {
+      "owner": "Visnet",
+      "food": 0,
+      "wood": 0,
+      "steel": 3,
+      "nuclear": 1,
+      "oil": 0,
+      "troops": 1,
+      "units": 5,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 1,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": true,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Brazili\u00eb": {
+      "owner": "Visnet",
+      "food": 0,
+      "wood": 3,
+      "steel": 1,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 0,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": true,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Peru": {
+      "owner": "__default_player__",
+      "food": 1,
+      "wood": 0,
+      "steel": 3,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 5,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Alaska": {
+      "owner": "Joeri",
+      "food": 1,
+      "wood": 0,
+      "steel": 1,
+      "nuclear": 0,
+      "oil": 1,
+      "troops": 1,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "New York": {
+      "owner": "Joeri",
+      "food": 4,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 0,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Los Angeles": {
+      "owner": "Joeri",
+      "food": 2,
+      "wood": 1,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Canada": {
+      "owner": "__default_player__",
+      "food": 0,
+      "wood": 2,
+      "steel": 0,
+      "nuclear": 1,
+      "oil": 1,
+      "troops": 0,
+      "units": 4,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": true,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Mexico": {
+      "owner": "Visnet",
+      "food": 1,
+      "wood": 1,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Groenland": {
+      "owner": "Joeri",
+      "food": 2,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 1,
+      "troops": 0,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Cuba": {
+      "owner": "__default_player__",
+      "food": 2,
+      "wood": 1,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Pearl Harbor": {
+      "owner": "Visnet",
+      "food": 0,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 2,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": true,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    }
+  },
+  "connections": [
+    {
+      "between": [
+        "Nigeria",
+        "Zuid-Afrika"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "India",
+        "Sri Lanka"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Kazachstan",
+        "Sovjet-Rusland"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Japan",
+        "Pearl Harbor"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "India",
+        "Kazachstan"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Los Angeles",
+        "Redneck"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Siberi\u00eb",
+        "Sovjet-Rusland"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Kazachstan",
+        "Ottomaanse Rijk"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Canada",
+        "Groenland"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Argentini\u00eb",
+        "Brazili\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "China",
+        "Mongoli\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Arabi\u00eb",
+        "Ottomaanse Rijk"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Canada",
+        "Redneck"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Argentini\u00eb",
+        "Peru"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "China",
+        "India"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Ottomaanse Rijk",
+        "Sahara"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "New York",
+        "Redneck"
+      ],
+      "kind": "land",
+      "rails": true,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Brazili\u00eb",
+        "Peru"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "China",
+        "Noord-Korea"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Nigeria",
+        "Spanje"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Londen",
+        "New York"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Brazili\u00eb",
+        "Venezuela"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Mongoli\u00eb",
+        "Noord-Korea"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Sahara",
+        "Spanje"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Groenland",
+        "IJsland"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Peru",
+        "Venezuela"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "China",
+        "Japan"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Romeinse Rijk",
+        "Sahara"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Cuba",
+        "New York"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Brazili\u00eb",
+        "Nigeria"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Japan",
+        "Noord-Korea"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Nazi-Duitsland",
+        "Spanje"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Cuba",
+        "Venezuela"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Belgisch Congo",
+        "Nigeria"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Japan",
+        "Siberi\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Nazi-Duitsland",
+        "Romeinse Rijk"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Cuba",
+        "Mexico"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Belgisch Congo",
+        "Somali\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "China",
+        "Maleisi\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Belarus",
+        "Romeinse Rijk"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Los Angeles",
+        "Mexico"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Nigeria",
+        "Somali\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "India",
+        "Maleisi\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Londen",
+        "Spanje"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Canada",
+        "Los Angeles"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Maleisi\u00eb",
+        "Nederlands-Indi\u00eb"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Los Angeles",
+        "Pearl Harbor"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Londen",
+        "Nazi-Duitsland"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Mexico",
+        "Redneck"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Nederlands-Indi\u00eb",
+        "Outback"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Londen",
+        "Viking"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Mexico",
+        "Venezuela"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Madagaskar",
+        "Zuid-Afrika"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "India",
+        "Nederlands-Indi\u00eb"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Nazi-Duitsland",
+        "Viking"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Sovjet-Rusland",
+        "Viking"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Belgisch Congo",
+        "Zuid-Afrika"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Gold Coast",
+        "Outback"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "IJsland",
+        "Viking"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Belarus",
+        "Sovjet-Rusland"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Madagaskar",
+        "Sri Lanka"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Gold Coast",
+        "Papoea Nieuw Guinea"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "IJsland",
+        "Londen"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Madagaskar",
+        "Somali\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Japan",
+        "Papoea Nieuw Guinea"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Ottomaanse Rijk",
+        "Romeinse Rijk"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Arabi\u00eb",
+        "Somali\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Alaska",
+        "Siberi\u00eb"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Belarus",
+        "Nazi-Duitsland"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Sahara",
+        "Somali\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Alaska",
+        "Canada"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Belarus",
+        "Ottomaanse Rijk"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Arabi\u00eb",
+        "Sahara"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Alaska",
+        "Los Angeles"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Kazachstan",
+        "Mongoli\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Arabi\u00eb",
+        "India"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    }
+  ]
+}
