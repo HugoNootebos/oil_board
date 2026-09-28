@@ -4,8 +4,21 @@ from models import (
 )
 
 
+CONTINENTS = {
+    "Africa": ["Madagaskar", "Zuid-Afrika", "Belgisch Congo", "Somalië", "Nigeria", "Sahara"],
+    "Europe": ["IJsland", "Viking", "Sovjet-Rusland", "Belarus", "Nazi-Duitsland", "Romeinse Rijk",
+               "Spanje", "Londen"],
+    "Asia": ["Siberië", "Kazachstan", "China", "Mongolië", "Noord-Korea", "Maleisië", "Sri Lanka",
+             "India", "Ottomaanse Rijk", "Arabië", "Japan"],
+    "Oceania": ["Nederlands-Indië", "Outback", "Gold Coast", "Papoea Nieuw Guinea"],
+    "South America": ["Argentinië", "Venezuela", "Brazilië", "Peru"],
+    "North America": ["Alaska", "New York", "Los Angeles", "Canada", "Mexico", "Groenland", "Cuba",
+                      "Pearl Harbor", "Redneck"],
+}
+
+
 def get_countries(default_player):
-    return {
+    countries = {
         "Redneck": Country(
             "Redneck",
             [
@@ -463,15 +476,16 @@ def get_countries(default_player):
             [
                 [(191, 163), (193, 158), (200, 158), (199, 166), (189, 172), (189, 176), (184, 177), (176, 184),
                  (178, 189),
-                 (174, 190), (165, 197), (163, 205), (164, 214), (161, 219), (158, 218), (158, 204), (156, 204),
+                 (174, 190), (165, 197), (166, 206), (167.4, 212), (166.4, 217), (162.6, 210),
+                 (158, 204), (156, 204),
                  (154, 206),
                  (151, 203), (153, 192), (158, 182), (164, 174), (179, 167), (178, 164)]
             ],
             food=4,
             owner=default_player,
         ),
-        "Californië": Country(
-            "Californië",
+        "Los Angeles": Country(
+            "Los Angeles",
             [
                 [(89, 156), (85, 156), (83, 170), (85, 183), (90, 198), (98, 198), (103, 203), (112, 201), (112, 187),
                  (110, 169), (111, 150), (86, 150)]
@@ -569,6 +583,33 @@ def get_countries(default_player):
             owner=default_player,
         ),
     }
+    # Finer coastlines from Natural Earth (drawing only); if the generated
+    # file is missing the hand-drawn outlines above are used as they are.
+    try:
+        from map_polygons import POLYGONS
+    except ImportError:
+        POLYGONS = {}
+    for name, outline in POLYGONS.items():
+        countries[name].set_outline(outline)
+    # Some islands are too small to see (or click) properly: drawn larger.
+    for name, factor in (("Sri Lanka", 1.8), ("Cuba", 2.2)):
+        countries[name].scale_shape(factor)
+    # Sri Lanka sits one (enlarged) island length further south, clear of India.
+    sri_lanka = countries["Sri Lanka"]
+    ys = [p.y for ring in sri_lanka.polygon for p in ring]
+    sri_lanka.translate(0, max(ys) - min(ys))
+    # The enlarged Cuba moves south, leaving a strait below Florida's tip.
+    countries["Cuba"].translate(0, 9)
+    # Round off the (drawn) outlines, all countries at once so shared
+    # borders bend identically on both sides.
+    from outline_smoothing import smooth_outlines
+    smoothed = smooth_outlines({
+        name: [[(p.x, p.y) for p in ring] for ring in country.polygon]
+        for name, country in countries.items()
+    })
+    for name, rings in smoothed.items():
+        countries[name].set_drawn_outline(rings)
+    return countries
 
 
 def get_connections():
@@ -613,11 +654,11 @@ def get_connections():
         Connection({"Ottomaanse Rijk", "Belarus"}, 'land'),
         Connection({"Kazachstan", "Mongolië"}, 'land'),
         Connection({"Kazachstan", "Sovjet-Rusland"}, 'land'),
-        Connection({"Mongolië", "Sovjet-Rusland"}, 'land'),
         Connection({"Sovjet-Rusland", "Siberië"}, 'land'),
         Connection({"Mongolië", "China"}, 'land'),
         Connection({"India", "China"}, 'land'),
         Connection({"China", "Noord-Korea"}, 'land'),
+        Connection({"Noord-Korea", "Mongolië"}, 'land'),
         Connection({"China", "Japan"}, 'sea'),
         Connection({"Noord-Korea", "Japan"}, 'sea'),
         Connection({"Japan", "Siberië"}, 'sea'),
@@ -625,25 +666,26 @@ def get_connections():
         Connection({"Maleisië", "India"}, 'land'),
         Connection({"Maleisië", "Nederlands-Indië"}, 'sea'),
         Connection({"Nederlands-Indië", "Outback"}, 'sea'),
+        Connection({"India", "Nederlands-Indië"}, 'sea'),
         Connection({"Outback", "Gold Coast"}, 'land'),
         Connection({"Papoea Nieuw Guinea", "Gold Coast"}, 'sea'),
         Connection({"Papoea Nieuw Guinea", "Japan"}, 'sea'),
         Connection({"Alaska", "Siberië"}, 'sea'),
         Connection({"Alaska", "Canada"}, 'land'),
-        Connection({"Californië", "Alaska"}, 'sea'),
-        Connection({"Californië", "Pearl Harbor"}, 'sea'),
+        Connection({"Los Angeles", "Alaska"}, 'sea'),
+        Connection({"Los Angeles", "Pearl Harbor"}, 'sea'),
         Connection({"Japan", "Pearl Harbor"}, 'sea'),
-        Connection({"Californië", "Redneck"}, 'land'),
+        Connection({"Los Angeles", "Redneck"}, 'land'),
         Connection({"Canada", "Groenland"}, 'sea'),
         Connection({"Redneck", "Canada"}, 'land'),
         Connection({"New York", "Redneck"}, 'land'),
-        Connection({"Canada", "New York"}, 'sea'),
         Connection({"New York", "Londen"}, 'sea'),
         Connection({"IJsland", "Groenland"}, 'sea'),
         Connection({"New York", "Cuba"}, 'sea'),
         Connection({"Cuba", "Venezuela"}, 'sea'),
-        Connection({"Californië", "Mexico"}, 'land'),
-        Connection({"Californië", "Canada"}, 'land'),
+        Connection({"Cuba", "Mexico"}, 'sea'),
+        Connection({"Los Angeles", "Mexico"}, 'land'),
+        Connection({"Los Angeles", "Canada"}, 'land'),
         Connection({"Redneck", "Mexico"}, 'land'),
         Connection({"Mexico", "Venezuela"}, 'land'),
         Connection({"Viking", "Sovjet-Rusland"}, 'sea'),
