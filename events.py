@@ -403,6 +403,18 @@ class WrongButton(Event):
         country.units = country.units // 2  # rounded down
         country.radioactive += 3
         country.bombed_by = chooser
+        if country.units == 0:
+            # Same as the shop's nuke (ShopPhase.drop_nuke): nobody is left
+            # to hold it, so it goes back to mouse; if it was a player's
+            # last country, the chooser eliminated them.
+            manager = engine.turn_manager
+            phase = manager.phases[0]
+            conquered = manager.conquered_enemy_this_turn
+            phase.take_last_country(chooser, country)
+            if chooser is not engine.players[engine.turn]:
+                # The turn's conquest card belongs to whoever's turn it is.
+                manager.conquered_enemy_this_turn = conquered
+            phase.abandon(country)
 
     def _launch(self, engine, chooser, return_to, why):
         """`chooser` (Noord-Korea's owner) picks the Asian country to nuke:
