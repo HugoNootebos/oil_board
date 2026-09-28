@@ -1160,8 +1160,7 @@ class AttackPhase(Phase):
             defence = engine.countries[self.defence_country]
             if getattr(defence.owner, "is_bot", False):
                 # A bot defender decides on the spot (see bot.py).
-                from bot import defence_tanks
-                choice = defence_tanks(engine, defence)
+                choice = manager.bot.defence_tanks(defence)
                 defence.owner.oil -= choice
                 manager.defending_tanks[self.defence_country] = choice
                 self._cast_attack_dice()
@@ -2311,7 +2310,6 @@ class MouseAttackPhase(Phase):
             self._resolve(event, country)
 
     def _begin(self, event):
-        from bot import defence_tanks
         engine = self.engine
         country = engine.countries[event.queue[0]]
         owner = country.owner
@@ -2323,7 +2321,7 @@ class MouseAttackPhase(Phase):
         self.tanks = 0
         if country.tanks > 0 and owner.oil > 0:
             if owner.is_bot:
-                self.tanks = defence_tanks(engine, country)
+                self.tanks = self.manager.bot.defence_tanks(country)
                 owner.oil -= self.tanks
             else:
                 # Default to every tank their oil can run.

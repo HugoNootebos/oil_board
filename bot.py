@@ -41,9 +41,17 @@ STEP_MS = 400      # between actions
 DICE_MS = 900      # how long a roll stays visible before it's resolved
 NOTICE_MS = 2500   # a message on a bot's turn closes by itself after this
 
-ATTACK_MIN_P = 0.65   # start an attack only with at least this chance
-RETREAT_P = 0.25      # call a running attack off below this chance
-DEPLOY_TARGET_P = 0.8  # reinforce an attack until it's this likely
+# What a bot weighs its decisions with, per difficulty level (a player's
+# `bot_level`, see BotController.params). bot_selfplay.py can pit levels
+# against each other to tune these.
+LEVELS = {
+    "normal": {
+        "attack_min_p": 0.65,     # start an attack only with at least this chance
+        "retreat_p": 0.25,        # call a running attack off below this chance
+        "deploy_target_p": 0.8,   # reinforce an attack until it's this likely
+    },
+}
+DEFAULT_LEVEL = "normal"
 
 CONTINENT_OF = {name: continent for continent, members in CONTINENTS.items() for name in members}
 
@@ -85,11 +93,6 @@ def conquer_probability(attackers, defenders, mods=(0, 0, 0, 0)):
     )
 
 
-def defence_tanks(engine, country):
-    """How many of its tanks a bot defending `country` uses (1 oil each)."""
-    return min(country.tanks, country.owner.oil)
-
-
 class BotController:
 
     def __init__(self, manager):
@@ -113,6 +116,18 @@ class BotController:
     @property
     def notice_ms(self):
         return 0 if self.fast else NOTICE_MS
+
+    @property
+    def params(self):
+        """The current bot's tunables (its difficulty level's)."""
+        return LEVELS.get(getattr(self.player, "bot_level", DEFAULT_LEVEL), LEVELS[DEFAULT_LEVEL])
+
+    # --- decisions on someone else's turn ------------------------------------
+
+    def defence_tanks(self, country):
+        """How many of its tanks the bot owning `country` uses to defend it
+        against an attack (1 oil each)."""
+        return min(country.tanks, country.owner.oil)
 
     # --- per-frame driver --------------------------------------------------
 
@@ -364,10 +379,10 @@ class BotController:
             for from_c, target, _ in self._attack_options(extra={n: troops for n in self._frontier_names()}):
                 have = from_c.units + plan.get(from_c.name, 0)
                 value = self._target_value(target)
-                if self._win_probability(from_c, target, attackers=have - 1) >= DEPLOY_TARGET_P:
+                if self._win_probability(from_c, target, attackers=have - 1) >= self.params["deploy_target_p"]:
                     continue  # likely enough already
                 for k in range(1, troops + 1):
-                    if self._win_probability(from_c, target, attackers=have + k - 1) >= DEPLOY_TARGET_P:
+                    if self._win_probability(from_c, target, attackers=have + k - 1) >= self.params["deploy_target_p"]:
                         score = value / k
                         if best is None or score > best[0]:
                             best = (score, from_c.name, k)
@@ -489,7 +504,7 @@ class BotController:
             from_c = self.engine.countries[attack.attack_from]
             target = self.engine.countries[attack.defence_country]
             chance = self._win_probability(from_c, target, active_tanks=attack.active_tanks)
-            if chance < RETREAT_P:
+            if chance < self.params["retreat_p"]:
                 self._failed.add((from_c.name, target.name))
                 attack.attack_from = attack.defence_country = None
                 player.subattack = 0
@@ -511,7 +526,7 @@ class BotController:
             if (from_c.name, target.name) in self._failed:
                 continue
             chance = self._win_probability(from_c, target)
-            if chance < ATTACK_MIN_P:
+            if chance < self.params["attack_min_p"]:
                 continue
             score = chance * self._target_value(target)
             if best is None or score > best[0]:
