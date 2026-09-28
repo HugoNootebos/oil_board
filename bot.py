@@ -52,6 +52,10 @@ LEVELS = {
         # Troops that will starve at the next turn start anyway cost
         # nothing to lose: attacks made with them only need this chance.
         "free_attack_min_p": 0.4,
+        "kill_value": 0.5,        # an enemy player's troop killed, in our troops
+        "follow_discount": 0.7,   # weight of what the survivors can take next
+        "deploy_min_gain": 0.25,  # attack value a troop must add, else it defends
+        "hunt_min_p": 0.3,        # go for an elimination this likely (cards and all)
         "horizon": 3,             # turns a conquered country's income is counted for
         "develop_horizon": 4,     # turns a development is expected to pay out
         "hold_weak_sets": True,   # keep a card set worth less than 10 unless it's needed
@@ -91,18 +95,29 @@ def _round_outcomes(na, nd, a_all, a_high, d_all, d_high):
 
 
 @lru_cache(maxsize=None)
-def conquer_probability(attackers, defenders, mods=(0, 0, 0, 0)):
-    """Chance that `attackers` rolling troops (up to 3 dice a roll) wipe out
-    `defenders` (up to 2 dice) if the attack is kept up to the end."""
+def battle(attackers, defenders, mods=(0, 0, 0, 0)):
+    """How an attack by `attackers` rolling troops (up to 3 dice a roll) on
+    `defenders` (up to 2 dice) ends if it's kept up to the end:
+    (chance the defenders are wiped out, attackers left on average --
+    counting 0 when they lose --, defenders killed on average)."""
     if defenders <= 0:
-        return 1.0
+        return 1.0, float(attackers), 0.0
     if attackers <= 0:
-        return 0.0
+        return 0.0, 0.0, 0.0
     attackers, defenders = min(attackers, 60), min(defenders, 60)
-    return sum(
-        p * conquer_probability(attackers - al, defenders - dl, mods)
-        for al, dl, p in _round_outcomes(min(attackers, 3), min(defenders, 2), *mods)
-    )
+    win = survivors = killed = 0.0
+    for al, dl, p in _round_outcomes(min(attackers, 3), min(defenders, 2), *mods):
+        w, s, k = battle(attackers - al, defenders - dl, mods)
+        win += p * w
+        survivors += p * s
+        killed += p * (dl + k)
+    return win, survivors, killed
+
+
+def conquer_probability(attackers, defenders, mods=(0, 0, 0, 0)):
+    """Chance that `attackers` rolling troops wipe out `defenders` if the
+    attack is kept up to the end."""
+    return battle(attackers, defenders, mods)[0]
 
 
 class BotController:
@@ -380,9 +395,75 @@ class BotController:
                 value += 2 + CARD_VALUE * bonus  # breaks their continent
         if self._is_real(target.owner):
             value += 0.5 if manager.conquered_enemy_this_turn else CARD_VALUE  # the turn's card
-            if not any(c.owner is target.owner and c is not target for c in engine.countries.values()):
+            left = sum(1 for c in engine.countries.values() if c.owner is target.owner)
+            if left == 1:
                 value += 6 + self._loot_value(target.owner)  # eliminates them
+            elif target.owner in self._hunt():
+                # A step towards finishing them off this turn.
+                value += (6 + self._loot_value(target.owner)) * self._hunt()[target.owner] / left
         return value
+
+    def _hunt(self):
+        """{player: chance}: other players the bot can likely wipe out this
+        turn -- a few countries, each within reach of one of our stacks."""
+        def compute():
+            engine, player = self.engine, self.player
+            hunted = {}
+            for other in engine.players:
+                if other is player or other.eliminated:
+                    continue
+                theirs = self._owned(other)
+                if not theirs or len(theirs) > 3:
+                    continue
+                chance = 1.0
+                for country in theirs:
+                    best = 0.0
+                    for name, kind in self._links(country.name).items():
+                        own = engine.countries[name]
+                        if own.owner is player and own.units > 1 and self._can_reach(own, kind):
+                            best = max(best, self._win_probability(own, country))
+                    chance *= best
+                if chance >= self.params["hunt_min_p"]:
+                    hunted[other] = chance
+            return hunted
+        return self._cached("hunt", compute)
+
+    def _attack_ev(self, from_c, target, attackers, active_tanks=None, depth=2, seen=()):
+        """What attacking `target` from `from_c` with `attackers` rolling
+        troops is worth on average, in troops: the target's value times the
+        chance of taking it, plus enemy troops killed, minus our troops lost
+        (troops that starve anyway cost nothing) -- and, `depth` conquests
+        deep, part of the best the survivors can then take from there."""
+        if attackers < 1:
+            return float("-inf")
+        key = ("ev", from_c.name, target.name, attackers, active_tanks, depth, seen)
+
+        def compute():
+            engine, player, event = self.engine, self.player, self.manager.current_event
+            if event is not None and event.free_claim_allowed(engine, target):
+                chance, left, killed = 1.0, float(attackers), 0.0
+            else:
+                tanks = min(from_c.tanks, player.oil) if active_tanks is None else active_tanks
+                chance, left, killed = battle(attackers, target.units, self._combat_mods(from_c, target, tanks))
+            starving = self._economy()["starving"]
+            troop_cost = 1 - min(1.0, starving / attackers)
+            kill_value = self.params["kill_value"] if self._is_real(target.owner) else 0
+            ev = chance * self._target_value(target) + kill_value * killed - troop_cost * (attackers - left)
+            if depth > 1 and chance > 0.05:
+                # The survivors move in (one stays behind) and go on.
+                onward = int(left / chance) - 1
+                seen_now = seen + (from_c.name, target.name)
+                best = 0.0
+                for name, kind in self._links(target.name).items():
+                    nxt = engine.countries[name]
+                    if kind != "land" or nxt.owner is player or name in seen_now:
+                        continue
+                    if event is not None and not event.can_attack_target(engine, nxt):
+                        continue
+                    best = max(best, self._attack_ev(target, nxt, onward, active_tanks, depth - 1, seen_now))
+                ev += chance * self.params["follow_discount"] * best
+            return ev
+        return self._cached(key, compute)
 
     def _can_reach(self, from_c, kind):
         """Whether an attack from from_c over a `kind` link can be made."""
@@ -476,29 +557,35 @@ class BotController:
         player.subattack = 1
 
     def _deploy_plan(self, troops):
-        """{country: troops}: first make the most valuable attacks likely
-        enough (cheapest first), then shore up the most threatened border."""
+        """{country: troops}: troops go, a few at a time, where they add the
+        most attack value per troop (see _attack_ev); once no stack gains
+        enough from more, the rest shore up the most threatened border."""
+        engine = self.engine
         plan = {}
+        targets = {}
+        for from_c, target, _ in self._attack_options(extra={n: troops for n in self._frontier_names()}):
+            targets.setdefault(from_c.name, []).append(target)
+
+        def stack_value(name, units):
+            from_c = engine.countries[name]
+            return max(0.0, max(self._attack_ev(from_c, t, units - 1) for t in targets[name]))
+
         while troops > 0:
             best = None
-            for from_c, target, _ in self._attack_options(extra={n: troops for n in self._frontier_names()}):
-                have = from_c.units + plan.get(from_c.name, 0)
-                value = self._target_value(target)
-                if self._win_probability(from_c, target, attackers=have - 1) >= self.params["deploy_target_p"]:
-                    continue  # likely enough already
-                for k in range(1, troops + 1):
-                    if self._win_probability(from_c, target, attackers=have + k - 1) >= self.params["deploy_target_p"]:
-                        score = value / k
-                        if best is None or score > best[0]:
-                            best = (score, from_c.name, k)
+            for name in targets:
+                have = engine.countries[name].units + plan.get(name, 0)
+                base = stack_value(name, have)
+                for k in sorted({1, 2, 3, 5, 8, 12, 20, troops}):
+                    if k > troops:
                         break
-            if best is None:
+                    gain = (stack_value(name, have + k) - base) / k
+                    if best is None or gain > best[0]:
+                        best = (gain, name, k)
+            if best is None or best[0] < self.params["deploy_min_gain"]:
                 break
             _, name, k = best
             plan[name] = plan.get(name, 0) + k
             troops -= k
-            if len(plan) >= 3:
-                break  # don't spread too thin
         if troops > 0:
             # What's left goes to the border facing the biggest enemy force
             # (or simply the biggest border stack).
@@ -653,7 +740,8 @@ class BotController:
             from_c = self.engine.countries[attack.attack_from]
             target = self.engine.countries[attack.defence_country]
             chance = self._win_probability(from_c, target, active_tanks=attack.active_tanks)
-            if chance < self.params["retreat_p"] * (1 - self._free_share(from_c)):
+            ev = self._attack_ev(from_c, target, from_c.units - 1, attack.active_tanks)
+            if chance < self.params["retreat_p"] * (1 - self._free_share(from_c)) or ev < 0:
                 self._failed.add((from_c.name, target.name))
                 attack.attack_from = attack.defence_country = None
                 player.subattack = 0
@@ -670,6 +758,8 @@ class BotController:
     def _start_best_attack(self):
         player, manager = self.player, self.manager
         attack = manager.phases[1]
+        if self._hunt() and self._trade(need_troops=True):
+            return  # troops to finish someone off; placed first (RecruitPhase)
         best = None
         for from_c, target, land in self._attack_options():
             if (from_c.name, target.name) in self._failed:
@@ -677,7 +767,9 @@ class BotController:
             chance = self._win_probability(from_c, target)
             if chance < self._attack_min_p(from_c):
                 continue
-            score = chance * self._target_value(target)
+            score = self._attack_ev(from_c, target, from_c.units - 1)
+            if score <= 0:
+                continue
             if best is None or score > best[0]:
                 best = (score, from_c, target, land)
         if best is None:
@@ -694,8 +786,8 @@ class BotController:
             attack.attack_from = None
             return
         # Planes only when they're the way across (they cost oil), and
-        # tanks only if they make a real difference.
-        if self._win_probability(from_c, target, active_tanks=0) >= 0.9:
+        # tanks -- while oil is short -- only if they make a real difference.
+        if self._weights()["oil"] >= 0.2 and self._win_probability(from_c, target, active_tanks=0) >= 0.9:
             attack.active_tanks = 0
         if land or attack.selected_ships > 0:
             attack.selected_planes = 0

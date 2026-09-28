@@ -14,6 +14,10 @@ possible -- for testing and tuning bot.py.
     python3 bot_selfplay.py [games] [players] --levels hard,normal
         A/B test between two difficulty levels of the current bot.
 
+    python3 bot_selfplay.py [games] [players] --levels normal,normal --tweak attack_min_p=0.5
+        A/B test of a tuning change: side A plays its level with the
+        tweaked values (--tweak can be repeated).
+
 In an A/B test the seats alternate between the sides, and every game is
 played twice from the same start (seed) with the sides swapped, so both
 get the same starting countries and turn order. It prints side A's win
@@ -26,6 +30,7 @@ Autosaves go to a temporary file, not saves/autosave.json.
 """
 
 import argparse
+import ast
 import collections
 import importlib.util
 import os
@@ -78,7 +83,8 @@ class MixedBots:
 
 
 class Stats:
-    """Tallies per side, gathered by wrapping a few game methods."""
+    """Tallies per side, gathered by wrapping a few game methods (so only
+    one per process)."""
 
     def __init__(self):
         self.side_of = {}  # player -> "A" / "B"
@@ -198,29 +204,62 @@ def play_game(player_count, seed, sides=None, levels=None, other=None, stats=Non
     return (sides[app.players.index(winner)] if sides else winner.name), manager.turn_num
 
 
-def ab_test(games, players, seed, levels=None, other=None):
-    stats = Stats()
+# One A/B game per call, possibly in a worker process (--jobs): each
+# process loads the other bot and installs the stats hooks once.
+_worker = {}
+
+
+def _init_worker(tweaked, other_path):
+    if tweaked:
+        bot.LEVELS["tweaked"] = tweaked
+    _worker["other"] = load_bot_module(other_path) if other_path else None
+    _worker["stats"] = Stats()
+
+
+def _ab_game(job):
+    i, players, seed, levels = job
+    # Pairs of games from the same seed, sides swapped.
+    sides = ["A" if (seat % 2 == 0) == (i % 2 == 0) else "B" for seat in range(players)]
+    stats = _worker["stats"]
+    stats.side_of.clear()
+    stats.count.clear()
+    winner, turns = play_game(players, seed + i // 2, sides, levels, _worker["other"], stats)
+    return winner, turns, {side: dict(counter) for side, counter in stats.count.items()}
+
+
+def ab_test(games, players, seed, levels=None, tweaked=None, other_path=None, jobs=1):
     wins = collections.Counter()
+    totals = collections.defaultdict(collections.Counter)
     turns = []
     start = time.time()
-    for i in range(games):
-        # Pairs of games from the same seed, sides swapped.
-        first = ["A" if (seat % 2 == 0) == (i % 2 == 0) else "B" for seat in range(players)]
-        winner, n = play_game(players, seed + i // 2, first, levels, other, stats)
+    job_list = [(i, players, seed, levels) for i in range(games)]
+    if jobs > 1:
+        import multiprocessing
+        pool = multiprocessing.Pool(jobs, initializer=_init_worker, initargs=(tweaked, other_path))
+        results = pool.imap_unordered(_ab_game, job_list)
+    else:
+        _init_worker(tweaked, other_path)
+        pool = None
+        results = map(_ab_game, job_list)
+    for done, (winner, n, counts) in enumerate(results, 1):
         wins[winner] += 1
         turns.append(n)
+        for side, counter in counts.items():
+            totals[side].update(counter)
         decided = wins["A"] + wins["B"]
-        if (i + 1) % 10 == 0 or i + 1 == games:
+        if done % 10 == 0 or done == games:
             rate = wins["A"] / decided if decided else 0
             print("{:4d} games: A {:3d}  B {:3d}  draws {:2d}  A win rate {:.1%}  ({:.0f} s)".format(
-                i + 1, wins["A"], wins["B"], wins[None], rate, time.time() - start), flush=True)
+                done, wins["A"], wins["B"], wins[None], rate, time.time() - start), flush=True)
+    if pool is not None:
+        pool.close()
     decided = wins["A"] + wins["B"]
     rate = wins["A"] / decided if decided else 0
     margin = 1.96 * (rate * (1 - rate) / decided) ** 0.5 if decided else 0
     print()
     print("A win rate {:.1%} +- {:.1%} over {} decided games; median game {} turns".format(
         rate, margin, decided, sorted(turns)[len(turns) // 2]))
-    keys = sorted(set(stats.count["A"]) | set(stats.count["B"]))
+    keys = sorted(set(totals["A"]) | set(totals["B"]))
     per_turn = ("oil at turn end", "food at turn end", "troops at turn end")
     print("{:28s} {:>10s} {:>10s}".format("per game (per turn for *)", "A", "B"))
     for key in keys:
@@ -228,9 +267,9 @@ def ab_test(games, players, seed, levels=None, other=None):
             continue
         row = []
         for side in "AB":
-            value = stats.count[side][key]
+            value = totals[side][key]
             if key in per_turn:
-                row.append(value / max(stats.count[side]["turns"], 1))
+                row.append(value / max(totals[side]["turns"], 1))
             else:
                 row.append(value / games)
         label = key + (" *" if key in per_turn else "")
@@ -243,16 +282,26 @@ def main():
     parser.add_argument("players", nargs="?", type=int, default=4)
     parser.add_argument("--vs", metavar="BOT_FILE", help="A/B test against the bot in this file")
     parser.add_argument("--levels", metavar="A,B", help="A/B test between two levels of the current bot")
+    parser.add_argument("--tweak", metavar="KEY=VALUE", action="append", default=[],
+                        help="with --levels: change one of side A's tunables")
     parser.add_argument("--seed", type=int, default=1, help="seed of the first game")
+    parser.add_argument("--jobs", type=int, default=1, help="games played at once (one per CPU core)")
     args = parser.parse_args()
 
     if args.vs or args.levels:
-        levels = None
+        levels = tweaked = None
         if args.levels:
             a, b = args.levels.split(",")
             levels = {"A": a.strip(), "B": b.strip()}
-        other = load_bot_module(args.vs) if args.vs else None
-        ab_test(args.games, args.players, args.seed, levels, other)
+            if args.tweak:
+                tweaked = dict(bot.LEVELS[levels["A"]])
+                for item in args.tweak:
+                    key, value = item.split("=")
+                    if key not in tweaked:
+                        parser.error("unknown tunable: " + key)
+                    tweaked[key] = type(tweaked[key])(ast.literal_eval(value))
+                levels["A"] = "tweaked"
+        ab_test(args.games, args.players, args.seed, levels, tweaked, args.vs, args.jobs)
         return
 
     for i in range(args.games):
