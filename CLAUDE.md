@@ -164,7 +164,15 @@ oil hardly once there's a stock), `_target_value`/`_hold_value` price
 countries, `battle` gives exact odds, survivors and kills, `_attack_ev` an
 attack's expected value with a conquest of lookahead, `_danger` the chance
 a neighbour takes a country before the bot's next turn, and
-`_position_value` combines those per country. Deployment, moving in, the
+`_position_value` combines those per country. Eliminations are judged
+both ways: `_hunt` goes for a player when the chance of taking all their
+countries this turn (`_campaign`) times the prize (their loot, one rival
+less) beats the troops it costs and the danger it leaves the bot in; and
+`_elimination_risk` is the chance another player wipes the bot out before
+its next turn -- above `survival_risk` it plays safe (its countries count
+for more, attacks count what they do to that risk, card sets go for
+troops, resources get spent rather than left as loot, no developing).
+Deployment, moving in, the
 one move a turn, rail/air redistribution, starvation, card trades
 (`_trade_reward`) and the shop (`_shop_options`: value over the turns an
 item lasts minus its price) all compare position values. Hitting whoever leads is

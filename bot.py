@@ -25,7 +25,12 @@ Everything is valued in troops:
     and kills, looking one conquest ahead (battle, _attack_ev);
   - a country's troops by what they can attack minus the chance a
     neighbour takes it before the bot's next turn (_danger,
-    _position_value).
+    _position_value);
+  - an elimination by the chance of pulling it off this turn times its
+    loot, against the troops it costs and the danger it leaves the bot in
+    (_hunt, _campaign) -- and the bot's own survival by the chance another
+    player wipes it out before its next turn (_elimination_risk): while
+    that's real, it holds back and builds up.
 
 The strategy, per phase:
   - reinforce: trade a card set when it's worth it, for whatever helps
@@ -82,7 +87,16 @@ BASE = {
     "fort_turns": 4,          # turns a fort or bridge is counted for
     "price_factor": 1.0,      # how dear the bot holds its resources when buying
     "follow_discount": 0.7,   # weight of what the survivors can take next
-    "hunt_min_p": 0.3,        # go for an elimination this likely (cards and all)
+    "hunt_min_p": 0.3,        # go for an elimination only this likely at least
+    "hunt_max_countries": 4,  # ... of a player down to this many countries
+    "loot_weight": 1.0,       # how much an eliminated player's loot counts
+    # Being wiped out costs the game (this much, in troops) plus all the
+    # bot holds; while the chance of it is above survival_risk the bot
+    # plays for survival, and its countries count survival_weight x that
+    # chance more.
+    "survival_value": 40.0,
+    "survival_risk": 0.15,
+    "survival_weight": 3.0,
     "horizon": 3,             # turns a conquered country's income is counted for
     "develop_horizon": 4,     # turns a development is expected to pay out
     "hold_weak_sets": True,   # keep a card set worth less than 10 unless it's needed
@@ -96,11 +110,12 @@ LEVELS = {
     "normal": dict(BASE, noise=0.4, follow_discount=0.3, enemy_aggression=0.6, hunt_min_p=0.5,
                    reposition_min_gain=2.0, redistribute_min_gain=99.0, price_factor=1.3),
     # Mostly picks at random among what looks good, only attacks sure
-    # things, barely sees threats coming, never plans ahead, never hunts
-    # anyone down and rarely buys anything.
+    # things, barely sees threats coming (not even its own end), never plans
+    # ahead, never hunts anyone down and rarely buys anything.
     "easy": dict(BASE, noise=0.8, attack_min_p=0.75, free_attack_min_p=0.6, kill_value=0.2,
                  enemy_aggression=0.3, follow_discount=0.0, hunt_min_p=1.1, hold_weak_sets=False,
-                 price_factor=2.0, reposition_min_gain=4.0, redistribute_min_gain=99.0),
+                 price_factor=2.0, reposition_min_gain=4.0, redistribute_min_gain=99.0,
+                 survival_value=0.0, survival_weight=0.0),
 }
 DEFAULT_LEVEL = "normal"
 
@@ -314,9 +329,11 @@ class BotController:
             self._done = set()
             self._failed = set()
             personality = getattr(player, "bot_personality", DEFAULT_PERSONALITY)
-            self._say("{} bot{}, thinking".format(
+            self._cache = {}
+            self._say("{} bot{}, {}".format(
                 getattr(player, "bot_level", DEFAULT_LEVEL),
-                "" if personality == DEFAULT_PERSONALITY else ", " + personality))
+                "" if personality == DEFAULT_PERSONALITY else ", " + personality,
+                "playing it safe" if self._in_danger() else "thinking"))
 
         phase = manager.phases.get(player.attack)
         if self._human_defending() or self._human_picking() or player.attack == 6:
@@ -541,10 +558,10 @@ class BotController:
             value += 0.5 if manager.conquered_enemy_this_turn else CARD_VALUE  # the turn's card
             left = sum(1 for c in engine.countries.values() if c.owner is target.owner)
             if left == 1:
-                value += 6 + self._loot_value(target.owner)  # eliminates them
+                value += self._prize(target.owner)  # eliminates them
             elif target.owner in self._hunt():
                 # A step towards finishing them off this turn.
-                value += (6 + self._loot_value(target.owner)) * self._hunt()[target.owner] / left
+                value += self._prize(target.owner) * self._hunt()[target.owner] / left
         return value
 
     def _lead(self, player):
@@ -559,30 +576,148 @@ class BotController:
             return {p: s / total - 1 / len(strength) for p, s in strength.items()} if total else {}
         return self._cached("lead", compute).get(player, 0.0)
 
+    # --- eliminations: ours of others, and others' of us ----------------------
+    # Wiping a player out hands over their wood, steel, nuclear, oil and
+    # cards; being wiped out ends the game. So the bot goes for an
+    # elimination when the chance of pulling it off, times what it brings,
+    # beats the troops it costs and the danger it leaves the bot in -- and
+    # while another player could wipe the bot out, it holds back and builds
+    # up instead (see _elimination_risk).
+
+    def _prize(self, loser):
+        """What eliminating `loser` brings: their loot, and one rival less."""
+        return 6 + self.params["loot_weight"] * self._loot_value(loser)
+
+    def _campaign(self, victim):
+        """(chance, troops lost) for taking every country `victim` holds
+        this turn: each in turn falls to the strongest stack next to it --
+        one of ours, or the survivors in a country just taken (they move
+        in, one stays behind, and go on over land)."""
+        engine, player = self.engine, self.player
+        free = {c.name: c.units - 1 for c in self._owned() if c.units > 1}
+        remaining = self._owned(victim)
+        chance, lost = 1.0, 0.0
+        while remaining:
+            best = None
+            for target in remaining:
+                for name, kind in self._links(target.name).items():
+                    if free.get(name, 0) < 1:
+                        continue
+                    origin = engine.countries[name]
+                    ours = origin.owner is player
+                    if (ours and not self._can_reach(origin, kind)) or (not ours and kind != "land"):
+                        continue
+                    tanks = min(origin.tanks, player.oil) if ours else 0
+                    p, left, _ = battle(free[name], target.units, self._combat_mods(origin, target, tanks))
+                    if best is None or p > best[0]:
+                        best = (p, left, name, target)
+            if best is None or best[0] <= 0:
+                return 0.0, lost
+            p, left, name, target = best
+            chance *= p
+            lost += free[name] - left
+            free[name] = 0
+            free[target.name] = int(left / p) - 1
+            remaining.remove(target)
+        return chance, lost
+
     def _hunt(self):
-        """{player: chance}: other players the bot can likely wipe out this
-        turn -- a few countries, each within reach of one of our stacks."""
+        """{player: chance}: other players worth wiping out this turn -- the
+        chance of taking all their countries (see _campaign) times the prize
+        beats the troops it costs and the extra danger of being wiped out
+        ourselves once they're spent."""
         def compute():
-            engine, player = self.engine, self.player
+            engine, player, p = self.engine, self.player, self.params
+            e = self._economy()
+            troop_cost = 1 - min(1.0, e["starving"] / max(e["units"], 1))
+            risk = self._elimination_risk()
             hunted = {}
             for other in engine.players:
                 if other is player or other.eliminated:
                     continue
                 theirs = self._owned(other)
-                if not theirs or len(theirs) > 3:
+                if not theirs or len(theirs) > p["hunt_max_countries"]:
                     continue
-                chance = 1.0
-                for country in theirs:
-                    best = 0.0
-                    for name, kind in self._links(country.name).items():
-                        own = engine.countries[name]
-                        if own.owner is player and own.units > 1 and self._can_reach(own, kind):
-                            best = max(best, self._win_probability(own, country))
-                    chance *= best
-                if chance >= self.params["hunt_min_p"]:
+                chance, lost = self._campaign(other)
+                if chance < p["hunt_min_p"]:
+                    continue
+                # Once wiped out, they're no threat to us any more.
+                gone = {other: sum(c.units for c in theirs) + 99}
+                worth = chance * self._prize(other) - troop_cost * lost \
+                    - self._survival_value() * (self._elimination_risk(lost, gone) - risk)
+                if worth > 0:
                     hunted[other] = chance
             return hunted
         return self._cached("hunt", compute)
+
+    def _territory_parts(self):
+        """The bot's countries, in groups connected through its own territory."""
+        def compute():
+            parts, seen = [], set()
+            for country in self._owned():
+                if country.name not in seen:
+                    part = self._own_reach(country.name)
+                    seen |= part
+                    parts.append(part)
+            return parts
+        return self._cached("parts", compute)
+
+    def _elimination_risk(self, lost=0, killed=None):
+        """Chance another player wipes the bot out before its next turn --
+        with `lost` of our troops gone (negative: added), and `killed`
+        ({player: troops}) of theirs. A neighbour that borders every part of
+        the bot's territory throws everything it has there, plus its next
+        reinforcements and a card set, at all of the bot's troops."""
+        killed = killed or {}
+        lost = int(round(lost))
+        key = ("doom", lost, tuple(sorted((p.name, int(round(n))) for p, n in killed.items())))
+
+        def compute():
+            engine, player = self.engine, self.player
+            owned = self._owned()
+            troops = sum(c.units for c in owned)
+            defenders = troops - lost
+            if defenders <= 0:
+                return 1.0
+            fort = round(sum(c.fort_lvl * c.units for c in owned) / max(troops, 1))
+            parts = self._territory_parts()
+            safe = 1.0
+            for enemy in engine.players:
+                if enemy is player or enemy.eliminated:
+                    continue
+                stacks, touched = {}, set()
+                for i, part in enumerate(parts):
+                    for name in part:
+                        for other, kind in self._links(name).items():
+                            c = engine.countries[other]
+                            if c.owner is not enemy or c.units < 2:
+                                continue
+                            if kind == "sea" and not (c.ships or (c.planes and enemy.oil)):
+                                continue
+                            stacks[other] = c
+                            touched.add(i)
+                if not stacks or len(touched) < len(parts):
+                    continue
+                extra = self.engine.production(enemy)["helmets"] // 3 + 3 + (10 if len(enemy.cards) >= 3 else 0)
+                attackers = sum(c.units - 1 for c in stacks.values()) + extra - int(round(killed.get(enemy, 0)))
+                tanks = max(min(c.tanks, enemy.oil) for c in stacks.values())
+                wiped = battle(attackers, defenders, (0, tanks, fort, 0))[0]
+                safe *= 1 - wiped * self.params["enemy_aggression"]
+            return 1 - safe
+        return self._cached(key, compute)
+
+    def _in_danger(self):
+        """Whether the bot plays for survival: another player could well
+        wipe it out before its next turn."""
+        return self._elimination_risk() > self.params["survival_risk"]
+
+    def _survival_value(self):
+        """What being wiped out costs, in troops: the game itself, plus all
+        the bot holds -- which the one who does it takes."""
+        def compute():
+            return self.params["survival_value"] + sum(self._hold_value(c) for c in self._owned()) \
+                + self._loot_value(self.player)
+        return self._cached("survival", compute)
 
     def _attack_ev(self, from_c, target, attackers, active_tanks=None, depth=2, seen=()):
         """What attacking `target` from `from_c` with `attackers` rolling
@@ -605,6 +740,12 @@ class BotController:
             troop_cost = 1 - min(1.0, starving / attackers)
             kill_value = self.params["kill_value"] if self._is_real(target.owner) else 0
             ev = chance * self._target_value(target) + kill_value * killed - troop_cost * (attackers - left)
+            if not seen and self.params["survival_value"]:
+                # What the fight does to our own chance of being wiped out:
+                # our troops lost against theirs killed.
+                theirs = {target.owner: killed} if self._is_real(target.owner) else None
+                ev -= self._survival_value() * (
+                    self._elimination_risk(attackers - left, theirs) - self._elimination_risk())
             if depth > 1 and chance > 0.05:
                 # The survivors move in (one stays behind) and go on.
                 onward = int(left / chance) - 1
@@ -722,7 +863,7 @@ class BotController:
                 value += 3 + CARD_VALUE * self.params["horizon"] * CONTINENT_CARD_BONUS.get(continent, 0)
             if len(self._owned()) == 1:
                 value += 50  # the last one
-            return value
+            return value * (1 + self.params["survival_weight"] * self._elimination_risk())
         return self._cached(("hold", country.name), compute)
 
     def _best_attack_ev(self, country, units, depth=2, ships=None, planes=None, tanks=None):
@@ -870,7 +1011,7 @@ class BotController:
                 card.use = False
             return False
         urgent = forced or need_troops or len(player.cards) >= manager.MAX_CARDS \
-            or self._economy()["starving"] > 0
+            or self._economy()["starving"] > 0 or self._in_danger()
         if base < 10 and self.params["hold_weak_sets"] and not urgent:
             for card in player.cards:
                 card.use = False
@@ -895,9 +1036,11 @@ class BotController:
         def value(reward, n):
             if reward == "helmets":
                 # Troops that can't be fed at the next turn start still
-                # fight (and defend) for a round.
+                # fight (and defend) for a round -- which counts all the
+                # more while the bot could be wiped out.
                 fed = min(n, feedable)
-                return fed + 0.5 * (n - fed)
+                safer = self._elimination_risk() - self._elimination_risk(lost=-n)
+                return fed + 0.5 * (n - fed) + self._survival_value() * safer
             if reward == "food":
                 saved = min(n, e["starving"])
                 return saved + 0.3 * w["food"] * (n - saved)
@@ -975,7 +1118,10 @@ class BotController:
         True if it bought something."""
         best = None
         for value, cost, action, text in self._shop_options():
-            net = self._jitter(value - self.params["price_factor"] * self._price(cost))
+            # Whatever is left when the bot is wiped out goes to the one who
+            # does it: the more likely that is, the cheaper spending it.
+            price = self._price(cost) * (1 - self._elimination_risk())
+            net = self._jitter(value - self.params["price_factor"] * price)
             if net > 0 and (best is None or net > best[0]):
                 best = (net, action, text)
         if best is None:
@@ -1173,8 +1319,9 @@ class BotController:
             manager.end_phase()
             return
         _, from_c, target, land = best
-        self._say("attacks {} from {} ({:.0%})".format(
-            target.name, from_c.name, self._win_probability(from_c, target)))
+        self._say("attacks {} from {} ({:.0%}){}".format(
+            target.name, from_c.name, self._win_probability(from_c, target),
+            " to finish off " + target.owner.name if target.owner in self._hunt() else ""))
         attack.attack_from = from_c.name
         attack._start_attack(target.name, land)
         if player.subattack == 5:
@@ -1266,6 +1413,8 @@ class BotController:
         stays safe for a few turns -- but not if paying the food makes
         troops starve."""
         player, e, w = self.player, self._economy(), self._weights()
+        if self._in_danger():
+            return None  # the resources go on surviving
         horizon = self.params["develop_horizon"]
         best, best_gain = None, 0
         for c in self._owned():

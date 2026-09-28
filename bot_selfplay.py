@@ -269,6 +269,9 @@ def ab_test(games, players, seed, levels, tweaked=None, other_path=None, jobs=1,
     wins = collections.Counter()
     totals = collections.defaultdict(collections.Counter)
     turns = []
+    # Per game, side A minus side B: loot score, and times eliminated.
+    loot_gap, elim_gap = [], []
+    eliminated_keys = ("eliminated by a player", "died on own turn", "died otherwise")
     start = time.time()
     job_list = [(i, players, seed, levels) for i in range(games)]
     if jobs > 1:
@@ -284,6 +287,9 @@ def ab_test(games, players, seed, levels, tweaked=None, other_path=None, jobs=1,
         turns.append(n)
         for side, counter in counts.items():
             totals[side].update(counter)
+        side_a, side_b = counts.get("A", {}), counts.get("B", {})
+        loot_gap.append(side_a.get("loot score", 0) - side_b.get("loot score", 0))
+        elim_gap.append(sum(side_a.get(k, 0) - side_b.get(k, 0) for k in eliminated_keys))
         decided = wins["A"] + wins["B"]
         if done % 10 == 0 or done == games:
             rate = wins["A"] / decided if decided else 0
@@ -303,10 +309,16 @@ def ab_test(games, players, seed, levels, tweaked=None, other_path=None, jobs=1,
 
     def per_game(side, *keys):
         return sum(totals[side][k] for k in keys) / games
-    print("Loot stolen by eliminating players, per game (resources + {} a card): A {:.1f}, B {:.1f}".format(
-        CARD_LOOT, per_game("A", "loot score"), per_game("B", "loot score")))
-    print("Eliminated, per game: A {:.2f}, B {:.2f}".format(
-        *(per_game(side, "eliminated by a player", "died on own turn", "died otherwise") for side in "AB")))
+
+    def gap(values):
+        """Mean of A-minus-B per game, with a 95% margin."""
+        mean = sum(values) / len(values)
+        spread = (sum((v - mean) ** 2 for v in values) / max(len(values) - 1, 1)) ** 0.5
+        return "{:+.2f} +- {:.2f}".format(mean, 1.96 * spread / len(values) ** 0.5)
+    print("Loot stolen by eliminating players, per game (resources + {} a card): A {:.1f}, B {:.1f} "
+          "(A-B {})".format(CARD_LOOT, per_game("A", "loot score"), per_game("B", "loot score"), gap(loot_gap)))
+    print("Eliminated, per game: A {:.2f}, B {:.2f} (A-B {})".format(
+        per_game("A", *eliminated_keys), per_game("B", *eliminated_keys), gap(elim_gap)))
     print()
     keys = sorted(set(totals["A"]) | set(totals["B"]))
     per_turn = ("oil at turn end", "food at turn end", "troops at turn end")
