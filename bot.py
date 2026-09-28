@@ -49,11 +49,23 @@ LEVELS = {
         "attack_min_p": 0.65,     # start an attack only with at least this chance
         "retreat_p": 0.25,        # call a running attack off below this chance
         "deploy_target_p": 0.8,   # reinforce an attack until it's this likely
+        # Troops that will starve at the next turn start anyway cost
+        # nothing to lose: attacks made with them only need this chance.
+        "free_attack_min_p": 0.4,
+        "horizon": 3,             # turns a conquered country's income is counted for
+        "develop_horizon": 4,     # turns a development is expected to pay out
+        "hold_weak_sets": True,   # keep a card set worth less than 10 unless it's needed
     },
 }
 DEFAULT_LEVEL = "normal"
 
 CONTINENT_OF = {name: continent for continent, members in CONTINENTS.items() for name in members}
+
+RESOURCES = ("food", "wood", "steel", "oil", "nuclear")
+TRADE_MULT = {reward: mult for _, reward, mult in CardMenu.TRADE_OPTIONS}
+CARD_VALUE = 3      # a card, in troops: a third of a set, which buys ~15
+TANK_STEEL = 20
+NUKE_NUCLEAR = 5
 
 
 # --- combat odds ---------------------------------------------------------
@@ -104,6 +116,14 @@ class BotController:
         self._turn_key = None
         self._done = set()     # things already dealt with this turn
         self._failed = set()   # attacks (from, to) that didn't start or were called off
+        # Worked-out facts about the board, valid for one decision (the
+        # board changes with every action).
+        self._cache = {}
+
+    def _cached(self, key, compute):
+        if key not in self._cache:
+            self._cache[key] = compute()
+        return self._cache[key]
 
     @property
     def engine(self):
@@ -193,8 +213,9 @@ class BotController:
         return self.player.attack == 5 and chooser is not None and not chooser.is_bot
 
     def _act(self, player):
+        self._cache = {}
         if self.manager.must_trade(player):
-            self._trade()
+            self._trade(forced=True)
             return
         handler = {
             0: self._reinforce,
@@ -211,13 +232,15 @@ class BotController:
 
     def _links(self, name):
         """{neighbour: "land" or "sea"} (land wins if both exist)."""
-        links = {}
-        for c in self.engine.connections:
-            if name in c.connection:
-                for other in c.connection:
-                    if other != name and links.get(other) != "land":
-                        links[other] = c.kind
-        return links
+        def adjacency():
+            links = {n: {} for n in self.engine.countries}
+            for c in self.engine.connections:
+                a, b = tuple(c.connection)
+                for x, y in ((a, b), (b, a)):
+                    if links[x].get(y) != "land":
+                        links[x][y] = c.kind
+            return links
+        return self._cached("links", adjacency)[name]
 
     def _owned(self, player=None):
         player = player or self.player
@@ -263,28 +286,102 @@ class BotController:
         mods = self._combat_mods(from_c, target, active_tanks)
         return conquer_probability(attackers, target.units, mods)
 
+    # --- economy -------------------------------------------------------------
+    # Food is what caps an army: at the start of a turn every troop beyond
+    # the food in stock starves (that turn's harvest only comes in after),
+    # so over time an army can't outgrow its food income. Everything below
+    # is valued in troops.
+
+    def _economy(self, player=None):
+        """Where `player` stands. units: troops on the board plus any still
+        to be placed this turn; food: the stock that has to feed them all
+        at their next turn start; starving: how many of them that stock
+        can't feed; *_income: what their countries yield a turn;
+        reinforce: the troops their next turn brings."""
+        player = player or self.player
+
+        def compute():
+            manager = self.manager
+            production = self.engine.production(player)
+            owned = self._owned(player)
+            on_board = sum(c.units for c in owned)
+            pending = 0
+            if player is self.player:
+                if player.attack == 0 and player.subattack in (1, 2):
+                    pending += manager.reinforcements + manager.pending_troops
+                elif player.attack == 4:
+                    pending += manager.phases[4].pool
+            units = on_board + pending
+            economy = {r + "_income": production[r] for r in RESOURCES}
+            economy["food_income"] = production["food"] + on_board  # production() is net of upkeep
+            economy.update(
+                units=units,
+                food=player.food,
+                starving=max(0, units - player.food),
+                reinforce=production["helmets"] // 3 + 3,
+                tanks=sum(c.tanks for c in owned),
+                planes=sum(c.planes for c in owned),
+            )
+            return economy
+        return self._cached(("economy", player.name), compute)
+
+    def _weights(self):
+        """What one unit of each resource is worth to the bot now, in troops
+        -- as income per turn, or in stock. Food counts for a whole troop
+        while the army is at or over what food can carry, much less when
+        there's plenty; oil only runs tanks, planes and rails, so a big
+        stock of it is worth next to nothing; helmets (reinforcements) only
+        help while the troops they bring can be fed."""
+        def compute():
+            e = self._economy()
+            army = e["units"] + e["reinforce"]
+            cover = (e["food"] + 2 * e["food_income"]) / max(2 * army, 1)
+            food = 1.0 if cover <= 1 else max(0.25, 1.0 - 0.5 * (cover - 1))
+            oil_use = 1 + e["tanks"] + e["planes"]
+            oil_turns = (self.player.oil + 2 * e["oil_income"]) / oil_use
+            oil = 0.4 if oil_turns <= 4 else max(0.03, 1.6 / oil_turns)
+            return {
+                "food": food, "wood": 0.3, "steel": 0.4, "oil": oil, "nuclear": 0.6,
+                # 3 helmets bring 1 troop a turn.
+                "troops": 0.33 if food < 0.6 else 0.15,
+            }
+        return self._cached("weights", compute)
+
+    def _income_value(self, country):
+        """What `country` yields a turn, in troops."""
+        w = self._weights()
+        mult = 2 if country.developed else 1
+        if country.radioactive:
+            # Nothing but helmets until it heals.
+            mult *= max(0, self.params["horizon"] - country.radioactive) / self.params["horizon"]
+        return w["troops"] * country.troops + mult * sum(w[r] * getattr(country, r) for r in RESOURCES)
+
+    def _loot_value(self, loser):
+        """What eliminating `loser` hands over: their wood, steel, nuclear,
+        oil and cards."""
+        w = self._weights()
+        return sum(w[r] * getattr(loser, r) for r in ("wood", "steel", "nuclear", "oil")) \
+            + CARD_VALUE * len(loser.cards)
+
     def _target_value(self, target):
+        """What taking `target` is worth, in troops."""
         engine, manager, player = self.engine, self.manager, self.player
-        value = 1.0
-        if target.radioactive == 0:
-            mult = 2 if target.developed else 1
-            value += mult * (0.25 * target.food + 0.5 * target.wood + 0.6 * target.steel
-                             + 0.7 * target.oil + 0.8 * target.nuclear)
-        value += 0.4 * target.troops
+        value = 1.0 + self.params["horizon"] * self._income_value(target)
         if target.airport:
-            value += 0.5
+            value += 1.0
         continent = CONTINENT_OF.get(target.name)
         if continent is not None:
+            bonus = CONTINENT_CARD_BONUS.get(continent, 0)
             members = CONTINENTS[continent]
             others = [engine.countries[n] for n in members if n != target.name]
             if all(c.owner is player for c in others):
-                value += 3 + 2 * CONTINENT_CARD_BONUS.get(continent, 0)
+                value += 3 + CARD_VALUE * self.params["horizon"] * bonus
             elif self._is_real(target.owner) and all(c.owner is target.owner for c in others):
-                value += 2  # breaks their continent
+                value += 2 + CARD_VALUE * bonus  # breaks their continent
         if self._is_real(target.owner):
-            value += 0.5 if manager.conquered_enemy_this_turn else 1.5  # the turn's card
+            value += 0.5 if manager.conquered_enemy_this_turn else CARD_VALUE  # the turn's card
             if not any(c.owner is target.owner and c is not target for c in engine.countries.values()):
-                value += 4  # eliminates them: their resources and cards
+                value += 6 + self._loot_value(target.owner)  # eliminates them
         return value
 
     def _can_reach(self, from_c, kind):
@@ -355,14 +452,22 @@ class BotController:
         self.manager.phases[0].deploy_boat(best)
 
     def _starve(self):
-        """Starvation: the troops lost come off the biggest, safest stacks."""
+        """Starvation: the troops lost come off the stacks that can spare
+        them best (the most troops beyond what their neighbours threaten).
+        Only if every country is down to one troop are countries given up,
+        the least valuable first -- never a food producer while there's
+        another choice."""
         engine, manager, player = self.engine, self.manager, self.player
         phase = manager.phases[0]
         for _ in range(phase.starved):
             owned = [c for c in self._owned() if c.units > 0]
             if not owned:
                 break
-            victim = max(owned, key=lambda c: (c.units - self._threat(c.name), c.units))
+            spare = [c for c in owned if c.units > 1]
+            if spare:
+                victim = max(spare, key=lambda c: (c.units - self._threat(c.name), c.units))
+            else:
+                victim = min(owned, key=lambda c: (c.food > 0, self._income_value(c)))
             victim.units -= 1
         for country in self._owned():
             if country.units == 0:
@@ -409,8 +514,11 @@ class BotController:
 
     # --- cards -----------------------------------------------------------
 
-    def _trade(self):
-        """Trade a set of cards if there is one; True if it did."""
+    def _trade(self, forced=False, need_troops=False):
+        """Trade a set of cards if there is one worth trading now, for
+        whatever helps most; True if it did. A set worth less than the best
+        (10) is kept for later unless the hand is (nearly) full, troops are
+        starving, or `need_troops` (e.g. a player to finish off)."""
         player, manager = self.player, self.manager
         if not manager.can_trade():
             return False
@@ -425,12 +533,53 @@ class BotController:
             for card in player.cards:
                 card.use = False
             return False
+        urgent = forced or need_troops or len(player.cards) >= manager.MAX_CARDS \
+            or self._economy()["starving"] > 0
+        if base < 10 and self.params["hold_weak_sets"] and not urgent:
+            for card in player.cards:
+                card.use = False
+            return False
         menu.trade_cards = [card for card in player.cards if card.use]
-        production = self.engine.production(player)
-        reward = "food" if player.food + 2 * production["food"] < 0 else "helmets"
-        mult = dict((r, m) for _, r, m in CardMenu.TRADE_OPTIONS)[reward]
-        menu._execute_trade(reward, int(round(base * mult)))
+        reward = "helmets" if need_troops else self._trade_reward(base)
+        menu._execute_trade(reward, int(round(base * TRADE_MULT[reward])))
         return True
+
+    def _trade_reward(self, base):
+        """The card-trade reward (a CardMenu.TRADE_OPTIONS resource) worth
+        the most right now for a set worth `base`."""
+        player, e, w = self.player, self._economy(), self._weights()
+        shop = self.manager.phases[3]
+        feedable = max(0, e["food"] - e["units"])
+        tank_cost = shop._cost({"steel": TANK_STEEL})["steel"]
+        nuke_cost = shop._cost({"nuclear": NUKE_NUCLEAR})["nuclear"]
+        oil_for_tank = player.oil + e["oil_income"] > e["tanks"]
+
+        def value(reward, n):
+            if reward == "helmets":
+                # Troops that can't be fed at the next turn start still
+                # fight (and defend) for a round.
+                fed = min(n, feedable)
+                return fed + 0.5 * (n - fed)
+            if reward == "food":
+                saved = min(n, e["starving"])
+                return saved + 0.3 * w["food"] * (n - saved)
+            if reward == "steel":
+                tanks = (player.steel + n) // tank_cost - player.steel // tank_cost
+                return tanks * (5 if oil_for_tank else 2) + 0.1 * n
+            if reward == "nuclear":
+                nukes = (player.nuclear + n) // nuke_cost - player.nuclear // nuke_cost
+                return nukes * self._nuke_worth() + 0.1 * n
+            return w[reward] * n
+
+        return max(TRADE_MULT, key=lambda r: value(r, int(round(base * TRADE_MULT[r]))))
+
+    def _nuke_worth(self):
+        """Roughly what one more nuke is worth: half the biggest enemy army
+        next to us, dead."""
+        engine, player = self.engine, self.player
+        stacks = [engine.countries[o].units for c in self._owned() for o in self._links(c.name)
+                  if engine.countries[o].owner is not player and self._is_real(engine.countries[o].owner)]
+        return max(stacks, default=0) // 2
 
     def _recruit(self):
         """Troops from a card trade outside the reinforcement phase."""
@@ -504,7 +653,7 @@ class BotController:
             from_c = self.engine.countries[attack.attack_from]
             target = self.engine.countries[attack.defence_country]
             chance = self._win_probability(from_c, target, active_tanks=attack.active_tanks)
-            if chance < self.params["retreat_p"]:
+            if chance < self.params["retreat_p"] * (1 - self._free_share(from_c)):
                 self._failed.add((from_c.name, target.name))
                 attack.attack_from = attack.defence_country = None
                 player.subattack = 0
@@ -526,7 +675,7 @@ class BotController:
             if (from_c.name, target.name) in self._failed:
                 continue
             chance = self._win_probability(from_c, target)
-            if chance < self.params["attack_min_p"]:
+            if chance < self._attack_min_p(from_c):
                 continue
             score = chance * self._target_value(target)
             if best is None or score > best[0]:
@@ -554,6 +703,18 @@ class BotController:
             # Over sea without a ship: one plane (1 oil) carries them.
             attack.selected_planes = 1
             attack.active_tanks = min(attack.active_tanks, max(player.oil - 1 + attack.prepaid_planes, 0))
+
+    def _free_share(self, from_c):
+        """How much of an attack from `from_c` is made with troops that
+        starve at the next turn start anyway (0..1)."""
+        attackers = from_c.units - 1
+        return min(1.0, self._economy()["starving"] / attackers) if attackers > 0 else 0.0
+
+    def _attack_min_p(self, from_c):
+        """The chance an attack from `from_c` needs: lower the more of it is
+        made with troops that would starve anyway."""
+        p = self.params
+        return p["attack_min_p"] - (p["attack_min_p"] - p["free_attack_min_p"]) * self._free_share(from_c)
 
     def _move_in(self):
         """After a conquest: push forward, keeping back only what the old
@@ -586,15 +747,9 @@ class BotController:
 
         if not player.developed_this_turn and "develop" not in self._done:
             self._done.add("develop")
-            options = []
-            for c in self._owned():
-                cost = phase.develop_cost(c)
-                if c.developed or not sum(cost.values()) or self._threat(c.name):
-                    continue
-                if all(getattr(player, r) >= n for r, n in cost.items()):
-                    options.append(c)
-            if options:
-                phase.develop(max(options, key=lambda c: sum(phase.develop_cost(c).values())))
+            country = self._develop_choice(phase)
+            if country is not None:
+                phase.develop(country)
                 return
 
         if not player.repositioned_this_turn and "reposition" not in self._done:
@@ -605,6 +760,35 @@ class BotController:
         for name in sorted(manager.landmarks_owed):
             manager.place_landmark(name)
         manager.end_phase()
+
+    def _develop_choice(self, phase):
+        """The country most worth developing, or None. Developing costs one
+        turn's yield of the country and (unless its whole continent is
+        held) the next income, then doubles it: worth it for a country that
+        stays safe for a few turns -- but not if paying the food makes
+        troops starve."""
+        player, e, w = self.player, self._economy(), self._weights()
+        horizon = self.params["develop_horizon"]
+        best, best_gain = None, 0
+        for c in self._owned():
+            cost = phase.develop_cost(c)
+            if c.developed or c.radioactive or not sum(cost.values()) or self._threat(c.name):
+                continue
+            if any(getattr(player, r) < n for r, n in cost.items()):
+                continue
+            income = sum(w[r] * getattr(c, r) for r in RESOURCES)
+            idle = 0 if self._holds_continent_of(c.name) else 1
+            gain = income * (horizon - idle) - sum(w[r] * n for r, n in cost.items())
+            gain -= max(0, e["units"] - (player.food - cost["food"])) - e["starving"]
+            if gain > best_gain:
+                best, best_gain = c, gain
+        return best
+
+    def _holds_continent_of(self, name, player=None):
+        player = player or self.player
+        continent = CONTINENT_OF.get(name)
+        return continent is not None and all(
+            self.engine.countries[n].owner is player for n in CONTINENTS[continent])
 
     def _reposition(self, phase):
         """The biggest garrison with nothing to fight marches (over land) to
