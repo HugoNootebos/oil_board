@@ -48,13 +48,15 @@ LEVELS = {
     "normal": {
         "attack_min_p": 0.65,     # start an attack only with at least this chance
         "retreat_p": 0.25,        # call a running attack off below this chance
-        "deploy_target_p": 0.8,   # reinforce an attack until it's this likely
         # Troops that will starve at the next turn start anyway cost
         # nothing to lose: attacks made with them only need this chance.
         "free_attack_min_p": 0.4,
         "kill_value": 0.5,        # an enemy player's troop killed, in our troops
+        "enemy_aggression": 0.8,  # how likely a neighbour makes an attack that would work
+        "next_turn_weight": 0.5,  # attacks a move sets up for next turn, vs this turn's
+        "reposition_min_gain": 1.0,   # a move must be worth this much
+        "redistribute_min_gain": 2.0,  # a rail/air redistribution too (it costs 1 oil)
         "follow_discount": 0.7,   # weight of what the survivors can take next
-        "deploy_min_gain": 0.25,  # attack value a troop must add, else it defends
         "hunt_min_p": 0.3,        # go for an elimination this likely (cards and all)
         "horizon": 3,             # turns a conquered country's income is counted for
         "develop_horizon": 4,     # turns a development is expected to pay out
@@ -469,28 +471,120 @@ class BotController:
         """Whether an attack from from_c over a `kind` link can be made."""
         return kind == "land" or from_c.ships > 0 or (from_c.planes > 0 and self.player.oil >= 1)
 
-    def _attack_options(self, extra=None):
-        """(from, to, over_land) for every attack the bot could start now.
-        `extra` ({name: troops}) pretends some troops were added first."""
-        engine, player = self.engine, self.player
-        event = self.manager.current_event
-        options = []
-        for from_c in self._owned():
-            units = from_c.units + (extra or {}).get(from_c.name, 0)
-            if units < 2:
-                continue
+    def _targets_from(self, from_c, ships=None, planes=None):
+        """[(target, kind)]: what an attack from `from_c` can go for -- over
+        sea only with a ship there, or a plane and oil to fly it (`ships`/
+        `planes` pretend a different number is there)."""
+        ships = from_c.ships if ships is None else ships
+        planes = from_c.planes if planes is None else planes
+
+        def compute():
+            engine, player = self.engine, self.player
+            event = self.manager.current_event
             if event is not None and not event.can_attack_from(engine, from_c):
-                continue
+                return []
+            targets = []
             for other, kind in self._links(from_c.name).items():
                 target = engine.countries[other]
-                if target.owner is player or not self._can_reach(from_c, kind):
+                if target.owner is player:
+                    continue
+                if kind == "sea" and not (ships > 0 or (planes > 0 and player.oil >= 1)):
                     continue
                 if event is not None and not event.can_attack_target(engine, target):
                     continue
                 if kind == "sea" and type(event).__name__ == "StormAtSea":
                     continue  # pirates: not worth a third of the army
+                targets.append((target, kind))
+            return targets
+        return self._cached(("targets", from_c.name, ships, planes), compute)
+
+    def _attack_options(self, extra=None):
+        """(from, to, over_land) for every attack the bot could start now.
+        `extra` ({name: troops}) pretends some troops were added first."""
+        options = []
+        for from_c in self._owned():
+            if from_c.units + (extra or {}).get(from_c.name, 0) < 2:
+                continue
+            for target, kind in self._targets_from(from_c):
                 options.append((from_c, target, kind == "land"))
         return options
+
+    # --- defence and positioning ---------------------------------------------
+
+    def _enemy_extra(self, owner):
+        """Troops another player can add to one spot before attacking from
+        it: half their next reinforcements, plus a card set if they hold
+        three cards."""
+        def compute():
+            extra = (self.engine.production(owner)["helmets"] // 3 + 3) // 2
+            if len(owner.cards) >= 3:
+                extra += 6
+            return extra
+        return self._cached(("enemy_extra", owner.name), compute)
+
+    def _danger(self, country, units=None, fort=None):
+        """Chance another player takes `country` (with `units` troops and a
+        `fort` level) before our next turn: the strongest attack a neighbour
+        can make on it -- over sea only with a ship, or a plane and oil --
+        with what they can add there first, their tanks, and our fort and
+        tanks against it."""
+        units = country.units if units is None else units
+        fort = country.fort_lvl if fort is None else fort
+        if units <= 0:
+            return 1.0
+
+        def compute():
+            engine, player, event = self.engine, self.player, self.manager.current_event
+            worst = 0.0
+            for name, kind in self._links(country.name).items():
+                enemy = engine.countries[name]
+                owner = enemy.owner
+                if owner is player or not self._is_real(owner):
+                    continue
+                if kind == "sea" and not (enemy.ships > 0 or (enemy.planes > 0 and owner.oil > 0)):
+                    continue
+                if event is not None and not (event.can_attack_from(engine, enemy)
+                                              and event.can_attack_target(engine, country)):
+                    continue
+                a_all, d_all = 0, fort
+                if event is not None:
+                    a_all += event.attack_bonus(engine, enemy) - event.dice_penalty(engine, owner)
+                    d_all -= event.dice_penalty(engine, player)
+                mods = (int(a_all), min(enemy.tanks, owner.oil), int(d_all), min(country.tanks, player.oil))
+                attackers = enemy.units - 1 + self._enemy_extra(owner)
+                worst = max(worst, battle(attackers, units, mods)[0])
+            return worst * self.params["enemy_aggression"]
+        return self._cached(("danger", country.name, units, fort), compute)
+
+    def _hold_value(self, country):
+        """What keeping `country` is worth, in troops: what losing it costs."""
+        def compute():
+            value = 1.0 + self.params["horizon"] * self._income_value(country) + 2 * country.fort_lvl
+            if country.airport:
+                value += 1.0
+            continent = CONTINENT_OF.get(country.name)
+            if continent is not None and self._holds_continent_of(country.name):
+                value += 3 + CARD_VALUE * self.params["horizon"] * CONTINENT_CARD_BONUS.get(continent, 0)
+            if len(self._owned()) == 1:
+                value += 50  # the last one
+            return value
+        return self._cached(("hold", country.name), compute)
+
+    def _best_attack_ev(self, country, units, depth=2, ships=None, planes=None):
+        """The most an attack from `country` with `units` troops on it is
+        worth (0 when nothing is)."""
+        best = 0.0
+        for target, _ in self._targets_from(country, ships, planes):
+            best = max(best, self._attack_ev(country, target, units - 1, depth=depth))
+        return best
+
+    def _position_value(self, country, units, attack_weight=1.0, depth=2, ships=None, planes=None):
+        """How good `units` troops on `country` are: what they can attack
+        (times `attack_weight`) minus what could be lost there."""
+        value = -self._hold_value(country) * self._danger(country, units)
+        if units > 1 and attack_weight:
+            value += attack_weight * self._best_attack_ev(country, units, depth, ships, planes)
+        return value
 
     # --- reinforcement -------------------------------------------------------
 
@@ -533,9 +627,8 @@ class BotController:
         self.manager.phases[0].deploy_boat(best)
 
     def _starve(self):
-        """Starvation: the troops lost come off the stacks that can spare
-        them best (the most troops beyond what their neighbours threaten).
-        Only if every country is down to one troop are countries given up,
+        """Starvation: the troops lost come off the stacks that miss them
+        least (see _position_value). Only if every country is down to one troop are countries given up,
         the least valuable first -- never a food producer while there's
         another choice."""
         engine, manager, player = self.engine, self.manager, self.player
@@ -546,7 +639,8 @@ class BotController:
                 break
             spare = [c for c in owned if c.units > 1]
             if spare:
-                victim = max(spare, key=lambda c: (c.units - self._threat(c.name), c.units))
+                victim = min(spare, key=lambda c: self._position_value(c, c.units, 0.5)
+                             - self._position_value(c, c.units - 1, 0.5))
             else:
                 victim = min(owned, key=lambda c: (c.food > 0, self._income_value(c)))
             victim.units -= 1
@@ -556,44 +650,38 @@ class BotController:
         manager.initial_units = {n: c.units for n, c in engine.countries.items()}
         player.subattack = 1
 
-    def _deploy_plan(self, troops):
+    def _deploy_plan(self, troops, names=None, base=None, attack_weight=1.0):
         """{country: troops}: troops go, a few at a time, where they add the
-        most attack value per troop (see _attack_ev); once no stack gains
-        enough from more, the rest shore up the most threatened border."""
+        most value per troop -- to an attack worth making (see _attack_ev)
+        or to a border that could otherwise be lost (see _danger). `names`
+        limits where they can go (default: the borders), `base` gives
+        what's there before (default: what's on the board)."""
         engine = self.engine
+        names = names or self._frontier_names() or [c.name for c in self._owned()]
+        have = dict(base) if base else {n: engine.countries[n].units for n in names}
         plan = {}
-        targets = {}
-        for from_c, target, _ in self._attack_options(extra={n: troops for n in self._frontier_names()}):
-            targets.setdefault(from_c.name, []).append(target)
 
-        def stack_value(name, units):
-            from_c = engine.countries[name]
-            return max(0.0, max(self._attack_ev(from_c, t, units - 1) for t in targets[name]))
+        def value(name, units):
+            return self._position_value(engine.countries[name], units, attack_weight)
 
         while troops > 0:
             best = None
-            for name in targets:
-                have = engine.countries[name].units + plan.get(name, 0)
-                base = stack_value(name, have)
+            for name in names:
+                units = have[name] + plan.get(name, 0)
+                now = value(name, units)
                 for k in sorted({1, 2, 3, 5, 8, 12, 20, troops}):
                     if k > troops:
                         break
-                    gain = (stack_value(name, have + k) - base) / k
+                    gain = (value(name, units + k) - now) / k
                     if best is None or gain > best[0]:
                         best = (gain, name, k)
-            if best is None or best[0] < self.params["deploy_min_gain"]:
-                break
-            _, name, k = best
+            gain, name, k = best
+            if gain <= 0:
+                # Nothing gains from more: the rest join the biggest stack.
+                name = max(names, key=lambda n: have[n] + plan.get(n, 0))
+                k = troops
             plan[name] = plan.get(name, 0) + k
             troops -= k
-        if troops > 0:
-            # What's left goes to the border facing the biggest enemy force
-            # (or simply the biggest border stack).
-            frontier = self._frontier_names() or [c.name for c in self._owned()]
-            name = max(frontier, key=lambda n: (
-                self._threat(n) - self.engine.countries[n].units - plan.get(n, 0),
-                self.engine.countries[n].units))
-            plan[name] = plan.get(name, 0) + troops
         return plan
 
     def _frontier_names(self):
@@ -733,6 +821,10 @@ class BotController:
         attack = self.manager.phases[1]
         sub = player.subattack
         if sub in (0, 1):
+            if "redistribute attack" not in self._done:
+                self._done.add("redistribute attack")
+                if self._redistribute(attack):
+                    return
             self._start_best_attack()
         elif sub == 6:
             player.subattack = 2
@@ -809,22 +901,21 @@ class BotController:
         return p["attack_min_p"] - (p["attack_min_p"] - p["free_attack_min_p"]) * self._free_share(from_c)
 
     def _move_in(self):
-        """After a conquest: push forward, keeping back only what the old
-        country needs against real players next to it."""
+        """After a conquest: split the troops between the old and the new
+        country where they're worth the most (see _position_value)."""
         engine = self.engine
         attack = self.manager.phases[1]
         from_c = engine.countries[attack.attack_from]
         target = engine.countries[attack.defence_country]
         total = from_c.units + target.units
         least = attack.conquest_units
-        if not self._frontier(target.name):
-            moved = least
-        elif not self._frontier(from_c.name):
-            moved = total - 1
+        if total <= least:
+            moved = total
         else:
-            keep = min(self._threat(from_c.name), (total - 1) // 2)
-            moved = total - 1 - keep
-        moved = max(least, min(moved, total - 1)) if total > least else total
+            step = max(1, (total - 1 - least) // 8)
+            options = set(range(least, total, step)) | {least, total - 1}
+            moved = max(options, key=lambda m: (
+                self._position_value(target, m) + self._position_value(from_c, total - m), m))
         target.units, from_c.units = moved, total - moved
         attack._finish_conquest(from_c)
 
@@ -842,6 +933,12 @@ class BotController:
             country = self._develop_choice(phase)
             if country is not None:
                 phase.develop(country)
+                return
+
+        if not player.repositioned_this_turn and "redistribute" not in self._done:
+            # Rails/airports first: once repositioned, no origin can be picked.
+            self._done.add("redistribute")
+            if self._redistribute(phase):
                 return
 
         if not player.repositioned_this_turn and "reposition" not in self._done:
@@ -864,13 +961,13 @@ class BotController:
         best, best_gain = None, 0
         for c in self._owned():
             cost = phase.develop_cost(c)
-            if c.developed or c.radioactive or not sum(cost.values()) or self._threat(c.name):
+            if c.developed or c.radioactive or not sum(cost.values()) or self._danger(c) > 0.3:
                 continue
             if any(getattr(player, r) < n for r, n in cost.items()):
                 continue
             income = sum(w[r] * getattr(c, r) for r in RESOURCES)
             idle = 0 if self._holds_continent_of(c.name) else 1
-            gain = income * (horizon - idle) - sum(w[r] * n for r, n in cost.items())
+            gain = income * (horizon - idle) * (1 - self._danger(c)) - sum(w[r] * n for r, n in cost.items())
             gain -= max(0, e["units"] - (player.food - cost["food"])) - e["starving"]
             if gain > best_gain:
                 best, best_gain = c, gain
@@ -882,27 +979,132 @@ class BotController:
         return continent is not None and all(
             self.engine.countries[n].owner is player for n in CONTINENTS[continent])
 
-    def _reposition(self, phase):
-        """The biggest garrison with nothing to fight marches (over land) to
-        the border that needs it most. True if something moved."""
-        engine = self.engine
-        idle = [c for c in self._owned() if c.units > 1 and not self._frontier(c.name)]
-        for origin in sorted(idle, key=lambda c: -c.units):
-            reachable = phase._land_flood_fill(origin.name) - {origin.name}
-            borders = [engine.countries[n] for n in reachable if self._frontier(n)]
-            if not borders:
-                continue
-            target = max(borders, key=lambda c: (self._threat(c.name) - c.units, self._best_attack_value(c)))
-            target.units += origin.units - 1
-            origin.units = 1
-            self.player.repositioned_this_turn = True
-            return True
-        return False
+    def _own_reach(self, origin):
+        """The bot's countries reachable from `origin` without leaving its
+        own territory (over any link)."""
+        engine, player = self.engine, self.player
+        seen, todo = {origin}, [origin]
+        while todo:
+            for other in self._links(todo.pop()):
+                if other not in seen and engine.countries[other].owner is player:
+                    seen.add(other)
+                    todo.append(other)
+        return seen
 
-    def _best_attack_value(self, country):
-        values = [self._target_value(self.engine.countries[o])
-                  for o in self._links(country.name) if self.engine.countries[o].owner is not self.player]
-        return max(values, default=0)
+    def _reposition(self, phase):
+        """The one move a turn: troops (and their tanks) from where they're
+        worth least to where they're worth most (see _position_value), over
+        land -- or over sea with a ship or plane going along; or a lone
+        plane or ship to where it opens up attacks over sea. True if
+        something moved."""
+        engine, player = self.engine, self.player
+        weight = self.params["next_turn_weight"]
+        oil_cost = self._weights()["oil"]
+
+        def value(country, units, ships=None, planes=None):
+            return self._position_value(country, units, weight, 1, ships, planes)
+
+        best_gain, best = self.params["reposition_min_gain"], None
+        for origin in self._owned():
+            spare = origin.units - 1
+            if spare <= 0 and not origin.planes:
+                continue
+            reach = self._own_reach(origin.name) - {origin.name}
+            targets = [engine.countries[n] for n in reach if self._frontier(n)]
+            if not targets:
+                continue
+            land = phase._land_flood_fill(origin.name)
+            by_sea = phase._sea_flood_fill(origin.name)
+            now = value(origin, origin.units)
+            planes = (0, 1) if origin.planes and player.oil >= 1 else (0,)
+            ships = (0, 1) if origin.ships else (0,)
+            for n in sorted({spare, spare // 2, min(spare, 3), 0}):
+                for plane in planes:
+                    for ship in ships:
+                        if (n, plane, ship) == (0, 0, 0) or (ship and not n):
+                            continue  # nothing moves / a ship needs a troop aboard
+                        loss = now - value(origin, origin.units - n, origin.ships - ship, origin.planes - plane)
+                        for target in targets:
+                            if ship and target.name not in by_sea:
+                                continue
+                            if n and target.name not in land and not (ship or plane):
+                                continue  # troops can't cross the sea alone
+                            gain = value(target, target.units + n, target.ships + ship, target.planes + plane) \
+                                - value(target, target.units) - loss - plane * oil_cost
+                            if gain > best_gain:
+                                best_gain, best = gain, (origin, target, n, ship, plane)
+        if best is None:
+            return False
+        origin, target, n, ship, plane = best
+        tanks = origin.tanks if n and 2 * n >= origin.units - 1 else 0
+        origin.units -= n
+        target.units += n
+        origin.tanks -= tanks
+        target.tanks += tanks
+        origin.ships -= ship
+        target.ships += ship
+        origin.planes -= plane
+        target.planes += plane
+        player.oil -= plane
+        player.repositioned_this_turn = True
+        return True
+
+    def _redistribute(self, phase):
+        """The rails or airport button: for 1 oil, share out the troops of
+        one network (rails, or all airports while a plane stands at one) as
+        _deploy_plan would, tanks going with the biggest stack -- if that's
+        clearly worth it. True if it did."""
+        engine, player = self.engine, self.player
+        if player.oil < 1:
+            return False
+        networks, seen = [], set()
+        for country in self._owned():
+            if country.name in seen:
+                continue
+            network = phase._compute_rail_network(country.name, player)
+            seen |= network
+            if len(network) > 1:
+                networks.append(("rails", country.name, network))
+        airports = sorted(n for n, c in engine.countries.items() if c.owner is player and c.airport)
+        if len(airports) > 1 and any(engine.countries[n].planes > 0 for n in airports):
+            networks.append(("air", airports[0], set(airports)))
+        weight = 1.0 if player.attack == 1 else self.params["next_turn_weight"]
+
+        best = None
+        for kind, origin, network in networks:
+            names = sorted(network)
+            pool = sum(engine.countries[n].units - 1 for n in names)
+            if pool <= 0:
+                continue
+            plan = self._deploy_plan(pool, names, {n: 1 for n in names}, weight)
+            gain = sum(self._position_value(engine.countries[n], 1 + plan.get(n, 0), weight)
+                       - self._position_value(engine.countries[n], engine.countries[n].units, weight)
+                       for n in names)
+            if best is None or gain > best[0]:
+                best = (gain, kind, origin, names, plan)
+        if best is None or best[0] < self.params["redistribute_min_gain"] + self._weights()["oil"]:
+            return False
+
+        _, kind, origin, names, plan = best
+        # As with the button: an origin selected, then the redistribute screen.
+        if player.attack == 1:
+            phase.attack_from = origin
+        else:
+            phase.origin_country = origin
+        player.subattack = 1
+        phase._enter_redistribute(set(names), kind)
+        tanks = sum(engine.countries[n].tanks for n in names)
+        for n in names:
+            engine.countries[n].units = 1 + plan.get(n, 0)
+            engine.countries[n].tanks = 0
+        engine.countries[max(names, key=lambda n: engine.countries[n].units)].tanks = tanks
+        phase._finish_redistribute()
+        if player.attack == 1:
+            phase.attack_from = None
+        else:
+            phase.origin_country = None
+        player.subattack = 0
+        return True
 
     # --- event picks -----------------------------------------------------------
 
