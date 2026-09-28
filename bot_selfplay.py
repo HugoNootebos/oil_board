@@ -28,9 +28,12 @@ plays N games at once (one per CPU core).
 In an A/B test the seats alternate between the sides, and every game is
 played twice from the same start (seed) with the sides swapped, so both
 get the same starting countries and turn order. It prints side A's win
-rate with a 95% margin, and per side: troops lost to starvation, players
-that died on their own turn (starved out) or were conquered, oil left
-unused, and what they bought and traded for. --seed picks the first
+rate with a 95% margin, then the "smarter" criterion: what each side
+steals by eliminating players (resources, plus CARD_LOOT a card) against
+how often it's eliminated itself. Then per side: eliminations made and
+their loot, troops lost to starvation, players that died on their own
+turn (starved out) or were eliminated by a player, oil left unused, and
+what they bought and traded for. --seed picks the first
 seed, so a run can be repeated exactly.
 
 Autosaves go to a temporary file, not saves/autosave.json.
@@ -57,6 +60,11 @@ from engine import Engine  # noqa: E402
 from models import CardMenu  # noqa: E402
 
 MAX_TURNS = 600
+# The "smarter" criterion: what a side steals by eliminating players (the
+# loser's wood, steel, nuclear, oil -- and food under Einde van de
+# mensheid -- plus their cards, a card counted as this many resources,
+# roughly what it trades for), against how often it gets eliminated itself.
+CARD_LOOT = 8
 
 
 class MixedBots:
@@ -134,12 +142,26 @@ class Stats:
         def eliminated(manager, player):
             victor = manager.elimination_loot.get(player, (None, []))[0]
             if victor is not None:
-                stats.add(player, "players conquered")
+                stats.add(player, "eliminated by a player")
             elif player is current(manager.phases[0]):
                 stats.add(player, "died on own turn")
             else:
                 stats.add(player, "died otherwise")
         wrap(phases.TurnManager, "_eliminate", before=eliminated)
+
+        def took_last(phase, result, state, player, country):
+            loser, before = state
+            entry = phase.manager.elimination_loot.get(loser)
+            if entry is None or entry is before:
+                return  # not their last country
+            victor, loot = entry
+            stats.add(victor, "eliminations made")
+            for amount, what in loot:
+                stats.add(victor, "loot: " + what, amount)
+                stats.add(victor, "loot score", amount * (CARD_LOOT if what == "cards" else 1))
+        wrap(phases.Phase, "take_last_country",
+             before=lambda phase, player, country: (country.owner, phase.manager.elimination_loot.get(country.owner)),
+             after=took_last)
 
         def turn_end(manager):
             player = current(manager.phases[0])
@@ -278,6 +300,14 @@ def ab_test(games, players, seed, levels, tweaked=None, other_path=None, jobs=1,
     print()
     print("A win rate {:.1%} +- {:.1%} over {} decided games; median game {} turns".format(
         rate, margin, decided, sorted(turns)[len(turns) // 2]))
+
+    def per_game(side, *keys):
+        return sum(totals[side][k] for k in keys) / games
+    print("Loot stolen by eliminating players, per game (resources + {} a card): A {:.1f}, B {:.1f}".format(
+        CARD_LOOT, per_game("A", "loot score"), per_game("B", "loot score")))
+    print("Eliminated, per game: A {:.2f}, B {:.2f}".format(
+        *(per_game(side, "eliminated by a player", "died on own turn", "died otherwise") for side in "AB")))
+    print()
     keys = sorted(set(totals["A"]) | set(totals["B"]))
     per_turn = ("oil at turn end", "food at turn end", "troops at turn end")
     print("{:28s} {:>10s} {:>10s}".format("per game (per turn for *)", "A", "B"))

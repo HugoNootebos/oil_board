@@ -175,6 +175,9 @@ weakest player. Tunables live in
 
 New player decisions in phases.py need a bot counterpart in bot.py.
 After changing a bot, A/B test it against the previous version before
-keeping it, e.g. `git show HEAD:bot.py > /tmp/old_bot.py; python3
+keeping it. A "smarter" bot wins more, and by the criterion A/B tests
+print: it steals more by eliminating players (loot score: the loser's
+resources plus `CARD_LOOT` per card) without being eliminated more often
+itself. E.g. `git show HEAD:bot.py > /tmp/old_bot.py; python3
 bot_selfplay.py 400 4 --vs /tmp/old_bot.py --jobs 4` (±5% at 400 games,
 about 10 minutes on 4 cores).
