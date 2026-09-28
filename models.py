@@ -60,8 +60,12 @@ class Player:
         self.developed_this_turn = False
         # Out of the game: no troops left on the board, never gets a turn.
         self.eliminated = False
-        # Played by the computer (bot.py) instead of with the mouse.
+        # Played by the computer (bot.py) instead of with the mouse, at a
+        # difficulty level and with a personality (see bot.LEVELS and
+        # bot.PERSONALITIES).
         self.is_bot = is_bot
+        self.bot_level = "normal"
+        self.bot_personality = "balanced"
         if self.color is None:
             self.color = 255 * np.random.rand(3)
 

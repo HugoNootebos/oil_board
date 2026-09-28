@@ -14,9 +14,16 @@ possible -- for testing and tuning bot.py.
     python3 bot_selfplay.py [games] [players] --levels hard,normal
         A/B test between two difficulty levels of the current bot.
 
-    python3 bot_selfplay.py [games] [players] --levels normal,normal --tweak attack_min_p=0.5
+    python3 bot_selfplay.py [games] [players] --levels hard,hard --tweak attack_min_p=0.5
         A/B test of a tuning change: side A plays its level with the
         tweaked values (--tweak can be repeated).
+
+    python3 bot_selfplay.py [games] [players] --levels hard,hard --personality turtle
+        A/B test of a personality: side A plays it, side B balanced.
+
+A/B tests play "hard" against "hard" unless --levels says otherwise, and
+every bot is "balanced" unless --personality says otherwise; --jobs N
+plays N games at once (one per CPU core).
 
 In an A/B test the seats alternate between the sides, and every game is
 played twice from the same start (seed) with the sides swapped, so both
@@ -58,6 +65,7 @@ class MixedBots:
 
     fast = True
     notice_ms = 0
+    dice_ms = 0
 
     def __init__(self, manager, controllers):
         self.manager = manager
@@ -169,11 +177,12 @@ def load_bot_module(path):
     return module
 
 
-def play_game(player_count, seed, sides=None, levels=None, other=None, stats=None):
+def play_game(player_count, seed, sides=None, levels=None, other=None, stats=None, personality=None):
     """One headless game. `sides` gives each seat's side ("A"/"B"), or None
     when every seat is the current bot. Side B plays `other`'s bot (a
     module) if given; `levels` ({side: level}) sets each side's level.
-    Returns (winning side or name, number of turns)."""
+    `personality` is side A's (everyone else is balanced). Returns
+    (winning side or name, number of turns)."""
     np.random.seed(seed)
     random.seed(seed)
     names = ["Bot {}".format(i + 1) for i in range(player_count)]
@@ -186,6 +195,7 @@ def play_game(player_count, seed, sides=None, levels=None, other=None, stats=Non
     manager.bot.fast = True
     if sides:
         for player, side in zip(app.players, sides):
+            player.bot_personality = personality if personality and side == "A" else bot.DEFAULT_PERSONALITY
             if levels:
                 player.bot_level = levels[side]
             if stats is not None:
@@ -213,11 +223,12 @@ def play_game(player_count, seed, sides=None, levels=None, other=None, stats=Non
 _worker = {}
 
 
-def _init_worker(tweaked, other_path):
+def _init_worker(tweaked, other_path, personality):
     if tweaked:
         bot.LEVELS["tweaked"] = tweaked
     _worker["other"] = load_bot_module(other_path) if other_path else None
     _worker["stats"] = Stats()
+    _worker["personality"] = personality
 
 
 def _ab_game(job):
@@ -227,11 +238,12 @@ def _ab_game(job):
     stats = _worker["stats"]
     stats.side_of.clear()
     stats.count.clear()
-    winner, turns = play_game(players, seed + i // 2, sides, levels, _worker["other"], stats)
+    winner, turns = play_game(players, seed + i // 2, sides, levels, _worker["other"], stats,
+                              _worker["personality"])
     return winner, turns, {side: dict(counter) for side, counter in stats.count.items()}
 
 
-def ab_test(games, players, seed, levels=None, tweaked=None, other_path=None, jobs=1):
+def ab_test(games, players, seed, levels, tweaked=None, other_path=None, jobs=1, personality=None):
     wins = collections.Counter()
     totals = collections.defaultdict(collections.Counter)
     turns = []
@@ -239,10 +251,10 @@ def ab_test(games, players, seed, levels=None, tweaked=None, other_path=None, jo
     job_list = [(i, players, seed, levels) for i in range(games)]
     if jobs > 1:
         import multiprocessing
-        pool = multiprocessing.Pool(jobs, initializer=_init_worker, initargs=(tweaked, other_path))
+        pool = multiprocessing.Pool(jobs, initializer=_init_worker, initargs=(tweaked, other_path, personality))
         results = pool.imap_unordered(_ab_game, job_list)
     else:
-        _init_worker(tweaked, other_path)
+        _init_worker(tweaked, other_path, personality)
         pool = None
         results = map(_ab_game, job_list)
     for done, (winner, n, counts) in enumerate(results, 1):
@@ -256,7 +268,10 @@ def ab_test(games, players, seed, levels=None, tweaked=None, other_path=None, jo
             print("{:4d} games: A {:3d}  B {:3d}  draws {:2d}  A win rate {:.1%}  ({:.0f} s)".format(
                 done, wins["A"], wins["B"], wins[None], rate, time.time() - start), flush=True)
     if pool is not None:
-        pool.close()
+        # Every result is in: stop the workers rather than wait for them to
+        # wind down (a worker can hang on exit).
+        pool.terminate()
+        pool.join()
     decided = wins["A"] + wins["B"]
     rate = wins["A"] / decided if decided else 0
     margin = 1.96 * (rate * (1 - rate) / decided) ** 0.5 if decided else 0
@@ -287,25 +302,26 @@ def main():
     parser.add_argument("--vs", metavar="BOT_FILE", help="A/B test against the bot in this file")
     parser.add_argument("--levels", metavar="A,B", help="A/B test between two levels of the current bot")
     parser.add_argument("--tweak", metavar="KEY=VALUE", action="append", default=[],
-                        help="with --levels: change one of side A's tunables")
+                        help="change one of side A's tunables")
+    parser.add_argument("--personality", choices=sorted(bot.PERSONALITIES),
+                        help="side A's personality (everyone else is balanced)")
     parser.add_argument("--seed", type=int, default=1, help="seed of the first game")
     parser.add_argument("--jobs", type=int, default=1, help="games played at once (one per CPU core)")
     args = parser.parse_args()
 
-    if args.vs or args.levels:
-        levels = tweaked = None
-        if args.levels:
-            a, b = args.levels.split(",")
-            levels = {"A": a.strip(), "B": b.strip()}
-            if args.tweak:
-                tweaked = dict(bot.LEVELS[levels["A"]])
-                for item in args.tweak:
-                    key, value = item.split("=")
-                    if key not in tweaked:
-                        parser.error("unknown tunable: " + key)
-                    tweaked[key] = type(tweaked[key])(ast.literal_eval(value))
-                levels["A"] = "tweaked"
-        ab_test(args.games, args.players, args.seed, levels, tweaked, args.vs, args.jobs)
+    if args.vs or args.levels or args.tweak or args.personality:
+        a, b = (args.levels or "hard,hard").split(",")
+        levels = {"A": a.strip(), "B": b.strip()}
+        tweaked = None
+        if args.tweak:
+            tweaked = dict(bot.LEVELS[levels["A"]])
+            for item in args.tweak:
+                key, value = item.split("=")
+                if key not in tweaked:
+                    parser.error("unknown tunable: " + key)
+                tweaked[key] = type(tweaked[key])(ast.literal_eval(value))
+            levels["A"] = "tweaked"
+        ab_test(args.games, args.players, args.seed, levels, tweaked, args.vs, args.jobs, args.personality)
         return
 
     for i in range(args.games):

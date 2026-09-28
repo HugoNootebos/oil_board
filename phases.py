@@ -2418,7 +2418,6 @@ class MouseAttackPhase(Phase):
         highest); a click -- or, for a bot defender, a short pause --
         applies them."""
         import pygame as pg
-        from bot import DICE_MS
         view = self.view
         self._draw_mouse_dice()
         defence = sorted((int(d) for d in self.defence_dice if d > 0), reverse=True)
@@ -2428,7 +2427,7 @@ class MouseAttackPhase(Phase):
             badge = country.fort_lvl + (self.tanks if i == 0 else 0)
             if badge != 0:
                 self.manager.phases[1]._bonus_badge(x, 100, badge)
-        wait = 0 if self.manager.bot.fast else DICE_MS
+        wait = self.manager.bot.dice_ms
         if not self.io.left_pressed and not (country.owner.is_bot and pg.time.get_ticks() - self.rolled_at >= wait):
             return
 

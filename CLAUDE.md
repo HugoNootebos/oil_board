@@ -30,8 +30,8 @@ Requirements: `pygame-ce>=2.5`, `numpy==1.19.3`, `matplotlib~=3.3.3`
 | `models.py` | `Player`, `Country` (drawing incl. troop markers + fort badges), `Connection` (routes, dotted sea routes, waypoint curves), `Dice`, `Io` (mouse input + hover/hit tests), `View`, `Gui` (side panels), `CardMenu`, `Kaertske`, `Button`. |
 | `board.py` | The map: `CONTINENTS`, `get_countries(default_player)` (resources/start units per country), `get_connections()` (land/sea links). |
 | `events.py` | World events: `Event` base class with hooks, one subclass per event, `EVENTS` list (23). |
-| `bot.py` | Heuristic computer player: `BotController` (plays a bot's turn step by step), exact combat odds (`conquer_probability`), `defence_tanks` for a bot being attacked. |
-| `bot_selfplay.py` | Headless bot-vs-bot games for testing/tuning: `python3 bot_selfplay.py [games] [players]`. |
+| `bot.py` | Computer player: `BotController` (plays a bot's turn step by step, values everything in troops), exact combat odds (`battle`), difficulty `LEVELS` and `PERSONALITIES`. |
+| `bot_selfplay.py` | Headless bot-vs-bot games and A/B tests for tuning bots: `python3 bot_selfplay.py [games] [players] [--vs FILE / --levels a,b / --tweak k=v / --personality p] [--jobs N]`. |
 | `save_load.py` | JSON save/load, save paths (`saves/autosave.json`, `saves/slot1-4.json`), legacy `savegame.json` migration. |
 | `player_colors.py` | Fixed player colours for N-player games, `light_tint`, `name_text_color` (black text on yellow). |
 | `map_polygons.py` | Country outline data. |
@@ -70,6 +70,11 @@ menu and move phase once dice are cast.
 - By default one troop stays behind when attacking; with only one defence
   die the defender rolls automatically; move-in is automatic when there's no choice.
 - Crossing water needs a ship or plane escort; a moved ship needs at least one troop with it.
+- Food caps armies: at the start of a turn every troop beyond the food *in
+  stock* starves (that turn's harvest only comes in after), so an army
+  can't outgrow its food income for long. A player who starves while
+  their income is 0 (e.g. under nucleaire winter) loses everything the
+  turn after.
 - Continents give cards at turn start (`CONTINENT_CARD_BONUS` in phases.py).
   Developed countries yield double, after one idle income — unless the owner
   still holds the whole continent at their next turn start.
@@ -80,7 +85,8 @@ menu and move phase once dice are cast.
   `events.py` and appending it to `EVENTS`; use the hooks (`on_start`,
   `on_end`, `modify_income`, `attack_bonus`, `dice_penalty`,
   `discount_shop_cost`, `on_turn_start`, ...) rather than special-casing
-  events in phases.py.
+  events in phases.py (or bot.py: bots see an event through those hooks,
+  plus the `bot_*` hints for what they can't work out from them).
 
 ## Drawing conventions
 
@@ -110,6 +116,7 @@ code changes; unknown names are dropped rather than failing. New mutable
 state on players/countries/connections/TurnManager must be added to both
 `save_game` and `load_game` (use `.get(key, default)` when loading so old
 saves still work). A save always resumes at `subattack = 0` of its phase.
+Players' `is_bot`, `bot_level` and `bot_personality` are saved.
 
 ## Working with the user
 
@@ -133,15 +140,41 @@ saves still work). A save always resumes at `subattack = 0` of its phase.
 
 ## Bots
 
-A player with `is_bot` (toggled per player on the player-names screen,
-saved) is played by `bot.py`. On their turn `TurnManager.update` calls
+A player with `is_bot` (set per player on the player-names screen, where
+the button cycles Human → Bot (normal) → Bot (hard) → Bot (easy); saved)
+is played by `bot.py`. On their turn `TurnManager.update` calls
 `BotController.update` instead of the normal phase handling: the phase
 still draws itself but gets no clicks, and the bot makes one decision per
-step (`STEP_MS`/`DICE_MS` pauses; `bot.fast = True` for headless games),
-calling the same methods the buttons use (`AttackPhase.roll_attack`,
-`ShopPhase.place_unit/place_fort/drop_nuke`, `MovementPhase.develop`,
-`EventTargetPhase.pick`, `TurnManager.end_phase`). Messages on a bot's
-turn close by themselves after `NOTICE_MS`. A bot attacking a human waits
-for the human's defence tanks/dice; a bot being attacked decides those
-itself. The shop and card buttons are disabled during a bot's turn.
+step (`STEP_MS`/`DICE_MS` pauses, shortened by the settings menu's "Fast
+bots"; `bot.fast = True` for headless games), calling the same methods the
+buttons use (`AttackPhase.roll_attack`, `ShopPhase.place_unit/place_fort/
+build_rails/build_bridge/drop_nuke`, `MovementPhase.develop`,
+`Phase._enter_redistribute`, `EventTargetPhase.pick`,
+`TurnManager.end_phase`). A status line at the bottom of the screen says
+what it's doing. Messages on a bot's turn close by themselves after
+`NOTICE_MS`. A bot attacking a human waits for the human's defence
+tanks/dice; a bot being attacked decides those itself
+(`BotController.defence_tanks`), as it does an event's pick for it on
+someone else's turn (`pick_country`). The shop and card buttons are
+disabled during a bot's turn.
+
+How it decides: everything is valued in troops. `_weights` prices each
+resource by need (food fully while the army is at what food can carry;
+oil hardly once there's a stock), `_target_value`/`_hold_value` price
+countries, `battle` gives exact odds, survivors and kills, `_attack_ev` an
+attack's expected value with a conquest of lookahead, `_danger` the chance
+a neighbour takes a country before the bot's next turn, and
+`_position_value` combines those per country. Deployment, moving in, the
+one move a turn, rail/air redistribution, starvation, card trades
+(`_trade_reward`) and the shop (`_shop_options`: value over the turns an
+item lasts minus its price) all compare position values. Hitting whoever leads is
+worth a bit extra (`leader_bias`), so bots don't just pile onto the
+weakest player. Tunables live in
+`BASE`/`LEVELS` (easy/normal/hard; lower levels add `noise`) and
+`PERSONALITIES` (one at random per bot: balanced/aggressive/builder/turtle).
+
 New player decisions in phases.py need a bot counterpart in bot.py.
+After changing a bot, A/B test it against the previous version before
+keeping it, e.g. `git show HEAD:bot.py > /tmp/old_bot.py; python3
+bot_selfplay.py 400 4 --vs /tmp/old_bot.py --jobs 4` (±5% at 400 games,
+about 10 minutes on 4 cores).

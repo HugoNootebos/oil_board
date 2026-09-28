@@ -232,8 +232,10 @@ def run_player_names_menu(count, width=960, height=640):
     """Shown after a 3/4/5/6-player game is picked. One text box per
     player, focus advances with Tab or Return; "Start Game" only works
     once every box has something in it. The button next to each box
-    switches that player between human and bot (a bot left unnamed is
-    called "Bot N"). Returns (names, bot flags), both in order."""
+    switches that player between human and bot, and the bot's difficulty
+    (human -> normal -> hard -> easy -> human; a bot left unnamed is called
+    "Bot N"). Returns (names, bots), both in order: a bot's level, or False
+    for a human."""
     pg.init()
     pg.font.init()
     screen = _open_window(width, height)
@@ -244,6 +246,7 @@ def run_player_names_menu(count, width=960, height=640):
 
     names = [""] * count
     bots = [False] * count
+    cycle = [False, "normal", "hard", "easy"]
     active = 0
 
     def final_names():
@@ -253,7 +256,7 @@ def run_player_names_menu(count, width=960, height=640):
     total_h = count * box_h + (count - 1) * gap
     start_y = height // 2 - total_h // 2 - 30
     boxes = [pg.Rect(width // 2 - box_w // 2, start_y + i * (box_h + gap), box_w, box_h) for i in range(count)]
-    bot_rects = [pg.Rect(box.right + 15, box.y, 110, box_h) for box in boxes]
+    bot_rects = [pg.Rect(box.right + 15, box.y, 170, box_h) for box in boxes]
 
     start_w, start_h = 220, 60
     start_rect = pg.Rect(width // 2 - start_w // 2, boxes[-1].bottom + 40, start_w, start_h)
@@ -272,7 +275,7 @@ def run_player_names_menu(count, width=960, height=640):
                         active = i
                 for i, rect in enumerate(bot_rects):
                     if rect.collidepoint(mouse_pos):
-                        bots[i] = not bots[i]
+                        bots[i] = cycle[(cycle.index(bots[i]) + 1) % len(cycle)]
                 if all_filled and start_rect.collidepoint(mouse_pos):
                     return final_names(), bots
             elif event.type == pg.KEYDOWN:
@@ -307,7 +310,7 @@ def run_player_names_menu(count, width=960, height=640):
             else:
                 text = label_font.render("Bot {}".format(i + 1), True, (110, 110, 110))
             screen.blit(text, (box.x + 10, box.centery - text.get_height() // 2))
-            _draw_button(screen, label_font, bot_rects[i], "Bot" if bots[i] else "Human",
+            _draw_button(screen, label_font, bot_rects[i], "Bot ({})".format(bots[i]) if bots[i] else "Human",
                          (245, 200, 120) if bots[i] else (200, 200, 200),
                          hovered=bot_rects[i].collidepoint(mouse_pos))
             if focused and (pg.time.get_ticks() // 500) % 2 == 0:

@@ -117,6 +117,8 @@ def _player_to_dict(player):
         "developed_this_turn": player.developed_this_turn,
         "eliminated": player.eliminated,
         "is_bot": player.is_bot,
+        "bot_level": player.bot_level,
+        "bot_personality": player.bot_personality,
         # Cards only need their type (0-3); Kaertske re-derives everything
         # else (name, sprite, layout position) from that plus engine.images.
         "cards": [card.type for card in player.cards],
@@ -247,6 +249,8 @@ def load_game(path, engine, manager):
         player.developed_this_turn = pdata.get("developed_this_turn", False)
         player.eliminated = pdata.get("eliminated", False)
         player.is_bot = pdata.get("is_bot", False)
+        player.bot_level = pdata.get("bot_level", "normal")
+        player.bot_personality = pdata.get("bot_personality", "balanced")
         player.cards = [Kaertske(card_type, images=engine.images) for card_type in pdata["cards"]]
         new_players.append(player)
     engine.players = new_players

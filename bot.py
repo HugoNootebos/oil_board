@@ -1,32 +1,51 @@
 """
-A basic heuristic computer player.
+The computer player.
 
 A player with `is_bot` set doesn't get mouse input: on their turn,
 TurnManager.update hands control to BotController.update, which still lets
 the current phase draw itself (with all clicks withheld) and then makes one
 decision at a time, with a short pause in between so people can follow
-along. It works through the same phase methods the buttons use
-(AttackPhase.roll_attack, ShopPhase.place_unit, TurnManager.end_phase, ...),
-so the rules stay in phases.py.
+along (and a status line saying what it's doing). It works through the same
+phase methods the buttons use (AttackPhase.roll_attack, ShopPhase.place_unit,
+TurnManager.end_phase, ...), so the rules stay in phases.py.
 
 The one moment a bot's turn waits on someone else is a human defender
 picking their tanks / defence dice; that phase screen then runs normally.
 The other way round, a bot that's attacked picks its defending tanks in
-defence_tanks() and always rolls every defence die.
+defence_tanks() and always rolls every defence die, and an event's pick
+for a bot during someone else's turn goes through pick_country().
+
+Everything is valued in troops:
+  - resources by need (_weights): food counts fully while the army is at
+    what food can carry -- every troop beyond the food in stock starves at
+    the turn start --, a stockpile of oil hardly at all;
+  - a country by what it yields, its continent and cards, and a player it
+    would finish off (_target_value, _hold_value);
+  - an attack by its expected value, from exact odds of winning, survivors
+    and kills, looking one conquest ahead (battle, _attack_ev);
+  - a country's troops by what they can attack minus the chance a
+    neighbour takes it before the bot's next turn (_danger,
+    _position_value).
 
 The strategy, per phase:
-  - reinforce: trade a card set (for food when about to starve, otherwise
-    troops), put the troops where they make the best attack likely (or,
-    failing that, on the most threatened border), then buy something;
-  - attack: keep making the attack with the best chance x value (exact
-    Risk odds incl. forts, tanks and event bonuses), as long as the chance
-    is good enough, and back off when a fight turns bad;
-  - move: develop a safe country if affordable, move the biggest idle
-    garrison to the border that needs it most, and place any owed
-    pagoda/torii.
+  - reinforce: trade a card set when it's worth it, for whatever helps
+    most; place troops where they add the most, to an attack or a border;
+    buy whatever is worth the most for its price (tanks, forts, ships,
+    planes, bridges, rails, nukes);
+  - attack: share out troops by rail or air if that pays, then keep making
+    the attack worth the most, hunting down a player it can finish off,
+    calling a fight off once it's no longer worth it, and splitting the
+    troops after a conquest where they're worth the most;
+  - move: develop a safe country if it pays, share out troops by rail or
+    air, make the one move worth the most, and place any owed pagoda/torii.
+
+How far it looks and how sure it plays depends on its level (LEVELS:
+easy/normal/hard) and personality (PERSONALITIES).
 """
 
 import itertools
+import math
+import random
 from contextlib import contextmanager
 from functools import lru_cache
 
@@ -34,39 +53,65 @@ import pygame as pg
 
 from board import CONTINENTS
 from models import CardMenu
+from player_colors import light_tint
 from phases import CONTINENT_CARD_BONUS
 
 # Pauses (ms) so a bot's turn can be followed on screen.
 STEP_MS = 400      # between actions
 DICE_MS = 900      # how long a roll stays visible before it's resolved
 NOTICE_MS = 2500   # a message on a bot's turn closes by itself after this
+FAST_BOTS = 0.3    # all of these, with "Fast bots" on in the settings menu
 
-# What a bot weighs its decisions with, per difficulty level (a player's
-# `bot_level`, see BotController.params). bot_selfplay.py can pit levels
-# against each other to tune these.
+# What a bot weighs its decisions with. Its difficulty level (a player's
+# `bot_level`) picks one of LEVELS, and its personality (`bot_personality`)
+# shifts a few of those values (see BotController.params). bot_selfplay.py
+# can pit levels and tweaks against each other to tune these.
+BASE = {
+    "attack_min_p": 0.65,     # start an attack only with at least this chance
+    "retreat_p": 0.25,        # call a running attack off below this chance
+    # Troops that will starve at the next turn start anyway cost nothing
+    # to lose: attacks made with them only need this chance.
+    "free_attack_min_p": 0.4,
+    "kill_value": 0.5,        # an enemy player's troop killed, in our troops
+    "leader_bias": 8.0,       # extra value for hitting whoever leads, per share of the lead
+    "enemy_aggression": 0.8,  # how likely a neighbour makes an attack that would work
+    "next_turn_weight": 0.5,  # attacks a move sets up for next turn, vs this turn's
+    "reposition_min_gain": 1.0,    # a move must be worth this much
+    "redistribute_min_gain": 2.0,  # a rail/air redistribution too (it costs 1 oil)
+    "asset_turns": 3,         # turns a tank, ship, plane or rails are counted for
+    "fort_turns": 4,          # turns a fort or bridge is counted for
+    "price_factor": 1.0,      # how dear the bot holds its resources when buying
+    "follow_discount": 0.7,   # weight of what the survivors can take next
+    "hunt_min_p": 0.3,        # go for an elimination this likely (cards and all)
+    "horizon": 3,             # turns a conquered country's income is counted for
+    "develop_horizon": 4,     # turns a development is expected to pay out
+    "hold_weak_sets": True,   # keep a card set worth less than 10 unless it's needed
+    "noise": 0.0,             # how much its choices are off, at random (0: never)
+}
 LEVELS = {
-    "normal": {
-        "attack_min_p": 0.65,     # start an attack only with at least this chance
-        "retreat_p": 0.25,        # call a running attack off below this chance
-        # Troops that will starve at the next turn start anyway cost
-        # nothing to lose: attacks made with them only need this chance.
-        "free_attack_min_p": 0.4,
-        "kill_value": 0.5,        # an enemy player's troop killed, in our troops
-        "enemy_aggression": 0.8,  # how likely a neighbour makes an attack that would work
-        "next_turn_weight": 0.5,  # attacks a move sets up for next turn, vs this turn's
-        "reposition_min_gain": 1.0,   # a move must be worth this much
-        "redistribute_min_gain": 2.0,  # a rail/air redistribution too (it costs 1 oil)
-        "asset_turns": 3,         # turns a tank, ship, plane or rails are counted for
-        "fort_turns": 4,          # turns a fort or bridge is counted for
-        "price_factor": 1.0,      # how dear the bot holds its resources when buying
-        "follow_discount": 0.7,   # weight of what the survivors can take next
-        "hunt_min_p": 0.3,        # go for an elimination this likely (cards and all)
-        "horizon": 3,             # turns a conquered country's income is counted for
-        "develop_horizon": 4,     # turns a development is expected to pay out
-        "hold_weak_sets": True,   # keep a card set worth less than 10 unless it's needed
-    },
+    "hard": dict(BASE),
+    # Often picks a lesser option, hardly looks past the next conquest,
+    # underestimates threats, never shuffles troops by rail or air and
+    # holds on to its resources.
+    "normal": dict(BASE, noise=0.4, follow_discount=0.3, enemy_aggression=0.6, hunt_min_p=0.5,
+                   reposition_min_gain=2.0, redistribute_min_gain=99.0, price_factor=1.3),
+    # Mostly picks at random among what looks good, only attacks sure
+    # things, barely sees threats coming, never plans ahead, never hunts
+    # anyone down and rarely buys anything.
+    "easy": dict(BASE, noise=0.8, attack_min_p=0.75, free_attack_min_p=0.6, kill_value=0.2,
+                 enemy_aggression=0.3, follow_discount=0.0, hunt_min_p=1.1, hold_weak_sets=False,
+                 price_factor=2.0, reposition_min_gain=4.0, redistribute_min_gain=99.0),
 }
 DEFAULT_LEVEL = "normal"
+
+# Shifts on top of the level, so bots of one level still play differently.
+PERSONALITIES = {
+    "balanced": {},
+    "aggressive": {"attack_min_p": -0.1, "kill_value": 0.3, "enemy_aggression": -0.2, "follow_discount": 0.1},
+    "builder": {"develop_horizon": 2, "horizon": 1, "price_factor": -0.2},
+    "turtle": {"attack_min_p": 0.1, "enemy_aggression": 0.2, "fort_turns": 2},
+}
+DEFAULT_PERSONALITY = "balanced"
 
 CONTINENT_OF = {name: continent for continent, members in CONTINENTS.items() for name in members}
 
@@ -125,6 +170,23 @@ def conquer_probability(attackers, defenders, mods=(0, 0, 0, 0)):
     return battle(attackers, defenders, mods)[0]
 
 
+def bot_params(player):
+    """`player`'s tunables: their level's (LEVELS), shifted by their
+    personality (PERSONALITIES)."""
+    level = getattr(player, "bot_level", DEFAULT_LEVEL)
+    personality = getattr(player, "bot_personality", DEFAULT_PERSONALITY)
+    key = (level, personality)
+    if key not in _PARAMS:
+        params = dict(LEVELS.get(level, LEVELS[DEFAULT_LEVEL]))
+        for name, shift in PERSONALITIES.get(personality, {}).items():
+            params[name] = max(0, params[name] + shift)
+        _PARAMS[key] = params
+    return _PARAMS[key]
+
+
+_PARAMS = {}
+
+
 class BotController:
 
     def __init__(self, manager):
@@ -136,10 +198,40 @@ class BotController:
         self._turn_key = None
         self._done = set()     # things already dealt with this turn
         self._failed = set()   # attacks (from, to) that didn't start or were called off
+        # What the bot is doing, shown at the bottom of the screen during
+        # its turn (see _say).
+        self.status = ""
         # Worked-out facts about the board, valid for one decision (the
         # board changes with every action).
         self._cache = {}
         self._acting = None
+        # For the random slips of the lower levels (see _jitter); its own,
+        # so it doesn't disturb the game's dice.
+        self.rng = random.Random(0)
+
+    def _say(self, text):
+        """What the bot is doing now, for the status line."""
+        self.status = text
+
+    def _draw_status(self):
+        """The bot's status line: a box at the bottom middle of the screen,
+        in the player's colour."""
+        if self.fast or not self.status:
+            return
+        engine = self.engine
+        view, player = engine.view, engine.players[engine.turn]
+        text = engine.font.render("{}: {}".format(player.name, self.status), True, (0, 0, 0))
+        w, h = text.get_width() + 24, text.get_height() + 12
+        rect = pg.Rect(view.WIDTH // 2 - w // 2, view.HEIGHT - h - 14, w, h)
+        pg.draw.rect(view.screen, light_tint(player.color), rect)
+        pg.draw.rect(view.screen, (0, 0, 0), rect, 2)
+        view.screen.blit(text, (rect.x + 12, rect.y + 6))
+
+    def _jitter(self, score):
+        """`score` nudged up or down at random by the level's noise (lower
+        levels sometimes prefer a lesser option); unchanged at noise 0."""
+        noise = self.params["noise"]
+        return score * math.exp(noise * self.rng.gauss(0, 1)) if noise else score
 
     def _cached(self, key, compute):
         if key not in self._cache:
@@ -166,14 +258,24 @@ class BotController:
         finally:
             self._acting, self._cache = None, {}
 
+    def _pace(self, ms):
+        if self.fast:
+            return 0
+        return int(ms * FAST_BOTS) if self.engine.settings.get("fast_bots") else ms
+
     @property
     def notice_ms(self):
-        return 0 if self.fast else NOTICE_MS
+        return self._pace(NOTICE_MS)
+
+    @property
+    def dice_ms(self):
+        return self._pace(DICE_MS)
 
     @property
     def params(self):
-        """The current bot's tunables (its difficulty level's)."""
-        return LEVELS.get(getattr(self.player, "bot_level", DEFAULT_LEVEL), LEVELS[DEFAULT_LEVEL])
+        """The deciding bot's tunables: its level's, shifted by its
+        personality."""
+        return bot_params(self.player)
 
     # --- decisions on someone else's turn ------------------------------------
 
@@ -211,12 +313,17 @@ class BotController:
             self._turn_key = key
             self._done = set()
             self._failed = set()
+            personality = getattr(player, "bot_personality", DEFAULT_PERSONALITY)
+            self._say("{} bot{}, thinking".format(
+                getattr(player, "bot_level", DEFAULT_LEVEL),
+                "" if personality == DEFAULT_PERSONALITY else ", " + personality))
 
         phase = manager.phases.get(player.attack)
         if self._human_defending() or self._human_picking() or player.attack == 6:
             # Their tank/dice choice or event pick, with the mouse; an
             # event's mouse attack (attack 6) runs itself.
             phase.update()
+            self._draw_status()
             return
 
         # Draw the phase as usual, but it gets no clicks: the bot plays.
@@ -229,10 +336,11 @@ class BotController:
 
         if self.player is not player:
             return  # the phase ended the turn (e.g. nothing left to feed)
+        self._draw_status()
         if not self._ready(player):
             return
         self._act(player)
-        self._next_at = pg.time.get_ticks() + STEP_MS
+        self._next_at = pg.time.get_ticks() + self._pace(STEP_MS)
 
     def _ready(self, player):
         """Pace the bot: a pause after every action, and a longer one while
@@ -243,7 +351,7 @@ class BotController:
         state = (player.attack, player.subattack)
         if state != self._last_state:
             self._last_state = state
-            wait = DICE_MS if state == (1, 4) else STEP_MS
+            wait = self.dice_ms if state == (1, 4) else self._pace(STEP_MS)
             self._next_at = max(self._next_at, now + wait)
         return now >= self._next_at
 
@@ -429,6 +537,7 @@ class BotController:
         if event is not None:
             value += event.bot_country_value(engine, player, target)
         if self._is_real(target.owner):
+            value += self.params["leader_bias"] * self._lead(target.owner)
             value += 0.5 if manager.conquered_enemy_this_turn else CARD_VALUE  # the turn's card
             left = sum(1 for c in engine.countries.values() if c.owner is target.owner)
             if left == 1:
@@ -437,6 +546,18 @@ class BotController:
                 # A step towards finishing them off this turn.
                 value += (6 + self._loot_value(target.owner)) * self._hunt()[target.owner] / left
         return value
+
+    def _lead(self, player):
+        """How far `player` is ahead of an even share of all the players'
+        strength (troops, plus 3 a country): negative when behind."""
+        def compute():
+            strength = {}
+            for c in self.engine.countries.values():
+                if self._is_real(c.owner):
+                    strength[c.owner] = strength.get(c.owner, 0) + c.units + 3
+            total = sum(strength.values())
+            return {p: s / total - 1 / len(strength) for p, s in strength.items()} if total else {}
+        return self._cached("lead", compute).get(player, 0.0)
 
     def _hunt(self):
         """{player: chance}: other players the bot can likely wipe out this
@@ -639,8 +760,10 @@ class BotController:
             self._deploy_boat()
             return
         if manager.reinforcements > 0:
-            for name, n in self._deploy_plan(manager.reinforcements).items():
+            plan = self._deploy_plan(manager.reinforcements)
+            for name, n in plan.items():
                 self.engine.countries[name].units += n
+            self._say(self._placed(manager.reinforcements, plan))
             manager.reinforcements = 0
             manager.all_reinforcements_deployed = True
             return
@@ -650,11 +773,18 @@ class BotController:
             return
         manager.end_phase()
 
+    @staticmethod
+    def _placed(troops, plan):
+        """E.g. "places 8 troops: Siberië 5, China 3" (the biggest three)."""
+        parts = ["{} {}".format(n, k) for n, k in sorted(plan.items(), key=lambda x: -x[1])]
+        return "places {} troops: {}".format(troops, ", ".join(parts[:3]) + (", ..." if len(parts) > 3 else ""))
+
     def _deploy_boat(self):
         """The free boat goes where a ship adds the most (see _shop)."""
         best = max(self._owned(), key=lambda c: (
             self._position_value(c, c.units, ships=c.ships + 1) - self._position_value(c, c.units), c.units))
         self.manager.phases[0].deploy_boat(best)
+        self._say("puts its free boat on " + best.name)
 
     def _starve(self):
         """Starvation: the troops lost come off the stacks that miss them
@@ -663,6 +793,7 @@ class BotController:
         another choice."""
         engine, manager, player = self.engine, self.manager, self.player
         phase = manager.phases[0]
+        self._say("loses {} troops to hunger".format(phase.starved))
         for _ in range(phase.starved):
             owned = [c for c in self._owned() if c.units > 0]
             if not owned:
@@ -702,7 +833,7 @@ class BotController:
                 for k in sorted({1, 2, 3, 5, 8, 12, 20, troops}):
                     if k > troops:
                         break
-                    gain = (value(name, units + k) - now) / k
+                    gain = self._jitter((value(name, units + k) - now) / k)
                     if best is None or gain > best[0]:
                         best = (gain, name, k)
             gain, name, k = best
@@ -746,7 +877,9 @@ class BotController:
             return False
         menu.trade_cards = [card for card in player.cards if card.use]
         reward = "helmets" if need_troops else self._trade_reward(base)
-        menu._execute_trade(reward, int(round(base * TRADE_MULT[reward])))
+        amount = int(round(base * TRADE_MULT[reward]))
+        menu._execute_trade(reward, amount)
+        self._say("trades cards for {} {}".format(amount, "troops" if reward == "helmets" else reward))
         return True
 
     def _trade_reward(self, base):
@@ -789,8 +922,10 @@ class BotController:
     def _recruit(self):
         """Troops from a card trade outside the reinforcement phase."""
         phase = self.manager.phases[4]
-        for name, n in self._deploy_plan(phase.pool).items():
+        plan = self._deploy_plan(phase.pool)
+        for name, n in plan.items():
             self.engine.countries[name].units += n
+        self._say(self._placed(phase.pool, plan))
         phase.pool = 0
         self.manager.end_trade_recruit()
 
@@ -839,17 +974,18 @@ class BotController:
         used from the reinforcement phase, where everything can be bought).
         True if it bought something."""
         best = None
-        for value, cost, action in self._shop_options():
-            net = value - self.params["price_factor"] * self._price(cost)
+        for value, cost, action, text in self._shop_options():
+            net = self._jitter(value - self.params["price_factor"] * self._price(cost))
             if net > 0 and (best is None or net > best[0]):
-                best = (net, action)
+                best = (net, action, text)
         if best is None:
             return False
         best[1]()
+        self._say(best[2])
         return True
 
     def _shop_options(self):
-        """[(value, cost, buy)] for each purchase worth a look."""
+        """[(value, cost, buy, what)] for each purchase worth a look."""
         engine, player, p = self.engine, self.player, self.params
         shop = self.manager.phases[3]
         e = self._economy()
@@ -867,14 +1003,16 @@ class BotController:
             fuel = 1.0 if player.oil + 2 * e["oil_income"] > e["tanks"] else 0.3
             for c in stacks:
                 options.append((fuel * p["asset_turns"] * gain(c, tanks=c.tanks + 1), cost,
-                                lambda c=c, cost=cost: shop.place_unit("tanks", cost, c.name)))
+                                lambda c=c, cost=cost: shop.place_unit("tanks", cost, c.name),
+                                "buys a tank for " + c.name))
 
         # Forts, where a border could be lost.
         for c in frontier:
             cost = {"wood": shop.fort_cost(c)}
             if c.fort_lvl < 3 and self._affordable(cost) and self._danger(c) > 0.05:
                 options.append((p["fort_turns"] * gain(c, fort=c.fort_lvl + 1), cost,
-                                lambda c=c: shop.place_fort(c.name)))
+                                lambda c=c: shop.place_fort(c.name),
+                                "builds a level {} fort on {}".format(c.fort_lvl + 1, c.name)))
 
         # A ship or a plane where it opens up attacks over sea; a plane also
         # makes the country an airport (troops move by air between them).
@@ -884,10 +1022,12 @@ class BotController:
                 continue
             if self._affordable(ship_cost) and not c.ships:
                 options.append((p["asset_turns"] * gain(c, ships=1), ship_cost,
-                                lambda c=c: shop.place_unit("ships", ship_cost, c.name)))
+                                lambda c=c: shop.place_unit("ships", ship_cost, c.name),
+                                "buys a ship for " + c.name))
             if self._affordable(plane_cost):
                 options.append((self._plane_value(c), plane_cost,
-                                lambda c=c: shop.place_unit("planes", plane_cost, c.name)))
+                                lambda c=c: shop.place_unit("planes", plane_cost, c.name),
+                                "buys a plane for " + c.name))
 
         # A bridge, where a stack faces the sea without a ship or plane.
         cost = shop._cost({"wood": 10})
@@ -902,7 +1042,8 @@ class BotController:
                     with self._what_if((self._connection(c.name, other, "sea"), "kind", "land")):
                         after = self._local_value([c.name])
                     options.append((p["fort_turns"] * (after - before), cost,
-                                    lambda c=c, other=other: shop.build_bridge(c.name, other)))
+                                    lambda c=c, other=other: shop.build_bridge(c.name, other),
+                                    "builds a bridge from {} to {}".format(c.name, other)))
 
         # Rails, linking a stack with spare troops to a border.
         cost = shop._cost({"wood": 2, "steel": 1})
@@ -920,7 +1061,8 @@ class BotController:
                     with self._what_if((c, "rails", True)):
                         after = max(0.0, (self._best_redistribution(phase) or (0,))[0])
                     options.append((p["asset_turns"] * (after - before), cost,
-                                    lambda a=a, b=b: shop.build_rails(a, b)))
+                                    lambda a=a, b=b: shop.build_rails(a, b),
+                                    "lays rails from {} to {}".format(a, b)))
 
         # A nuke.
         cost = shop._cost({"nuclear": NUKE_NUCLEAR})
@@ -928,7 +1070,8 @@ class BotController:
             for name in shop._nuke_targets():
                 target = engine.countries[name]
                 if target.units >= 2 or self._is_real(target.owner):
-                    options.append((self._nuke_value(target), cost, lambda name=name: self._drop_nuke(name)))
+                    options.append((self._nuke_value(target), cost, lambda name=name: self._drop_nuke(name),
+                                    "nukes " + name))
         return options
 
     def _plane_value(self, country):
@@ -994,6 +1137,7 @@ class BotController:
             chance = self._win_probability(from_c, target, active_tanks=attack.active_tanks)
             ev = self._attack_ev(from_c, target, from_c.units - 1, attack.active_tanks)
             if chance < self.params["retreat_p"] * (1 - self._free_share(from_c)) or ev < 0:
+                self._say("calls off the attack on " + target.name)
                 self._failed.add((from_c.name, target.name))
                 attack.attack_from = attack.defence_country = None
                 player.subattack = 0
@@ -1011,6 +1155,7 @@ class BotController:
         player, manager = self.player, self.manager
         attack = manager.phases[1]
         if self._hunt() and self._trade(need_troops=True):
+            self._say("trades cards for troops to finish off " + ", ".join(p.name for p in self._hunt()))
             return  # troops to finish someone off; placed first (RecruitPhase)
         best = None
         for from_c, target, land in self._attack_options():
@@ -1019,7 +1164,7 @@ class BotController:
             chance = self._win_probability(from_c, target)
             if chance < self._attack_min_p(from_c):
                 continue
-            score = self._attack_ev(from_c, target, from_c.units - 1)
+            score = self._jitter(self._attack_ev(from_c, target, from_c.units - 1))
             if score <= 0:
                 continue
             if best is None or score > best[0]:
@@ -1028,6 +1173,8 @@ class BotController:
             manager.end_phase()
             return
         _, from_c, target, land = best
+        self._say("attacks {} from {} ({:.0%})".format(
+            target.name, from_c.name, self._win_probability(from_c, target)))
         attack.attack_from = from_c.name
         attack._start_attack(target.name, land)
         if player.subattack == 5:
@@ -1077,6 +1224,7 @@ class BotController:
             moved = max(options, key=lambda m: (
                 self._position_value(target, m) + self._position_value(from_c, total - m), m))
         target.units, from_c.units = moved, total - moved
+        self._say("takes {}, {} troops move in".format(target.name, moved))
         attack._finish_conquest(from_c)
 
     # --- movement ------------------------------------------------------------
@@ -1093,6 +1241,7 @@ class BotController:
             country = self._develop_choice(phase)
             if country is not None:
                 phase.develop(country)
+                self._say("develops " + country.name)
                 return
 
         if not player.repositioned_this_turn and "redistribute" not in self._done:
@@ -1189,8 +1338,9 @@ class BotController:
                                 continue
                             if n and target.name not in land and not (ship or plane):
                                 continue  # troops can't cross the sea alone
-                            gain = value(target, target.units + n, target.ships + ship, target.planes + plane) \
-                                - value(target, target.units) - loss - plane * oil_cost
+                            gain = self._jitter(
+                                value(target, target.units + n, target.ships + ship, target.planes + plane)
+                                - value(target, target.units) - loss - plane * oil_cost)
                             if gain > best_gain:
                                 best_gain, best = gain, (origin, target, n, ship, plane)
         if best is None:
@@ -1207,6 +1357,9 @@ class BotController:
         target.planes += plane
         player.oil -= plane
         player.repositioned_this_turn = True
+        extra = " with a plane" if plane else " by ship" if ship else ""
+        self._say("moves {} troops from {} to {}{}".format(n, origin.name, target.name, extra) if n
+                  else "moves a {} from {} to {}".format("plane" if plane else "ship", origin.name, target.name))
         return True
 
     def _best_redistribution(self, phase, kinds=("rails", "air")):
@@ -1267,6 +1420,7 @@ class BotController:
             engine.countries[n].tanks = 0
         engine.countries[max(names, key=lambda n: engine.countries[n].units)].tanks = tanks
         phase._finish_redistribute()
+        self._say("moves troops around by " + ("rail" if kind == "rails" else "air"))
         if player.attack == 1:
             phase.attack_from = None
         else:

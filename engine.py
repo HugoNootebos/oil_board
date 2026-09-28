@@ -5,7 +5,7 @@ import numpy as np
 from board import get_connections, get_countries
 from models import Position, Image, Player, Io, View, Gui, Shop, Button, CardMenu, LANDMARKS
 from phases import TurnManager
-from random import sample
+from random import choice, sample
 from player_colors import COUNT_MODE_COLORS
 from save_load import AUTOSAVE_PATH, SAVE_SLOT_COUNT, slot_path, read_save_name, save_game
 
@@ -158,7 +158,7 @@ class Engine:
         # for, since only it can cleanly exit.
         self.settings_open = False
         self.settings = {"assets": False, "sea": True, "land": True, "sea_route": True, "tank": True,
-                         "landmarks": True}
+                         "landmarks": True, "fast_bots": False}
         self.pending_quit = False
         # Save As panel: open or not, which slot is being named (None while
         # still picking one), and the name typed so far.
@@ -170,9 +170,16 @@ class Engine:
 
         self.default_player = Player("mouse", color=(140, 140, 140))
         self.players = self.get_players(mode)
-        # player_bots: which of the players (in order) the computer plays.
+        # player_bots: which of the players (in order) the computer plays --
+        # True, or the bot's difficulty level. Each bot gets a personality
+        # at random.
+        from bot import PERSONALITIES
         for player, is_bot in zip(self.players, player_bots or []):
             player.is_bot = bool(is_bot)
+            if isinstance(is_bot, str):
+                player.bot_level = is_bot
+            if is_bot:
+                player.bot_personality = choice(sorted(PERSONALITIES))
         self.countries = get_countries(self.default_player)
         self.connections = get_connections()
 
@@ -612,7 +619,7 @@ class Engine:
         toggles = [
             ("assets", "Show assets"), ("sea", "Show sea connections"), ("land", "Show land connections"),
             ("sea_route", "Ship / plane lines"), ("tank", "Tank lines"),
-            ("landmarks", "Show torii/pagoda"),
+            ("landmarks", "Show torii/pagoda"), ("fast_bots", "Fast bots"),
         ]
         for i, (key, text) in enumerate(toggles):
             row_y = save_as_rect.bottom + 20 + i * 42
