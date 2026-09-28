@@ -146,6 +146,38 @@ class Event:
         True if anything happened. The default does nothing."""
         return False
 
+    # --- hints for computer players (bot.py) --------------------------
+    # Everything an event does through the hooks above (income, combat,
+    # routes, shop prices, ...) the bots already see. These are only for
+    # what they can't work out from that.
+
+    def bot_country_value(self, engine, player, country):
+        """Extra worth, in troops (negative for a burden), a computer
+        player sees in taking `country` while this event is the active one
+        -- e.g. a card that comes with it, or a penalty for holding it.
+        The default is 0."""
+        return 0
+
+    def bot_sea_attack_loss(self, engine):
+        """Chance an attack over sea is lost before its dice are rolled
+        (see sea_attack_check), for a computer player weighing one. The
+        default is 0."""
+        return 0
+
+    def bot_extra_loot(self, engine, loser):
+        """{resource: amount} a computer player gets on top of the usual
+        loot for eliminating `loser` (see on_player_eliminated). The default
+        is nothing."""
+        return {}
+
+    def bot_pick_goal(self):
+        """What the country a player is made to pick (EventTargetPhase) is
+        in for, so a computer player knows what to look for: "strike" (it
+        gets hit -- pick the enemy it hurts most), "lose" (it's lost --
+        pick the one missed least) or "plane" (it gets a plane -- pick where
+        one helps most). The default, None, picks the most valuable."""
+        return None
+
     def save_state(self, engine):
         """JSON-able state this event needs kept across a save/load while
         it's the active one (by name, never object references)."""
@@ -248,6 +280,10 @@ class JapanGoesCrazy(Event):
         self.original_kinds = {n: k for n, k in data.get("original_kinds", {}).items() if n in engine.countries}
         self.troops_pending = data.get("troops_pending", False)
 
+    def bot_country_value(self, engine, player, country):
+        # The +5 troops for whoever takes Japan first.
+        return 5 if country.name == "Japan" and self.troops_pending else 0
+
 
 class NativesFightBack(Event):
     def __init__(self):
@@ -304,6 +340,10 @@ class NativesFightBack(Event):
         self.queue = [n for n in data.get("queue", []) if n in engine.countries]
         self.return_to = tuple(data.get("return_to", (0, 0)))
 
+    def bot_country_value(self, engine, player, country):
+        # Taking one still pending brings the natives' attack down on it.
+        return -4 if country.name in self.pending else 0
+
 
 class DevelopmentAid(Event):
     def __init__(self):
@@ -334,6 +374,13 @@ class EmperorsHonor(Event):
         if player is engine.default_player:
             return
         self.conquest_counts[player] = self.conquest_counts.get(player, 0) + 1
+
+    def bot_country_value(self, engine, player, country):
+        # Every conquest this round counts towards the claim -- while the
+        # player can still end up with the most.
+        mine = self.conquest_counts.get(player, 0)
+        others = max((n for p, n in self.conquest_counts.items() if p is not player), default=0)
+        return 2 if mine + 2 >= others else 0
 
     def on_end(self, engine):
         if not self.conquest_counts:
@@ -398,6 +445,9 @@ class WrongButton(Event):
     def load_state(self, engine, data):
         self.triggered = data.get("triggered", False)
 
+    def bot_pick_goal(self):
+        return "strike"
+
     def _strike(self, engine, chooser, country):
         self.triggered = True
         country.units = country.units // 2  # rounded down
@@ -411,9 +461,7 @@ class WrongButton(Event):
         manager = engine.turn_manager
         asia = [c for c in engine.countries.values() if c.name in CONTINENTS["Asia"]]
         if chooser.is_bot:
-            # The biggest army that isn't theirs, preferably a player's.
-            target = max(asia, key=lambda c: (c.owner is not chooser,
-                                              c.owner is not engine.default_player, c.units))
+            target = manager.bot.pick_country(chooser, asia, self)
             self._strike(engine, chooser, target)
             manager.notices.append([self.name, "{}: {} drops the nuke on {}".format(why, chooser.name, target.name)])
             return
@@ -451,6 +499,9 @@ class StormAtSea(Event):
     def sea_attack_check(self, engine):
         return np.random.random() < 1 / 3
 
+    def bot_sea_attack_loss(self, engine):
+        return 1 / 3
+
 
 class ChildSoldiers(Event):
     def __init__(self):
@@ -467,6 +518,12 @@ class ChildSoldiers(Event):
         if country.name not in CONTINENTS["Africa"]:
             return
         engine.turn_manager.pending_event_cards += 1
+
+    def bot_country_value(self, engine, player, country):
+        # A card for each African country taken from a player.
+        if country.name in CONTINENTS["Africa"] and country.owner is not engine.default_player:
+            return 3
+        return 0
 
 
 class Slavery(Event):
@@ -502,6 +559,9 @@ class Slavery(Event):
             happened = True
         return happened
 
+    def bot_country_value(self, engine, player, country):
+        return 1 if country.name in self.pending else 0  # its troop comes along
+
     def on_end(self, engine):
         self.pending = []
 
@@ -522,6 +582,9 @@ class EndOfHumanity(Event):
     def on_player_eliminated(self, engine, victor, loser):
         victor.food += loser.food
         loser.food = 0
+
+    def bot_extra_loot(self, engine, loser):
+        return {"food": loser.food}
 
 
 class VOCPart2(Event):
@@ -604,6 +667,9 @@ class ChildLabor(Event):
                 self.name, "{} took {}: +5 steel".format(country.owner.name, name)])
             happened = True
         return happened
+
+    def bot_country_value(self, engine, player, country):
+        return 2 if country.name in self.pending else 0  # its 5 steel come along
 
     def on_end(self, engine):
         self.pending = []
@@ -708,6 +774,9 @@ class Ebola(Event):
         self.candidates = [n for n in data.get("candidates", []) if n in engine.countries]
         self.chooser = next((p for p in engine.players if p.name == data.get("chooser")), None)
 
+    def bot_pick_goal(self):
+        return "lose"
+
     @staticmethod
     def _strike(engine, country):
         # Reuses Phase.abandon (any Phase instance will do -- it only
@@ -778,6 +847,13 @@ class Pilgrimage(Event):
                 abandon(country)  # goes to default_player as usual
         arabia.units += total + 5
 
+    def bot_country_value(self, engine, player, country):
+        # Whoever takes Arabië while it's pending moves every troop there
+        # (+5), giving up all their other countries.
+        if country.name == "Arabië" and self.pending:
+            return 5 - 6 * sum(1 for c in engine.countries.values() if c.owner is player)
+        return 0
+
 
 class Looting(Event):
     def __init__(self):
@@ -824,6 +900,9 @@ class ClimateHoax(Event):
             return_to=(player.attack, player.subattack),
         )
         player.attack, player.subattack = 5, 0
+
+    def bot_pick_goal(self):
+        return "plane"
 
 
 class TrumpWall(Event):
@@ -895,6 +974,12 @@ class Drugs(Event):
         if player is engine.default_player:
             return 0
         return 1 if any(engine.countries[name].owner is player for name in self.COUNTRIES) else 0
+
+    def bot_country_value(self, engine, player, country):
+        # The first of these costs 1 on every die for the rest of the round.
+        if country.name in self.COUNTRIES and not self.dice_penalty(engine, player):
+            return -4
+        return 0
 
 
 class NaziExpansion(Event):

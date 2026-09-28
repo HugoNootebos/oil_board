@@ -75,10 +75,14 @@ class MixedBots:
         return sys.modules[type(controller).__module__].defence_tanks(self.manager.engine, country)
 
     def __getattr__(self, name):
-        # Anything else a phase asks of "the bot" (a decision for a player
-        # other than the current one): the owner is the first argument.
+        # Anything else asked of "the bot" (a decision for a player who may
+        # not be the current one): the deciding player is the first
+        # argument. An older bot without that decision gets today's.
         def call(player, *args, **kwargs):
-            return getattr(self.controllers[player], name)(player, *args, **kwargs)
+            controller = self.controllers[player]
+            if not hasattr(controller, name):
+                controller = bot.BotController(self.manager)
+            return getattr(controller, name)(player, *args, **kwargs)
         return call
 
 

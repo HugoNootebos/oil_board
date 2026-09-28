@@ -33,7 +33,6 @@ from functools import lru_cache
 import pygame as pg
 
 from board import CONTINENTS
-from events import WrongButton, Ebola, ClimateHoax
 from models import CardMenu
 from phases import CONTINENT_CARD_BONUS
 
@@ -140,6 +139,7 @@ class BotController:
         # Worked-out facts about the board, valid for one decision (the
         # board changes with every action).
         self._cache = {}
+        self._acting = None
 
     def _cached(self, key, compute):
         if key not in self._cache:
@@ -152,7 +152,19 @@ class BotController:
 
     @property
     def player(self):
-        return self.engine.players[self.engine.turn]
+        """Whose decision it is: the current player, or whoever _acting_as
+        says."""
+        return self._acting or self.engine.players[self.engine.turn]
+
+    @contextmanager
+    def _acting_as(self, player):
+        """Decide for `player`, who may not be the current player (e.g. an
+        event's pick during someone else's turn)."""
+        self._acting, self._cache = player, {}
+        try:
+            yield
+        finally:
+            self._acting, self._cache = None, {}
 
     @property
     def notice_ms(self):
@@ -169,6 +181,26 @@ class BotController:
         """How many of its tanks the bot owning `country` uses to defend it
         against an attack (1 oil each)."""
         return min(country.tanks, country.owner.oil)
+
+    def pick_country(self, player, countries, event=None):
+        """The country `player` (a bot) picks from `countries` when `event`
+        makes them pick one -- by what the pick is for (see
+        Event.bot_pick_goal)."""
+        goal = event.bot_pick_goal() if event is not None else None
+        with self._acting_as(player):
+            own = [c for c in countries if c.owner is player]
+            if goal == "strike":
+                others = [c for c in countries if c.owner is not player]
+                if others:
+                    return max(others, key=lambda c: (self._nuke_value(c), c.units))
+                return min(countries, key=lambda c: (self._hold_value(c), c.units))
+            if goal == "lose" and own:
+                return min(own, key=lambda c: (self._hold_value(c), c.units))
+            if goal == "plane" and own:
+                return max(own, key=lambda c: (self._plane_value(c), c.units))
+            if own:
+                return max(own, key=lambda c: (self._hold_value(c), c.units))
+            return max(countries, key=lambda c: (self._target_value(c), c.units))
 
     # --- per-frame driver --------------------------------------------------
 
@@ -317,7 +349,7 @@ class BotController:
             owned = self._owned(player)
             on_board = sum(c.units for c in owned)
             pending = 0
-            if player is self.player:
+            if player is self.engine.players[self.engine.turn]:
                 if player.attack == 0 and player.subattack in (1, 2):
                     pending += manager.reinforcements + manager.pending_troops
                 elif player.attack == 4:
@@ -371,8 +403,12 @@ class BotController:
         """What eliminating `loser` hands over: their wood, steel, nuclear,
         oil and cards."""
         w = self._weights()
-        return sum(w[r] * getattr(loser, r) for r in ("wood", "steel", "nuclear", "oil")) \
+        value = sum(w[r] * getattr(loser, r) for r in ("wood", "steel", "nuclear", "oil")) \
             + CARD_VALUE * len(loser.cards)
+        event = self.manager.current_event
+        if event is not None:
+            value += sum(w[r] * n for r, n in event.bot_extra_loot(self.engine, loser).items())
+        return value
 
     def _target_value(self, target):
         """What taking `target` is worth, in troops."""
@@ -389,6 +425,9 @@ class BotController:
                 value += 3 + CARD_VALUE * self.params["horizon"] * bonus
             elif self._is_real(target.owner) and all(c.owner is target.owner for c in others):
                 value += 2 + CARD_VALUE * bonus  # breaks their continent
+        event = manager.current_event
+        if event is not None:
+            value += event.bot_country_value(engine, player, target)
         if self._is_real(target.owner):
             value += 0.5 if manager.conquered_enemy_this_turn else CARD_VALUE  # the turn's card
             left = sum(1 for c in engine.countries.values() if c.owner is target.owner)
@@ -486,8 +525,8 @@ class BotController:
                     continue
                 if event is not None and not event.can_attack_target(engine, target):
                     continue
-                if kind == "sea" and type(event).__name__ == "StormAtSea":
-                    continue  # pirates: not worth a third of the army
+                if kind == "sea" and event is not None and event.bot_sea_attack_loss(engine) > 0.2:
+                    continue  # e.g. pirates: not worth a third of the army
                 targets.append((target, kind))
             return targets
         return self._cached(("targets", from_c.name, ships, planes), compute)
@@ -840,7 +879,6 @@ class BotController:
         # A ship or a plane where it opens up attacks over sea; a plane also
         # makes the country an airport (troops move by air between them).
         ship_cost, plane_cost = shop._cost({"wood": 15}), shop._cost({"steel": 10})
-        air_before = None
         for c in stacks:
             if c.units < 2:
                 continue
@@ -848,13 +886,8 @@ class BotController:
                 options.append((p["asset_turns"] * gain(c, ships=1), ship_cost,
                                 lambda c=c: shop.place_unit("ships", ship_cost, c.name)))
             if self._affordable(plane_cost):
-                value = p["asset_turns"] * gain(c, planes=c.planes + 1)
-                if not c.airport:
-                    if air_before is None:
-                        air_before = self._air_gain()
-                    with self._what_if((c, "airport", True), (c, "planes", c.planes + 1)):
-                        value += p["asset_turns"] * max(0.0, self._air_gain() - air_before)
-                options.append((value, plane_cost, lambda c=c: shop.place_unit("planes", plane_cost, c.name)))
+                options.append((self._plane_value(c), plane_cost,
+                                lambda c=c: shop.place_unit("planes", plane_cost, c.name)))
 
         # A bridge, where a stack faces the sea without a ship or plane.
         cost = shop._cost({"wood": 10})
@@ -897,6 +930,19 @@ class BotController:
                 if target.units >= 2 or self._is_real(target.owner):
                     options.append((self._nuke_value(target), cost, lambda name=name: self._drop_nuke(name)))
         return options
+
+    def _plane_value(self, country):
+        """What a plane on `country` adds over the turns it lasts: attacks
+        over sea from there, and -- if that makes it a new airport -- moving
+        troops by air between the airports."""
+        turns = self.params["asset_turns"]
+        value = turns * (self._position_value(country, country.units, planes=country.planes + 1)
+                         - self._position_value(country, country.units))
+        if not country.airport:
+            before = self._air_gain()
+            with self._what_if((country, "airport", True), (country, "planes", country.planes + 1)):
+                value += turns * max(0.0, self._air_gain() - before)
+        return value
 
     def _air_gain(self):
         """What sharing out the troops of the airport network would gain now."""
@@ -1236,16 +1282,5 @@ class BotController:
         if phase.predicate is None:
             return  # the phase bails out on its own
         valid = [c for c in engine.countries.values() if phase.predicate(c)]
-        if not valid:
-            return
-        event = self.manager.current_event
-        if isinstance(event, WrongButton):
-            # A nuke: the biggest army that isn't ours, preferably a player's.
-            choice = max(valid, key=lambda c: (c.owner is not player, self._is_real(c.owner), c.units))
-        elif isinstance(event, Ebola):
-            choice = min(valid, key=lambda c: (self._target_value(c), c.units))  # losing it anyway
-        elif isinstance(event, ClimateHoax):
-            choice = max(valid, key=lambda c: (self._frontier(c.name), c.units))  # a free plane
-        else:
-            choice = max(valid, key=lambda c: (c.owner is player, c.units))
-        phase.pick(choice)
+        if valid:
+            phase.pick(self.pick_country(player, valid, self.manager.current_event))
