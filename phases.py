@@ -2003,7 +2003,7 @@ class ShopPhase(Phase):
         if sub == 9:
             self._pick_origin(16)
         elif sub == 16:
-            self._build_link("sea", "land", cost=self._cost({"wood": 10}), back=9)
+            self._build_bridge(back=9)
         elif sub == 10:
             self._pick_origin(17)
         elif sub == 17:
@@ -2025,7 +2025,7 @@ class ShopPhase(Phase):
             self.build_origin = hover
             self.player.subattack = next_sub
 
-    def _build_link(self, kind_from, kind_to, cost, back):
+    def _build_bridge(self, back):
         if self.build_origin is not None:
             self.engine.countries[self.build_origin].shade = 1
         hover = self.io.hover_country
@@ -2035,12 +2035,19 @@ class ShopPhase(Phase):
             self.build_origin = None
             self.player.subattack = back
             return
+        if self.build_bridge(self.build_origin, hover):
+            self.manager.close_shop()
+
+    def build_bridge(self, origin, other):
+        """Turn the sea route from the player's `origin` to `other` into a
+        land route and pay for it (also called by bots). True if there was
+        such a sea route."""
         for c in self.engine.connections:
-            if {self.build_origin, hover} == set(c.connection) and c.kind == kind_from:
-                c.kind = kind_to
-                self.player.wood -= cost["wood"]
-                self.manager.close_shop()
-                break
+            if {origin, other} == set(c.connection) and c.kind == "sea":
+                c.kind = "land"
+                self.player.wood -= self._cost({"wood": 10})["wood"]
+                return True
+        return False
 
     def _build_rails(self, back):
         engine = self.engine
@@ -2067,18 +2074,25 @@ class ShopPhase(Phase):
             self.build_origin = None
             self.player.subattack = back
             return
-        if self.engine.countries[hover].owner != self.player:
-            return
+        if self.build_rails(self.build_origin, hover):
+            self.manager.close_shop()
+
+    def build_rails(self, origin, other):
+        """Lay rails on the land route between two of the player's countries
+        and pay for them (also called by bots). True if they were laid --
+        not if there's no such route or it already has rails."""
+        if self.engine.countries[other].owner != self.player:
+            return False
         for c in self.engine.connections:
-            if {self.build_origin, hover} == set(c.connection) and c.kind == "land":
+            if {origin, other} == set(c.connection) and c.kind == "land":
                 if c.rails:
-                    return  # already has rails: nothing to buy
+                    return False  # already has rails: nothing to buy
                 c.rails = True  # draws grey (Connection.draw) and enables rail redistribution
                 cost = self._cost({"wood": 2, "steel": 1})
                 self.player.wood -= cost["wood"]
                 self.player.steel -= cost["steel"]
-                self.manager.close_shop()
-                break
+                return True
+        return False
 
     def _nuke_targets(self):
         """Every country not the player's own that's adjacent (land or sea)

@@ -27,6 +27,7 @@ The strategy, per phase:
 """
 
 import itertools
+from contextlib import contextmanager
 from functools import lru_cache
 
 import pygame as pg
@@ -56,6 +57,9 @@ LEVELS = {
         "next_turn_weight": 0.5,  # attacks a move sets up for next turn, vs this turn's
         "reposition_min_gain": 1.0,   # a move must be worth this much
         "redistribute_min_gain": 2.0,  # a rail/air redistribution too (it costs 1 oil)
+        "asset_turns": 3,         # turns a tank, ship, plane or rails are counted for
+        "fort_turns": 4,          # turns a fort or bridge is counted for
+        "price_factor": 1.0,      # how dear the bot holds its resources when buying
         "follow_discount": 0.7,   # weight of what the survivors can take next
         "hunt_min_p": 0.3,        # go for an elimination this likely (cards and all)
         "horizon": 3,             # turns a conquered country's income is counted for
@@ -265,16 +269,6 @@ class BotController:
 
     def _is_real(self, player):
         return player is not self.engine.default_player
-
-    def _threat(self, name):
-        """Largest force another real player has next to `name`."""
-        player = self.player
-        worst = 0
-        for other in self._links(name):
-            c = self.engine.countries[other]
-            if c.owner is not player and self._is_real(c.owner):
-                worst = max(worst, c.units)
-        return worst
 
     def _frontier(self, name):
         """Whether `name` borders anything the bot doesn't own."""
@@ -522,14 +516,15 @@ class BotController:
             return extra
         return self._cached(("enemy_extra", owner.name), compute)
 
-    def _danger(self, country, units=None, fort=None):
-        """Chance another player takes `country` (with `units` troops and a
-        `fort` level) before our next turn: the strongest attack a neighbour
-        can make on it -- over sea only with a ship, or a plane and oil --
-        with what they can add there first, their tanks, and our fort and
-        tanks against it."""
+    def _danger(self, country, units=None, fort=None, tanks=None):
+        """Chance another player takes `country` (with `units` troops, a
+        `fort` level and `tanks`) before our next turn: the strongest attack
+        a neighbour can make on it -- over sea only with a ship, or a plane
+        and oil -- with what they can add there first, their tanks, and our
+        fort and tanks against it."""
         units = country.units if units is None else units
         fort = country.fort_lvl if fort is None else fort
+        tanks = country.tanks if tanks is None else tanks
         if units <= 0:
             return 1.0
 
@@ -550,16 +545,16 @@ class BotController:
                 if event is not None:
                     a_all += event.attack_bonus(engine, enemy) - event.dice_penalty(engine, owner)
                     d_all -= event.dice_penalty(engine, player)
-                mods = (int(a_all), min(enemy.tanks, owner.oil), int(d_all), min(country.tanks, player.oil))
+                mods = (int(a_all), min(enemy.tanks, owner.oil), int(d_all), min(tanks, player.oil))
                 attackers = enemy.units - 1 + self._enemy_extra(owner)
                 worst = max(worst, battle(attackers, units, mods)[0])
             return worst * self.params["enemy_aggression"]
-        return self._cached(("danger", country.name, units, fort), compute)
+        return self._cached(("danger", country.name, units, fort, tanks), compute)
 
     def _hold_value(self, country):
         """What keeping `country` is worth, in troops: what losing it costs."""
         def compute():
-            value = 1.0 + self.params["horizon"] * self._income_value(country) + 2 * country.fort_lvl
+            value = 1.0 + self.params["horizon"] * self._income_value(country)
             if country.airport:
                 value += 1.0
             continent = CONTINENT_OF.get(country.name)
@@ -570,20 +565,23 @@ class BotController:
             return value
         return self._cached(("hold", country.name), compute)
 
-    def _best_attack_ev(self, country, units, depth=2, ships=None, planes=None):
+    def _best_attack_ev(self, country, units, depth=2, ships=None, planes=None, tanks=None):
         """The most an attack from `country` with `units` troops on it is
         worth (0 when nothing is)."""
+        active = None if tanks is None else min(tanks, self.player.oil)
         best = 0.0
         for target, _ in self._targets_from(country, ships, planes):
-            best = max(best, self._attack_ev(country, target, units - 1, depth=depth))
+            best = max(best, self._attack_ev(country, target, units - 1, active, depth))
         return best
 
-    def _position_value(self, country, units, attack_weight=1.0, depth=2, ships=None, planes=None):
+    def _position_value(self, country, units, attack_weight=1.0, depth=2,
+                        ships=None, planes=None, tanks=None, fort=None):
         """How good `units` troops on `country` are: what they can attack
-        (times `attack_weight`) minus what could be lost there."""
-        value = -self._hold_value(country) * self._danger(country, units)
+        (times `attack_weight`) minus what could be lost there. `ships`,
+        `planes`, `tanks` and `fort` pretend a different number is there."""
+        value = -self._hold_value(country) * self._danger(country, units, fort, tanks)
         if units > 1 and attack_weight:
-            value += attack_weight * self._best_attack_ev(country, units, depth, ships, planes)
+            value += attack_weight * self._best_attack_ev(country, units, depth, ships, planes, tanks)
         return value
 
     # --- reinforcement -------------------------------------------------------
@@ -614,16 +612,9 @@ class BotController:
         manager.end_phase()
 
     def _deploy_boat(self):
-        """The free boat goes where it opens the most sea attacks: the
-        country with the most sea routes to countries it doesn't own."""
-        engine = self.engine
-
-        def sea_targets(name):
-            return sum(1 for c in engine.connections
-                       if c.kind == "sea" and name in c
-                       and any(engine.countries[o].owner is not self.player for o in c.connection if o != name))
-
-        best = max(self._owned(), key=lambda c: (sea_targets(c.name), c.units))
+        """The free boat goes where a ship adds the most (see _shop)."""
+        best = max(self._owned(), key=lambda c: (
+            self._position_value(c, c.units, ships=c.ships + 1) - self._position_value(c, c.units), c.units))
         self.manager.phases[0].deploy_boat(best)
 
     def _starve(self):
@@ -765,54 +756,177 @@ class BotController:
         self.manager.end_trade_recruit()
 
     # --- shop ----------------------------------------------------------------
+    # Everything the shop sells is scored the same way: what it adds to the
+    # position (see _position_value) over the turns it lasts, against its
+    # price in troops -- where a stockpile is cheap to spend (_stock_weight).
+
+    def _stock_weight(self, resource):
+        """What one unit of `resource` in stock costs to spend: its weight,
+        falling off once more than a couple of purchases' worth is piled up."""
+        typical = {"wood": 15, "steel": 20, "nuclear": 5, "oil": 10, "food": 20}[resource]
+        return self._weights()[resource] * min(1.0, 2 * typical / max(getattr(self.player, resource), 1))
+
+    def _price(self, cost):
+        return sum(self._stock_weight(r) * n for r, n in cost.items())
+
+    def _affordable(self, cost):
+        return all(getattr(self.player, r) >= n for r, n in cost.items())
+
+    @contextmanager
+    def _what_if(self, *changes):
+        """Look at the board with some values changed for a moment:
+        `changes` are (object, attribute, value)."""
+        saved = [(obj, attr, getattr(obj, attr)) for obj, attr, _ in changes]
+        for obj, attr, value in changes:
+            setattr(obj, attr, value)
+        self._cache = {}
+        try:
+            yield
+        finally:
+            for obj, attr, value in reversed(saved):
+                setattr(obj, attr, value)
+            self._cache = {}
+
+    def _local_value(self, names):
+        engine = self.engine
+        return sum(self._position_value(engine.countries[n], engine.countries[n].units)
+                   for n in names if engine.countries[n].owner is self.player)
+
+    def _connection(self, a, b, kind):
+        return next((c for c in self.engine.connections if {a, b} == set(c.connection) and c.kind == kind), None)
 
     def _shop(self):
-        """Buy one thing (the shop is only used from the reinforcement
-        phase, where everything can be bought). True if it bought something."""
-        engine, player = self.engine, self.player
-        shop = self.manager.phases[3]
-
-        # Nuke the biggest enemy army next to us.
-        if player.nuclear >= shop._cost({"nuclear": 5})["nuclear"]:
-            targets = [engine.countries[n] for n in shop._nuke_targets()]
-            targets = [c for c in targets if self._is_real(c.owner) and c.units >= 6]
-            if targets:
-                target = max(targets, key=lambda c: c.units)
-                shop.drop_nuke(target.name)
-                self.manager.notices.append("{} nuked {}!".format(player.name, target.name))
-                return True
-
-        frontier = [engine.countries[n] for n in self._frontier_names()]
-        if not frontier:
+        """Buy the one thing worth the most over its price (the shop is only
+        used from the reinforcement phase, where everything can be bought).
+        True if it bought something."""
+        best = None
+        for value, cost, action in self._shop_options():
+            net = value - self.params["price_factor"] * self._price(cost)
+            if net > 0 and (best is None or net > best[0]):
+                best = (net, action)
+        if best is None:
             return False
+        best[1]()
+        return True
 
-        # A tank on the strongest attacker, if there's oil to run it.
-        tank_cost = shop._cost({"steel": 20})
-        tanks = sum(c.tanks for c in self._owned())
-        if player.steel >= tank_cost["steel"] and player.oil + engine.production(player)["oil"] > tanks:
-            best = max(frontier, key=lambda c: c.units)
-            shop.place_unit("tanks", tank_cost, best.name)
-            return True
+    def _shop_options(self):
+        """[(value, cost, buy)] for each purchase worth a look."""
+        engine, player, p = self.engine, self.player, self.params
+        shop = self.manager.phases[3]
+        e = self._economy()
+        frontier = [engine.countries[n] for n in self._frontier_names()]
+        stacks = sorted(frontier, key=lambda c: -c.units)[:6]
+        options = []
 
-        # A fort where another player threatens us most.
-        threatened = [c for c in frontier if self._threat(c.name) > 0 and c.fort_lvl < 3
-                      and player.wood >= shop.fort_cost(c)]
-        if threatened:
-            worst = max(threatened, key=lambda c: self._threat(c.name) - c.units)
-            if shop.place_fort(worst.name):
-                return True
+        def gain(country, **pretend):
+            return self._position_value(country, country.units, **pretend) \
+                - self._position_value(country, country.units)
 
-        # A ship where the only way forward is over sea.
-        ship_cost = shop._cost({"wood": 15})
-        if player.wood >= ship_cost["wood"]:
-            for c in sorted(frontier, key=lambda c: -c.units):
-                links = self._links(c.name)
-                open_land = any(k == "land" and engine.countries[o].owner is not player for o, k in links.items())
-                open_sea = any(k == "sea" and engine.countries[o].owner is not player for o, k in links.items())
-                if c.ships == 0 and open_sea and not open_land and c.units >= 4:
-                    shop.place_unit("ships", ship_cost, c.name)
-                    return True
-        return False
+        # Tanks, on the stacks that attack or hold a border.
+        cost = shop._cost({"steel": TANK_STEEL})
+        if self._affordable(cost):
+            fuel = 1.0 if player.oil + 2 * e["oil_income"] > e["tanks"] else 0.3
+            for c in stacks:
+                options.append((fuel * p["asset_turns"] * gain(c, tanks=c.tanks + 1), cost,
+                                lambda c=c, cost=cost: shop.place_unit("tanks", cost, c.name)))
+
+        # Forts, where a border could be lost.
+        for c in frontier:
+            cost = {"wood": shop.fort_cost(c)}
+            if c.fort_lvl < 3 and self._affordable(cost) and self._danger(c) > 0.05:
+                options.append((p["fort_turns"] * gain(c, fort=c.fort_lvl + 1), cost,
+                                lambda c=c: shop.place_fort(c.name)))
+
+        # A ship or a plane where it opens up attacks over sea; a plane also
+        # makes the country an airport (troops move by air between them).
+        ship_cost, plane_cost = shop._cost({"wood": 15}), shop._cost({"steel": 10})
+        air_before = None
+        for c in stacks:
+            if c.units < 2:
+                continue
+            if self._affordable(ship_cost) and not c.ships:
+                options.append((p["asset_turns"] * gain(c, ships=1), ship_cost,
+                                lambda c=c: shop.place_unit("ships", ship_cost, c.name)))
+            if self._affordable(plane_cost):
+                value = p["asset_turns"] * gain(c, planes=c.planes + 1)
+                if not c.airport:
+                    if air_before is None:
+                        air_before = self._air_gain()
+                    with self._what_if((c, "airport", True), (c, "planes", c.planes + 1)):
+                        value += p["asset_turns"] * max(0.0, self._air_gain() - air_before)
+                options.append((value, plane_cost, lambda c=c: shop.place_unit("planes", plane_cost, c.name)))
+
+        # A bridge, where a stack faces the sea without a ship or plane.
+        cost = shop._cost({"wood": 10})
+        if self._affordable(cost):
+            for c in stacks:
+                if c.units < 3 or c.ships or c.planes:
+                    continue
+                for other, kind in self._links(c.name).items():
+                    if kind != "sea" or engine.countries[other].owner is player:
+                        continue
+                    before = self._local_value([c.name])
+                    with self._what_if((self._connection(c.name, other, "sea"), "kind", "land")):
+                        after = self._local_value([c.name])
+                    options.append((p["fort_turns"] * (after - before), cost,
+                                    lambda c=c, other=other: shop.build_bridge(c.name, other)))
+
+        # Rails, linking a stack with spare troops to a border.
+        cost = shop._cost({"wood": 2, "steel": 1})
+        if self._affordable(cost) and player.oil >= 2:
+            links = []
+            for c in engine.connections:
+                a, b = (engine.countries[n] for n in c.connection)
+                if c.kind == "land" and not c.rails and a.owner is player and b.owner is player \
+                        and (self._frontier(a.name) or self._frontier(b.name)):
+                    links.append((max(a.units, b.units), c, a.name, b.name))
+            if links:
+                phase = self.manager.phases[1]
+                before = max(0.0, (self._best_redistribution(phase) or (0,))[0])
+                for _, c, a, b in sorted(links, key=lambda x: -x[0])[:5]:
+                    with self._what_if((c, "rails", True)):
+                        after = max(0.0, (self._best_redistribution(phase) or (0,))[0])
+                    options.append((p["asset_turns"] * (after - before), cost,
+                                    lambda a=a, b=b: shop.build_rails(a, b)))
+
+        # A nuke.
+        cost = shop._cost({"nuclear": NUKE_NUCLEAR})
+        if self._affordable(cost):
+            for name in shop._nuke_targets():
+                target = engine.countries[name]
+                if target.units >= 2 or self._is_real(target.owner):
+                    options.append((self._nuke_value(target), cost, lambda name=name: self._drop_nuke(name)))
+        return options
+
+    def _air_gain(self):
+        """What sharing out the troops of the airport network would gain now."""
+        best = self._best_redistribution(self.manager.phases[1], kinds=("air",))
+        return max(0.0, best[0]) if best else 0.0
+
+    def _nuke_value(self, target):
+        """What a nuke on `target` is worth: a player's troops it kills, and
+        what halving the garrison (or, if nobody survives, handing it back
+        to the mouse) does for our attacks on it and our countries next to
+        it -- plus their elimination if it was their last country."""
+        engine, player = self.engine, self.player
+        half = target.units // 2
+        near = [n for n in self._links(target.name) if engine.countries[n].owner is player]
+        before = self._local_value(near)
+        changes = [(target, "radioactive", target.radioactive + 3), (target, "units", half)]
+        if half == 0:
+            changes += [(target, "owner", engine.default_player),
+                        (target, "units", engine.initial_country_units.get(target.name, 2))]
+        with self._what_if(*changes):
+            value = self._local_value(near) - before
+        if self._is_real(target.owner):
+            value += self.params["kill_value"] * (target.units - half)
+            if half == 0 and not any(c.owner is target.owner and c is not target for c in engine.countries.values()):
+                value += 6 + self._loot_value(target.owner)
+        return value
+
+    def _drop_nuke(self, name):
+        self.manager.phases[3].drop_nuke(name)
+        self.manager.notices.append("{} nuked {}!".format(self.player.name, name))
 
     # --- attack --------------------------------------------------------------
 
@@ -1049,16 +1163,13 @@ class BotController:
         player.repositioned_this_turn = True
         return True
 
-    def _redistribute(self, phase):
-        """The rails or airport button: for 1 oil, share out the troops of
-        one network (rails, or all airports while a plane stands at one) as
-        _deploy_plan would, tanks going with the biggest stack -- if that's
-        clearly worth it. True if it did."""
+    def _best_redistribution(self, phase, kinds=("rails", "air")):
+        """(gain, kind, origin, names, plan) for the rails or airport network
+        whose troops would gain the most from being shared out afresh (as
+        _deploy_plan would), or None."""
         engine, player = self.engine, self.player
-        if player.oil < 1:
-            return False
         networks, seen = [], set()
-        for country in self._owned():
+        for country in self._owned() if "rails" in kinds else ():
             if country.name in seen:
                 continue
             network = phase._compute_rail_network(country.name, player)
@@ -1066,9 +1177,9 @@ class BotController:
             if len(network) > 1:
                 networks.append(("rails", country.name, network))
         airports = sorted(n for n, c in engine.countries.items() if c.owner is player and c.airport)
-        if len(airports) > 1 and any(engine.countries[n].planes > 0 for n in airports):
+        if "air" in kinds and len(airports) > 1 and any(engine.countries[n].planes > 0 for n in airports):
             networks.append(("air", airports[0], set(airports)))
-        weight = 1.0 if player.attack == 1 else self.params["next_turn_weight"]
+        weight = 1.0 if player.attack in (0, 1) else self.params["next_turn_weight"]
 
         best = None
         for kind, origin, network in networks:
@@ -1082,6 +1193,17 @@ class BotController:
                        for n in names)
             if best is None or gain > best[0]:
                 best = (gain, kind, origin, names, plan)
+        return best
+
+    def _redistribute(self, phase):
+        """The rails or airport button: for 1 oil, share out the troops of
+        one network (rails, or all airports while a plane stands at one),
+        tanks going with the biggest stack -- if that's clearly worth it.
+        True if it did."""
+        engine, player = self.engine, self.player
+        if player.oil < 1:
+            return False
+        best = self._best_redistribution(phase)
         if best is None or best[0] < self.params["redistribute_min_gain"] + self._weights()["oil"]:
             return False
 
