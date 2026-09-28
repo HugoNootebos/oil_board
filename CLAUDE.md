@@ -70,6 +70,9 @@ menu and move phase once dice are cast.
 - By default one troop stays behind when attacking; with only one defence
   die the defender rolls automatically; move-in is automatic when there's no choice.
 - Crossing water needs a ship or plane escort; a moved ship needs at least one troop with it.
+- Each player has one free boat (`Player.start_ship`), put down with the boat
+  button: in the attack phase of their first turn (which skips
+  reinforcement), or in any later reinforcement phase.
 - Continents give cards at turn start (`CONTINENT_CARD_BONUS` in phases.py).
   Developed countries yield double, after one idle income — unless the owner
   still holds the whole continent at their next turn start.

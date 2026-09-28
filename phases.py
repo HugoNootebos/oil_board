@@ -424,12 +424,12 @@ class Phase:
     def update(self):
         raise NotImplementedError
 
-
-class ReinforcementPhase(Phase):
-    """player.attack == 0"""
-
-    # Boat button pressed: the next click on one of the player's countries
-    # puts their free boat there (once per game, see Player.start_ship).
+    # --- the free boat -------------------------------------------------
+    # Placed with the boat button: in the reinforcement phase, or in the
+    # attack phase of the player's first turn (which has no reinforcement
+    # phase). Boat button pressed: the next click on one of the player's
+    # countries puts their free boat there (once per game, see
+    # Player.start_ship).
     placing_boat = False
 
     def deploy_boat(self, country):
@@ -441,7 +441,7 @@ class ReinforcementPhase(Phase):
     def _boat_button(self):
         """The boat button and, while it's pressed, picking a country for
         the boat. Returns True while clicks belong to it (not to deploying
-        troops)."""
+        troops or picking an attack)."""
         engine = self.engine
         player = self.player
         if not player.start_ship:
@@ -462,6 +462,10 @@ class ReinforcementPhase(Phase):
         if self.io.left_pressed and hover is not None and engine.countries[hover].owner == player:
             self.deploy_boat(engine.countries[hover])
         return True
+
+
+class ReinforcementPhase(Phase):
+    """player.attack == 0"""
 
     def _start_turn(self):
         engine = self.engine
@@ -691,6 +695,7 @@ class AttackPhase(Phase):
         self.attack_dice = None
         self.defence_dice = None
         self.free_claim = False
+        self.placing_boat = False
         self.rail_network = []
         self.rail_initial_units = {}
         self.rail_initial_tanks = {}
@@ -701,11 +706,13 @@ class AttackPhase(Phase):
         player = self.player
         self._highlight_selection()
         subs = (1,) if self.free_claim else (1, 6)
-        self._draw_rails_button(self.attack_from, subs)
-        self._draw_airport_button(self.attack_from, subs)
+        if not self.placing_boat:
+            self._draw_rails_button(self.attack_from, subs)
+            self._draw_airport_button(self.attack_from, subs)
         sub = player.subattack
         if sub in (0, 1):
-            self._select_target()
+            if not self._first_turn_boat():
+                self._select_target()
         elif sub == 6:
             self._select_asset_transport()
         elif sub == 2:
@@ -720,6 +727,15 @@ class AttackPhase(Phase):
             self._redistribute_rails()
         elif sub == 8:
             self._select_defence_tanks()
+
+    def _first_turn_boat(self):
+        """The first turn has no reinforcement phase, so the free boat's
+        button is in the attack phase then (and only then). Returns True
+        while clicks belong to it."""
+        if not self.manager.first_round():
+            self.placing_boat = False
+            return False
+        return self._boat_button()
 
     def _highlight_selection(self):
         engine = self.engine
@@ -2521,6 +2537,11 @@ class TurnManager:
         for country in self.engine.countries.values():
             country.shade = 0
 
+    def first_round(self):
+        """Still every player's first turn (turn_num also ticks for
+        eliminated players skipped over, so this is one full round)."""
+        return self.turn_num < len(self.engine.players)
+
     def attack_in_progress(self):
         """Dice have been cast for an attack (rolled, being resolved, or
         choosing how many troops move in): it has to be finished before the
@@ -3064,8 +3085,8 @@ class TurnManager:
         # Every player's very first turn (i.e. we haven't yet completed a
         # full round of turn_num increments) skips recruiting entirely and
         # starts straight in the attack phase, using whatever they started
-        # the game with.
-        if player.attack == 0 and player.subattack == 0 and self.turn_num < len(engine.players):
+        # the game with (the free boat's button is in the attack phase then).
+        if player.attack == 0 and player.subattack == 0 and self.first_round():
             player.attack = 1
             player.subattack = 0
             self.attacked = []

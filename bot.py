@@ -337,7 +337,7 @@ class BotController:
                        and any(engine.countries[o].owner is not self.player for o in c.connection if o != name))
 
         best = max(self._owned(), key=lambda c: (sea_targets(c.name), c.units))
-        self.manager.phases[0].deploy_boat(best)
+        self.manager.phases[self.player.attack].deploy_boat(best)
 
     def _starve(self):
         """Starvation: the troops lost come off the biggest, safest stacks."""
@@ -482,6 +482,9 @@ class BotController:
         attack = self.manager.phases[1]
         sub = player.subattack
         if sub in (0, 1):
+            if player.start_ship and self.manager.first_round():
+                self._deploy_boat()  # the first turn has no reinforcement phase
+                return
             self._start_best_attack()
         elif sub == 6:
             player.subattack = 2
