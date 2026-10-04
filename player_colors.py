@@ -10,7 +10,7 @@ COUNT_MODE_COLORS = [
     (60, 110, 230),   # blue
     (40, 160, 70),    # green
     (210, 40, 40),    # red
-    (230, 200, 40),   # yellow -- see YELLOW below
+    (240, 110, 170),  # pink
     (150, 60, 200),   # purple
     (230, 140, 40),   # orange
 ]
@@ -22,7 +22,7 @@ def light_tint(color, amount=0.65):
     return tuple(int(c + (255 - c) * amount) for c in color)
 
 
-YELLOW = (230, 200, 40)
+YELLOW = (230, 200, 40)  # no longer a player colour; kept for old saves
 
 
 def name_text_color(color):

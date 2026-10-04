@@ -21,6 +21,7 @@ Then in ReinforcementPhase._start_turn, wherever food is added:
         player.food += country.food * mult
 """
 
+import sounds
 import numpy as np
 
 from board import CONTINENTS
@@ -145,6 +146,30 @@ class Event:
         ended this is never called again, so the chance is gone. Return
         True if anything happened. The default does nothing."""
         return False
+
+    # --- hints for bots (bot.py) about what the hooks above don't tell ---
+
+    def bot_pick_goal(self):
+        """What a pick this event forces on a player is for, so a bot picks
+        well: "strike" (hit someone else), "lose" (one of your own is
+        lost), "plane" (one of yours gets a plane) or None (one of yours
+        gets something good). The default is None."""
+        return None
+
+    def bot_extra_loot(self, engine, loser):
+        """{resource: amount} that eliminating `loser` brings on top of the
+        game's own loot, while this event is the active one."""
+        return {}
+
+    def bot_country_value(self, engine, player, target):
+        """Extra worth (in troops) to `player` of conquering `target`, while
+        this event is the active one."""
+        return 0
+
+    def bot_sea_attack_loss(self, engine):
+        """Chance an attack over sea is wiped out before rolling (see
+        sea_attack_check), while this event is the active one."""
+        return 0.0
 
     def save_state(self, engine):
         """JSON-able state this event needs kept across a save/load while
@@ -323,26 +348,30 @@ class EmperorsHonor(Event):
     def __init__(self):
         super().__init__(
             name="Eer van de keizer",
-            description="De speler die deze ronde de meeste gebieden verovert claimt alle landen om Japan heen.",
+            description="De speler die deze ronde de meeste gebieden van andere spelers verovert claimt alle landen om Japan heen.",
         )
+        # Player name -> conquests this round. By name, not Player object,
+        # so it survives a save/load (which rebuilds the players).
         self.conquest_counts = {}
 
     def on_start(self, engine):
         self.conquest_counts = {}  # fresh tally for this round
 
     def on_conquest(self, engine, player, country, previous_owner):
-        if player is engine.default_player:
-            return
-        self.conquest_counts[player] = self.conquest_counts.get(player, 0) + 1
+        if player is engine.default_player or previous_owner is engine.default_player:
+            return  # only countries taken from other players count
+        self.conquest_counts[player.name] = self.conquest_counts.get(player.name, 0) + 1
 
     def on_end(self, engine):
         if not self.conquest_counts:
             return  # nobody conquered anything this round
         best = max(self.conquest_counts.values())
-        leaders = [p for p, n in self.conquest_counts.items() if n == best]
+        leaders = [name for name, n in self.conquest_counts.items() if n == best]
         if len(leaders) != 1:
             return  # tied -- nothing happens
-        winner = leaders[0]
+        winner = next((p for p in engine.players if p.name == leaders[0]), None)
+        if winner is None or winner.eliminated:
+            return  # the winner is out of the game by now
         for connection in engine.connections:
             if "Japan" not in connection:
                 continue
@@ -354,12 +383,19 @@ class EmperorsHonor(Event):
                 # whatever the previous owner had stationed there (see
                 # AttackPhase._conquer) -- radioactivity, if any, is left
                 # alone, matching that too.
+                engine.log_wiped(country)
                 country.owner = winner
                 country.units = 1
                 country.ships = 0
                 country.tanks = 0
                 country.planes = 0
                 country.fort_lvl = 0
+
+    def save_state(self, engine):
+        return {"conquest_counts": dict(self.conquest_counts)}
+
+    def load_state(self, engine, data):
+        self.conquest_counts = dict(data.get("conquest_counts", {}))
 
 
 class WrongButton(Event):
@@ -398,11 +434,17 @@ class WrongButton(Event):
     def load_state(self, engine, data):
         self.triggered = data.get("triggered", False)
 
+    def bot_pick_goal(self):
+        return "strike"
+
     def _strike(self, engine, chooser, country):
         self.triggered = True
+        sounds.play("abomb")
         country.units = country.units // 2  # rounded down
         country.radioactive += 3
         country.bombed_by = chooser
+        if country.units <= 0 and country.owner is not engine.default_player:
+            engine.turn_manager.phases[0].abandon(country)  # nobody left: to the mouse
 
     def _launch(self, engine, chooser, return_to, why):
         """`chooser` (Noord-Korea's owner) picks the Asian country to nuke:
@@ -411,9 +453,7 @@ class WrongButton(Event):
         manager = engine.turn_manager
         asia = [c for c in engine.countries.values() if c.name in CONTINENTS["Asia"]]
         if chooser.is_bot:
-            # The biggest army that isn't theirs, preferably a player's.
-            target = max(asia, key=lambda c: (c.owner is not chooser,
-                                              c.owner is not engine.default_player, c.units))
+            target = manager.bot.pick_country(chooser, asia, self)
             self._strike(engine, chooser, target)
             manager.notices.append([self.name, "{}: {} drops the nuke on {}".format(why, chooser.name, target.name)])
             return
@@ -450,6 +490,9 @@ class StormAtSea(Event):
 
     def sea_attack_check(self, engine):
         return np.random.random() < 1 / 3
+
+    def bot_sea_attack_loss(self, engine):
+        return 1 / 3
 
 
 class ChildSoldiers(Event):
@@ -522,6 +565,9 @@ class EndOfHumanity(Event):
     def on_player_eliminated(self, engine, victor, loser):
         victor.food += loser.food
         loser.food = 0
+
+    def bot_extra_loot(self, engine, loser):
+        return {"food": loser.food}
 
 
 class VOCPart2(Event):
@@ -708,6 +754,9 @@ class Ebola(Event):
         self.candidates = [n for n in data.get("candidates", []) if n in engine.countries]
         self.chooser = next((p for p in engine.players if p.name == data.get("chooser")), None)
 
+    def bot_pick_goal(self):
+        return "lose"
+
     @staticmethod
     def _strike(engine, country):
         # Reuses Phase.abandon (any Phase instance will do -- it only
@@ -801,6 +850,9 @@ class ClimateHoax(Event):
 
     def on_start(self, engine):
         self.placed_on_turn = {}
+
+    def bot_pick_goal(self):
+        return "plane"
 
     def on_turn_start(self, engine, player):
         # Diverting into EventTargetPhase returns the player straight back

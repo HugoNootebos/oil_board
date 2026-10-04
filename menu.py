@@ -8,6 +8,8 @@ itself.
 
 import os
 import pygame as pg
+import sounds
+from fonts import game_font
 from player_colors import COUNT_MODE_COLORS, light_tint
 from save_load import AUTOSAVE_PATH, SAVE_SLOT_COUNT, slot_path, read_save_name
 
@@ -18,8 +20,18 @@ MENU_SCALE = 0.75
 
 
 def _open_window(width, height):
-    """Open the (smaller) menu window; returns the full-size canvas to draw on."""
-    pg.display.set_mode((round(width * MENU_SCALE), round(height * MENU_SCALE)))
+    """Open the (smaller) menu window; returns the full-size canvas to draw on.
+    Coming back from the game (Exit Game) the window may still be
+    fullscreen or big: it's made windowed, menu-sized and centered again."""
+    size = (round(width * MENU_SCALE), round(height * MENU_SCALE))
+    current = pg.display.get_surface()
+    resized = current is None or current.get_size() != size
+    pg.display.set_mode(size)
+    if resized:
+        window = pg.Window.from_display_module()
+        window.set_windowed()
+        window.size = size
+        window.position = pg.WINDOWPOS_CENTERED
     return pg.Surface((width, height))
 
 
@@ -52,15 +64,16 @@ def run_main_menu(width=960, height=640):
     pg.font.init()
     screen = _open_window(width, height)
     pg.display.set_caption("Main Menu")
-    title_font = pg.font.SysFont("Times New Roman", 48)
-    button_font = pg.font.SysFont("Times New Roman", 32)
-    hint_font = pg.font.SysFont("Times New Roman", 18)
+    title_font = game_font(48)
+    button_font = game_font(32)
+    hint_font = game_font(18)
 
     has_save = any(os.path.isfile(path) for _, path, _ in _save_entries())
 
     button_w, button_h = 300, 70
-    new_game_rect = pg.Rect(width // 2 - button_w // 2, height // 2 - 90, button_w, button_h)
-    continue_rect = pg.Rect(width // 2 - button_w // 2, height // 2 + 20, button_w, button_h)
+    new_game_rect = pg.Rect(width // 2 - button_w // 2, height // 2 - 120, button_w, button_h)
+    continue_rect = pg.Rect(width // 2 - button_w // 2, height // 2 - 10, button_w, button_h)
+    quit_rect = pg.Rect(width // 2 - button_w // 2, height // 2 + 180, button_w, button_h)
 
     clock = pg.time.Clock()
     while True:
@@ -70,15 +83,19 @@ def run_main_menu(width=960, height=640):
                 pg.quit()
                 raise SystemExit
             if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+                sounds.play("error" if not has_save and continue_rect.collidepoint(mouse_pos) else "click")
                 if new_game_rect.collidepoint(mouse_pos):
                     return "new"
                 if has_save and continue_rect.collidepoint(mouse_pos):
                     return "continue"
+                if quit_rect.collidepoint(mouse_pos):
+                    pg.quit()
+                    raise SystemExit
 
         screen.fill((30, 30, 40))
 
         title = title_font.render("OIL", True, (255, 255, 255))
-        screen.blit(title, (width // 2 - title.get_width() // 2, height // 2 - 200))
+        screen.blit(title, (width // 2 - title.get_width() // 2, height // 2 - 230))
 
         _draw_button(
             screen, button_font, new_game_rect, "New Game",
@@ -92,6 +109,10 @@ def run_main_menu(width=960, height=640):
         if not has_save:
             hint = hint_font.render("No saved game found", True, (200, 200, 200))
             screen.blit(hint, (width // 2 - hint.get_width() // 2, continue_rect.bottom + 10))
+        _draw_button(
+            screen, button_font, quit_rect, "Quit",
+            (240, 100, 100), hovered=quit_rect.collidepoint(mouse_pos),
+        )
 
         _present(screen)
         clock.tick(60)
@@ -104,16 +125,20 @@ def run_load_menu(width=960, height=640):
     pg.font.init()
     screen = _open_window(width, height)
     pg.display.set_caption("Continue")
-    title_font = pg.font.SysFont("Times New Roman", 40)
-    label_font = pg.font.SysFont("Times New Roman", 18)
-    name_font = pg.font.SysFont("Times New Roman", 28)
-    button_font = pg.font.SysFont("Times New Roman", 30)
+    title_font = game_font(40)
+    label_font = game_font(18)
+    name_font = game_font(28)
+    button_font = game_font(30)
 
     entries = _save_entries()
     row_w, row_h, gap = 420, 62, 12
     start_y = 130
     rows = [pg.Rect(width // 2 - row_w // 2, start_y + i * (row_h + gap), row_w, row_h) for i in range(len(entries))]
     back_rect = pg.Rect(width // 2 - 110, rows[-1].bottom + 30, 220, 56)
+    # An X right of each save deletes it; the first click arms it ("Sure?"),
+    # the second deletes the file.
+    delete_rects = [pg.Rect(rect.right + 12, rect.y + (row_h - 44) // 2, 44, 44) for rect in rows]
+    armed = None
 
     clock = pg.time.Clock()
     while True:
@@ -123,6 +148,24 @@ def run_load_menu(width=960, height=640):
                 pg.quit()
                 raise SystemExit
             if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+                hit = next((i for i, (r, (_, _, name)) in enumerate(zip(delete_rects, entries))
+                            if name and (r.inflate(46, 0).move(23, 0) if armed == i else r).collidepoint(mouse_pos)),
+                           None)
+                if hit is not None:
+                    sounds.play("click")
+                    if armed == hit:
+                        try:
+                            os.remove(entries[hit][1])
+                        except OSError:
+                            pass
+                        entries = _save_entries()
+                        armed = None
+                    else:
+                        armed = hit
+                    continue
+                armed = None
+                sounds.play("error" if any(not name and rect.collidepoint(mouse_pos)
+                                           for rect, (_, _, name) in zip(rows, entries)) else "click")
                 for rect, (_, path, name) in zip(rows, entries):
                     if name and rect.collidepoint(mouse_pos):
                         return path
@@ -143,6 +186,15 @@ def run_load_menu(width=960, height=640):
             screen.blit(label_font.render(label, True, (40, 40, 40)), (rect.x + 12, rect.y + 5))
             text = name_font.render(name or "(empty)", True, (0, 0, 0) if name else (60, 60, 60))
             screen.blit(text, (rect.x + 12, rect.y + 25))
+
+        for i, (rect, (_, _, name)) in enumerate(zip(delete_rects, entries)):
+            if not name:
+                continue
+            if armed == i:
+                sure = pg.Rect(rect.x, rect.y, 90, rect.h)
+                _draw_button(screen, label_font, sure, "Sure?", (240, 100, 100), hovered=sure.collidepoint(mouse_pos))
+                continue
+            _draw_button(screen, button_font, rect, "X", (240, 100, 100), hovered=rect.collidepoint(mouse_pos))
 
         _draw_button(screen, button_font, back_rect, "Back", (220, 220, 220),
                      hovered=back_rect.collidepoint(mouse_pos))
@@ -168,9 +220,9 @@ def run_new_game_menu(width=960, height=640):
     pg.font.init()
     screen = _open_window(width, height)
     pg.display.set_caption("New Game")
-    title_font = pg.font.SysFont("Times New Roman", 40)
-    button_font = pg.font.SysFont("Times New Roman", 32)
-    count_font = pg.font.SysFont("Times New Roman", 36)
+    title_font = game_font(40)
+    button_font = game_font(32)
+    count_font = game_font(36)
 
     card_icon = pg.transform.scale(pg.image.load("./images/card0.png").convert_alpha(), (40, 74))
 
@@ -195,6 +247,7 @@ def run_new_game_menu(width=960, height=640):
                 pg.quit()
                 raise SystemExit
             if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+                sounds.play("click")
                 if default_rect.collidepoint(mouse_pos):
                     return "default"
                 for rect, count in zip(count_rects, player_counts):
@@ -228,19 +281,25 @@ def run_new_game_menu(width=960, height=640):
         clock.tick(60)
 
 
+# What the human/bot button next to a player's name cycles through.
+BOT_CYCLE = [False, "normal", "hard", "easy"]
+
+
 def run_player_names_menu(count, width=960, height=640):
     """Shown after a 3/4/5/6-player game is picked. One text box per
     player, focus advances with Tab or Return; "Start Game" only works
     once every box has something in it. The button next to each box
-    switches that player between human and bot (a bot left unnamed is
-    called "Bot N"). Returns (names, bot flags), both in order."""
+    cycles that player through Human -> Bot (normal) -> Bot (hard) ->
+    Bot (easy) (a bot left unnamed is called "Bot N"). Returns (names,
+    bots), both in order; a bot is its level ("normal"/"hard"/"easy"), a
+    human False."""
     pg.init()
     pg.font.init()
     screen = _open_window(width, height)
     pg.display.set_caption("Player Names")
-    title_font = pg.font.SysFont("Times New Roman", 40)
-    label_font = pg.font.SysFont("Times New Roman", 26)
-    button_font = pg.font.SysFont("Times New Roman", 30)
+    title_font = game_font(40)
+    label_font = game_font(26)
+    button_font = game_font(30)
 
     names = [""] * count
     bots = [False] * count
@@ -253,7 +312,7 @@ def run_player_names_menu(count, width=960, height=640):
     total_h = count * box_h + (count - 1) * gap
     start_y = height // 2 - total_h // 2 - 30
     boxes = [pg.Rect(width // 2 - box_w // 2, start_y + i * (box_h + gap), box_w, box_h) for i in range(count)]
-    bot_rects = [pg.Rect(box.right + 15, box.y, 110, box_h) for box in boxes]
+    bot_rects = [pg.Rect(box.right + 15, box.y, 150, box_h) for box in boxes]
 
     start_w, start_h = 220, 60
     start_rect = pg.Rect(width // 2 - start_w // 2, boxes[-1].bottom + 40, start_w, start_h)
@@ -267,12 +326,14 @@ def run_player_names_menu(count, width=960, height=640):
                 pg.quit()
                 raise SystemExit
             if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+                sounds.play("error" if not all_filled and start_rect.collidepoint(mouse_pos) else "click")
                 for i, box in enumerate(boxes):
                     if box.collidepoint(mouse_pos):
                         active = i
                 for i, rect in enumerate(bot_rects):
                     if rect.collidepoint(mouse_pos):
-                        bots[i] = not bots[i]
+                        cycle = BOT_CYCLE
+                        bots[i] = cycle[(cycle.index(bots[i]) + 1) % len(cycle)]
                 if all_filled and start_rect.collidepoint(mouse_pos):
                     return final_names(), bots
             elif event.type == pg.KEYDOWN:
@@ -307,7 +368,7 @@ def run_player_names_menu(count, width=960, height=640):
             else:
                 text = label_font.render("Bot {}".format(i + 1), True, (110, 110, 110))
             screen.blit(text, (box.x + 10, box.centery - text.get_height() // 2))
-            _draw_button(screen, label_font, bot_rects[i], "Bot" if bots[i] else "Human",
+            _draw_button(screen, label_font, bot_rects[i], "Bot ({})".format(bots[i]) if bots[i] else "Human",
                          (245, 200, 120) if bots[i] else (200, 200, 200),
                          hovered=bot_rects[i].collidepoint(mouse_pos))
             if focused and (pg.time.get_ticks() // 500) % 2 == 0:

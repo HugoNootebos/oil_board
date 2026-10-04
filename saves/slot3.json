@@ -1,106 +1,111 @@
 {
   "version": 1,
-  "save_name": "Hitomi Ei",
+  "save_name": "De neven",
   "default_game": false,
   "settings": {
     "assets": false,
     "sea": true,
     "land": true,
+    "sea_route": true,
+    "tank": true,
     "landmarks": true,
-    "fast_bots": false
+    "fast_bots": true
   },
   "turn": {
-    "current_player_index": 0,
-    "turn_num": 94
+    "current_player_index": 1,
+    "turn_num": 37
   },
   "manager": {
     "reinforcements": 0,
     "all_reinforcements_deployed": true,
-    "attacked": [],
+    "attacked": [
+      "Nederlands-Indi\u00eb",
+      "Siberi\u00eb"
+    ],
     "defending_tanks": {},
     "landmarks_punished": [],
-    "conquered_enemy_this_turn": false,
+    "conquered_enemy_this_turn": true,
     "pending_event_cards": 0,
     "initial_units": {
-      "Redneck": 1,
-      "Madagaskar": 1,
-      "Zuid-Afrika": 0,
-      "Belgisch Congo": 1,
-      "Somali\u00eb": 1,
-      "Nigeria": 1,
-      "Sahara": 1,
+      "Redneck": 6,
+      "Madagaskar": 2,
+      "Zuid-Afrika": 1,
+      "Belgisch Congo": 2,
+      "Somali\u00eb": 2,
+      "Nigeria": 3,
+      "Sahara": 2,
       "IJsland": 1,
-      "Viking": 1,
-      "Sovjet-Rusland": 4,
-      "Belarus": 1,
+      "Viking": 2,
+      "Sovjet-Rusland": 1,
+      "Belarus": 4,
       "Nazi-Duitsland": 1,
       "Romeinse Rijk": 1,
-      "Spanje": 1,
-      "Londen": 2,
+      "Spanje": 2,
+      "Londen": 1,
       "Siberi\u00eb": 1,
       "Kazachstan": 1,
-      "China": 1,
-      "Mongoli\u00eb": 0,
-      "Noord-Korea": 0,
-      "Maleisi\u00eb": 0,
-      "Sri Lanka": 1,
-      "India": 0,
+      "China": 2,
+      "Mongoli\u00eb": 1,
+      "Noord-Korea": 1,
+      "Maleisi\u00eb": 1,
+      "Sri Lanka": 2,
+      "India": 1,
       "Ottomaanse Rijk": 1,
-      "Arabi\u00eb": 2,
+      "Arabi\u00eb": 1,
       "Japan": 1,
       "Nederlands-Indi\u00eb": 1,
       "Outback": 3,
       "Gold Coast": 1,
       "Papoea Nieuw Guinea": 1,
       "Argentini\u00eb": 1,
-      "Venezuela": 1,
+      "Venezuela": 2,
       "Brazili\u00eb": 1,
-      "Peru": 3,
-      "Alaska": 1,
-      "New York": 1,
-      "Los Angeles": 1,
+      "Peru": 1,
+      "Alaska": 2,
+      "New York": 2,
+      "Los Angeles": 2,
       "Canada": 1,
       "Mexico": 1,
       "Groenland": 1,
-      "Cuba": 2,
+      "Cuba": 1,
       "Pearl Harbor": 1
     },
-    "saved_attack": 1,
-    "saved_subattack": 7,
-    "turn_started": true,
-    "starved": 0,
-    "pending_troops": 0,
-    "event_turn_index": 69,
+    "saved_attack": 0,
+    "saved_subattack": 1,
+    "event_turn_index": 32,
     "event_bag": [
-      "Ontwikkelingshulp",
-      "de nazi's breiden uit",
-      "Verkeerde knop",
-      "storm of zee",
-      "De Japanners worden gek",
-      "drugs",
-      "Eer van de keizer",
-      "ebola",
+      "kindsoldaten",
+      "maak van de VOC een deel 2",
+      "japanse agressie",
       "covid",
+      "Verkeerde knop",
+      "Slavernij",
+      "de nazi's breiden uit",
+      "ebola",
+      "Einde van de mensheid",
+      "kinderarbeid",
+      "klimaatverandering blijkt hoax",
+      "nucleaire winter",
+      "bedevaart",
       "strenge winter",
+      "Muur van Trump",
+      "inboorlingen vechten terug",
+      "Ontwikkelingshulp",
       "plunderingen"
     ],
     "event_history": [
-      "nucleaire winter",
-      "kindsoldaten",
-      "Muur van Trump",
-      "klimaatverandering blijkt hoax",
-      "japanse agressie",
-      "bedevaart",
+      "storm of zee",
       "goede economie",
-      "Einde van de mensheid",
-      "kinderarbeid",
-      "Slavernij",
-      "inboorlingen vechten terug",
-      "maak van de VOC een deel 2"
+      "De Japanners worden gek",
+      "Eer van de keizer",
+      "drugs"
     ],
-    "current_event": "maak van de VOC een deel 2",
+    "current_event": "drugs",
     "event_state": {},
-    "event_pending_players": [],
+    "event_pending_players": [
+      "Tete",
+      "Laarbot"
+    ],
     "reveal_pool": [],
     "awaiting_gap": false,
     "event_schedule_pending": false
@@ -108,23 +113,7 @@
   "action_log": [
     [
       [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took Nazi-Duitsland from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Hugs",
+        "Fuug",
         [
           128,
           160,
@@ -132,7 +121,7 @@
         ]
       ],
       [
-        ": 0 lost, 1 defeated",
+        " built a fort in Cuba",
         [
           255,
           255,
@@ -142,61 +131,7 @@
     ],
     [
       [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " started developing Canada",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " moved by air: +2 Londen, -2 Siberi\u00eb, +1 tanks Londen, -1 tanks Siberi\u00eb",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " moved 1 troops from Cuba to Los Angeles",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
+        "Fuug",
         [
           128,
           160,
@@ -204,7 +139,7 @@
         ]
       ],
       [
-        " placed a ship in Spanje",
+        " finished deploying",
         [
           255,
           255,
@@ -214,7 +149,7 @@
     ],
     [
       [
-        "Hugs",
+        "Fuug",
         [
           128,
           160,
@@ -222,93 +157,7 @@
         ]
       ],
       [
-        " nuked Londen: 2 casualties",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Londen from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        ": 1 lost, 2 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took New York from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took India from ",
+        " attacked ",
         [
           255,
           255,
@@ -324,7 +173,7 @@
         ]
       ],
       [
-        ": 1 lost, 1 defeated",
+        " in Peru: lost 0, killed 1",
         [
           255,
           255,
@@ -334,7 +183,7 @@
     ],
     [
       [
-        "Hugs",
+        "Fuug",
         [
           128,
           160,
@@ -342,7 +191,33 @@
         ]
       ],
       [
-        " moved: -2 India, -1 ships India, +2 Arabi\u00eb, +1 ships Arabi\u00eb",
+        " conquered Peru from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ]
+    ],
+    [
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " moved 2 troops from Peru to Venezuela",
         [
           255,
           255,
@@ -352,15 +227,15 @@
     ],
     [
       [
-        "Hitomi EI",
+        "Fuug",
         [
-          115,
-          193,
-          134
+          128,
+          160,
+          238
         ]
       ],
       [
-        " lost 3 troops to starvation",
+        " started developing Venezuela",
         [
           255,
           255,
@@ -370,15 +245,15 @@
     ],
     [
       [
-        "Hitomi EI",
+        "Fuug",
         [
-          115,
-          193,
-          134
+          128,
+          160,
+          238
         ]
       ],
       [
-        " traded 3 cards (Vliegtuig, Menneke, Paerd) for 25 food",
+        " ended their turn",
         [
           255,
           255,
@@ -388,7 +263,7 @@
     ],
     [
       [
-        "Hitomi EI",
+        "Joeri",
         [
           115,
           193,
@@ -396,7 +271,25 @@
         ]
       ],
       [
-        " took Gold Coast from ",
+        " finished deploying",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " attacked ",
         [
           255,
           255,
@@ -412,7 +305,7 @@
         ]
       ],
       [
-        ": 0 lost, 2 defeated",
+        " in Noord-Korea: lost 1, killed 0",
         [
           255,
           255,
@@ -422,33 +315,15 @@
     ],
     [
       [
-        "Bot 4",
+        "Joeri",
         [
-          245,
-          160,
-          199
+          115,
+          193,
+          134
         ]
       ],
       [
-        " moved along rails: +2 China, -2 Kazachstan",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 4",
-        [
-          245,
-          160,
-          199
-        ]
-      ],
-      [
-        " took Japan from ",
+        " attacked ",
         [
           255,
           255,
@@ -464,7 +339,7 @@
         ]
       ],
       [
-        ": 1 lost, 1 defeated",
+        " in Noord-Korea: lost 0, killed 1",
         [
           255,
           255,
@@ -474,15 +349,57 @@
     ],
     [
       [
-        "Bot 4",
+        "Joeri",
         [
-          245,
-          160,
-          199
+          115,
+          193,
+          134
         ]
       ],
       [
-        " moved 1 troops, 1 planes from Japan to Maleisi\u00eb",
+        " conquered Noord-Korea from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ]
+    ],
+    [
+      [
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ],
+      [
+        " in Mongoli\u00eb: lost 1, killed 0",
         [
           255,
           255,
@@ -492,7 +409,31 @@
     ],
     [
       [
-        "Event: Slavernij",
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ],
+      [
+        " in Mongoli\u00eb: lost 0, killed 1",
         [
           255,
           255,
@@ -502,15 +443,177 @@
     ],
     [
       [
-        "Bot 6",
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " conquered Mongoli\u00eb from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ]
+    ],
+    [
+      [
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ],
+      [
+        " in Kazachstan: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " conquered Kazachstan from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ]
+    ],
+    [
+      [
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ],
+      [
+        " in India: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " conquered India from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ]
+    ],
+    [
+      [
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Laarbot",
         [
           238,
-          180,
+          219,
           115
         ]
       ],
       [
-        " placed a tank in Cuba",
+        " in Maleisi\u00eb: lost 0, killed 2",
         [
           255,
           255,
@@ -520,15 +623,57 @@
     ],
     [
       [
-        "Bot 6",
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " conquered Maleisi\u00eb from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Laarbot",
         [
           238,
-          180,
+          219,
+          115
+        ]
+      ]
+    ],
+    [
+      [
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Tete",
+        [
+          225,
+          115,
           115
         ]
       ],
       [
-        " built a fort in Los Angeles",
+        " in Sovjet-Rusland: lost 0, killed 2",
         [
           255,
           255,
@@ -538,15 +683,31 @@
     ],
     [
       [
-        "Bot 6",
+        "Joeri",
         [
-          238,
-          180,
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Tete",
+        [
+          225,
+          115,
           115
         ]
       ],
       [
-        " built rails from Belarus to Nazi-Duitsland",
+        " in Sovjet-Rusland: lost 0, killed 1",
         [
           255,
           255,
@@ -556,10 +717,126 @@
     ],
     [
       [
-        "Bot 6",
+        "Joeri",
         [
-          238,
-          180,
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " conquered Sovjet-Rusland from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ]
+    ],
+    [
+      [
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " moved 2 troops from Maleisi\u00eb to India",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " ended their turn",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " traded 3 cards for 15 troops",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " lost 4 troops to starvation",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " finished deploying",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
           115
         ]
       ],
@@ -572,15 +849,15 @@
         ]
       ],
       [
-        "Hugs",
+        "mouse",
         [
-          128,
-          160,
-          238
+          180,
+          180,
+          180
         ]
       ],
       [
-        " in New York: 6 lost, 1 defeated",
+        " in Spanje: lost 1, killed 0",
         [
           255,
           255,
@@ -590,15 +867,31 @@
     ],
     [
       [
-        "Bot 6",
+        "Tete",
         [
-          238,
-          180,
+          225,
+          115,
           115
         ]
       ],
       [
-        " started developing IJsland",
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        " in Spanje: lost 0, killed 1",
         [
           255,
           255,
@@ -608,69 +901,15 @@
     ],
     [
       [
-        "Bot 6",
+        "Tete",
         [
-          238,
-          180,
+          225,
+          115,
           115
         ]
       ],
       [
-        " moved 1 troops from Belarus to Romeinse Rijk",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " placed a plane in Sri Lanka",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " moved by air: -2 Arabi\u00eb, -1 Madagaskar, +4 New York, -1 Sahara, +1 planes New York, -1 planes Sri Lanka",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Cuba from ",
+        " conquered Spanje from ",
         [
           255,
           255,
@@ -678,33 +917,25 @@
         ]
       ],
       [
-        "Bot 6",
+        "mouse",
         [
-          238,
           180,
+          180,
+          180
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
           115
         ]
       ],
       [
-        ": 3 lost, 2 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Venezuela from ",
+        " attacked ",
         [
           255,
           255,
@@ -712,15 +943,15 @@
         ]
       ],
       [
-        "Bot 6",
+        "Laarbot",
         [
           238,
-          180,
+          219,
           115
         ]
       ],
       [
-        ": 1 lost, 1 defeated",
+        " in Nigeria: lost 0, killed 1",
         [
           255,
           255,
@@ -730,65 +961,57 @@
     ],
     [
       [
-        "Hugs",
+        "Tete",
         [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Peru from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 6",
-        [
-          238,
-          180,
+          225,
+          115,
           115
         ]
       ],
       [
-        ": 0 lost, 1 defeated",
+        " conquered Nigeria from ",
         [
           255,
           255,
           255
+        ]
+      ],
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
         ]
       ]
     ],
     [
       [
-        "Hugs",
+        "Tete",
         [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Argentini\u00eb from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 6",
-        [
-          238,
-          180,
+          225,
+          115,
           115
         ]
       ],
       [
-        ": 0 lost, 1 defeated",
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " in Brazili\u00eb: lost 0, killed 1",
         [
           255,
           255,
@@ -798,41 +1021,49 @@
     ],
     [
       [
-        "Hugs",
+        "Tete",
         [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Brazili\u00eb from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 6",
-        [
-          238,
-          180,
+          225,
+          115,
           115
         ]
       ],
       [
-        ": 1 lost, 1 defeated",
+        " conquered Brazili\u00eb from ",
         [
           255,
           255,
           255
         ]
+      ],
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
       ]
     ],
     [
       [
-        "Hugs",
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Fuug",
         [
           128,
           160,
@@ -840,7 +1071,7 @@
         ]
       ],
       [
-        " moved by air: +1 Arabi\u00eb, -1 New York, -1 Sahara, +1 Venezuela, +1 planes Arabi\u00eb, -1 planes Venezuela",
+        " in Argentini\u00eb: lost 0, killed 1",
         [
           255,
           255,
@@ -850,7 +1081,1279 @@
     ],
     [
       [
-        "Hitomi EI",
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " conquered Argentini\u00eb from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " in Peru: lost 1, killed 0",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " in Peru: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " conquered Peru from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " in Venezuela: lost 2, killed 0",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " in Venezuela: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " in Venezuela: lost 1, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " in Venezuela: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " conquered Venezuela from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " built a bridge from Venezuela to Cuba",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " nuked Cuba",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " in Cuba: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " conquered Cuba from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
+      ]
+    ],
+    [
+      [
+        "Fuug",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " has been eliminated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " built a bridge from Cuba to Mexico",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        " in Mexico: lost 1, killed 0",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        " in Mexico: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " conquered Mexico from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        " in Redneck: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " conquered Redneck from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " nuked Viking",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " ended their turn",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " traded 3 cards for 15 troops",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " finished deploying",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " in Romeinse Rijk: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " conquered Romeinse Rijk from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " in Nazi-Duitsland: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " conquered Nazi-Duitsland from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ],
+      [
+        " in Ottomaanse Rijk: lost 0, killed 2",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ],
+      [
+        " in Ottomaanse Rijk: lost 2, killed 0",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ],
+      [
+        " in Ottomaanse Rijk: lost 0, killed 2",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ],
+      [
+        " in Ottomaanse Rijk: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " conquered Ottomaanse Rijk from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        " in Kazachstan: lost 2, killed 0",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        " in Kazachstan: lost 0, killed 2",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " conquered Kazachstan from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        " in Mongoli\u00eb: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " conquered Mongoli\u00eb from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " in China: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " conquered China from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " in Nigeria: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " conquered Nigeria from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " in Spanje: lost 0, killed 1",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " conquered Spanje from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Tete",
+        [
+          225,
+          115,
+          115
+        ]
+      ]
+    ],
+    [
+      [
+        "Laarbot",
+        [
+          238,
+          219,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Joeri",
         [
           115,
           193,
@@ -858,7 +2361,7 @@
         ]
       ],
       [
-        " nuked Maleisi\u00eb: 3 casualties",
+        " in Maleisi\u00eb: lost 1, killed 0",
         [
           255,
           255,
@@ -868,31 +2371,15 @@
     ],
     [
       [
-        "Hitomi EI",
+        "Laarbot",
         [
-          115,
-          193,
-          134
+          238,
+          219,
+          115
         ]
       ],
       [
-        " took Maleisi\u00eb from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 4",
-        [
-          245,
-          160,
-          199
-        ]
-      ],
-      [
-        ": 0 lost, 2 defeated",
+        " started developing Romeinse Rijk",
         [
           255,
           255,
@@ -902,15 +2389,15 @@
     ],
     [
       [
-        "Hitomi EI",
+        "Laarbot",
         [
-          115,
-          193,
-          134
+          238,
+          219,
+          115
         ]
       ],
       [
-        " moved: -2 Maleisi\u00eb, -1 ships Maleisi\u00eb, +2 Nederlands-Indi\u00eb, +1 ships Nederlands-Indi\u00eb",
+        " ended their turn",
         [
           255,
           255,
@@ -920,11 +2407,159 @@
     ],
     [
       [
-        "Hitomi EI",
+        "Event: drugs",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ],
+      [
+        " placed a plane in Nederlands-Indi\u00eb",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ],
+      [
+        " finished deploying",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Joeri",
         [
           115,
           193,
           134
+        ]
+      ],
+      [
+        " in Maleisi\u00eb: lost 1, killed 0",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " in Maleisi\u00eb: lost 1, killed 0",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " in Maleisi\u00eb: lost 1, killed 0",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
         ]
       ],
       [
@@ -938,85 +2573,15 @@
     ],
     [
       [
-        "Bot 6",
+        "Marisbot",
         [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " built a fort in Mexico",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " placed a plane in Romeinse Rijk",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " moved by air: +1 Canada, -1 Romeinse Rijk",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took Venezuela from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Hugs",
-        [
+          186,
           128,
-          160,
-          238
+          219
         ]
       ],
       [
-        ": 1 lost, 2 defeated",
+        " ended their turn",
         [
           255,
           255,
@@ -1026,111 +2591,7 @@
     ],
     [
       [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took Brazili\u00eb from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took Peru from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        ": 1 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Event: inboorlingen vechten terug",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 4",
-        [
-          245,
-          160,
-          199
-        ]
-      ],
-      [
-        " defended China from the natives: 4 lost, 5 destroyed",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "The natives took Outback from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Hitomi EI",
+        "Joeri",
         [
           115,
           193,
@@ -1138,7 +2599,7 @@
         ]
       ],
       [
-        ": 1 lost, 2 defeated",
+        " lost 6 troops to starvation",
         [
           255,
           255,
@@ -1148,153 +2609,7 @@
     ],
     [
       [
-        "The natives took Sovjet-Rusland from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        ": 0 lost, 2 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "The natives took Peru from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        ": 1 lost, 2 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "The natives took Canada from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        ": 0 lost, 2 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Brazili\u00eb from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Venezuela from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hitomi EI",
+        "Joeri",
         [
           115,
           193,
@@ -1302,23 +2617,7 @@
         ]
       ],
       [
-        " took India from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "mouse",
-        [
-          180,
-          180,
-          180
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
+        " placed a plane in Outback",
         [
           255,
           255,
@@ -1328,7 +2627,7 @@
     ],
     [
       [
-        "Hitomi EI",
+        "Joeri",
         [
           115,
           193,
@@ -1336,23 +2635,7 @@
         ]
       ],
       [
-        " took China from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 4",
-        [
-          245,
-          160,
-          199
-        ]
-      ],
-      [
-        ": 1 lost, 1 defeated",
+        " placed a tank in Outback",
         [
           255,
           255,
@@ -1362,7 +2645,7 @@
     ],
     [
       [
-        "Hitomi EI",
+        "Joeri",
         [
           115,
           193,
@@ -1370,23 +2653,7 @@
         ]
       ],
       [
-        " took Noord-Korea from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 4",
-        [
-          245,
-          160,
-          199
-        ]
-      ],
-      [
-        ": 1 lost, 1 defeated",
+        " finished deploying",
         [
           255,
           255,
@@ -1396,855 +2663,11 @@
     ],
     [
       [
-        "Hitomi EI",
+        "Joeri",
         [
           115,
           193,
           134
-        ]
-      ],
-      [
-        " moved: -2 Noord-Korea, +2 China",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hitomi EI",
-        [
-          115,
-          193,
-          134
-        ]
-      ],
-      [
-        " forgot the pagoda: lost 2 troops in China",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 4",
-        [
-          245,
-          160,
-          199
-        ]
-      ],
-      [
-        " took China from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Hitomi EI",
-        [
-          115,
-          193,
-          134
-        ]
-      ],
-      [
-        ": 2 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " traded 3 cards (Vliegtuig, Menneke, Paerd) for 10 troops",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " built a bridge from Nazi-Duitsland to Londen",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took Venezuela from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        ": 0 lost, 3 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took New York from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "mouse",
-        [
-          180,
-          180,
-          180
-        ]
-      ],
-      [
-        ": 3 lost, 2 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took Cuba from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took Londen from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "mouse",
-        [
-          180,
-          180,
-          180
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took Brazili\u00eb from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        ": 1 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took Argentini\u00eb from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took Pearl Harbor from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "mouse",
-        [
-          180,
-          180,
-          180
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " moved 2 troops from Argentini\u00eb to Venezuela",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " traded 3 cards (Vliegtuig, Menneke, Paerd) for 10 troops",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took India from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Hitomi EI",
-        [
-          115,
-          193,
-          134
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Kazachstan from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 4",
-        [
-          245,
-          160,
-          199
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Mongoli\u00eb from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 4",
-        [
-          245,
-          160,
-          199
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Noord-Korea from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Hitomi EI",
-        [
-          115,
-          193,
-          134
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took China from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 4",
-        [
-          245,
-          160,
-          199
-        ]
-      ],
-      [
-        ": 2 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " moved along rails: -10 China, +10 India",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Nederlands-Indi\u00eb from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Hitomi EI",
-        [
-          115,
-          193,
-          134
-        ]
-      ],
-      [
-        ": 4 lost, 2 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Maleisi\u00eb from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "mouse",
-        [
-          180,
-          180,
-          180
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " moved along rails: -1 China, +1 Maleisi\u00eb",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took China from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "mouse",
-        [
-          180,
-          180,
-          180
-        ]
-      ],
-      [
-        ": 1 lost, 2 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Japan from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Bot 4",
-        [
-          245,
-          160,
-          199
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 4",
-        [
-          245,
-          160,
-          199
-        ]
-      ],
-      [
-        " has been eliminated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Papoea Nieuw Guinea from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "mouse",
-        [
-          180,
-          180,
-          180
-        ]
-      ],
-      [
-        ": 2 lost, 2 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " took Gold Coast from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "Hitomi EI",
-        [
-          115,
-          193,
-          134
-        ]
-      ],
-      [
-        ": 1 lost, 3 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hitomi EI",
-        [
-          115,
-          193,
-          134
-        ]
-      ],
-      [
-        " has been eliminated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " traded 3 cards (Menneke, Menneke, Menneke) for 4 troops",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
         ]
       ],
       [
@@ -2256,33 +2679,15 @@
         ]
       ],
       [
-        "mouse",
+        "Marisbot",
         [
-          180,
-          180,
-          180
-        ]
-      ],
-      [
-        " in Papoea Nieuw Guinea: 4 lost, 0 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
+          186,
           128,
-          160,
-          238
+          219
         ]
       ],
       [
-        " moved by air: +1 Arabi\u00eb, -1 Gold Coast, +1 planes Arabi\u00eb, -1 planes Gold Coast",
+        " in Nederlands-Indi\u00eb: lost 0, killed 1",
         [
           255,
           255,
@@ -2292,15 +2697,41 @@
     ],
     [
       [
-        "Hugs",
+        "Joeri",
         [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " conquered Nederlands-Indi\u00eb from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Marisbot",
+        [
+          186,
           128,
-          160,
-          238
+          219
+        ]
+      ]
+    ],
+    [
+      [
+        "Marisbot",
+        [
+          186,
+          128,
+          219
         ]
       ],
       [
-        " forgot the pagoda: China was taken over by the mouse",
+        " has been eliminated",
         [
           255,
           255,
@@ -2310,25 +2741,31 @@
     ],
     [
       [
-        "Event: maak van de VOC een deel 2",
+        "Joeri",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " attacked ",
         [
           255,
           255,
           255
         ]
-      ]
-    ],
-    [
+      ],
       [
-        "Bot 6",
+        "Tete",
         [
-          238,
-          180,
+          225,
+          115,
           115
         ]
       ],
       [
-        " placed a plane in Pearl Harbor",
+        " in Siberi\u00eb: lost 0, killed 1",
         [
           255,
           255,
@@ -2338,302 +2775,96 @@
     ],
     [
       [
-        "Bot 6",
+        "Joeri",
         [
-          238,
-          180,
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " conquered Siberi\u00eb from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Tete",
+        [
+          225,
+          115,
           115
-        ]
-      ],
-      [
-        " placed a ship in Londen",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " built a fort in Nazi-Duitsland",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " nuked Peru: 2 casualties",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took Canada from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "mouse",
-        [
-          180,
-          180,
-          180
-        ]
-      ],
-      [
-        ": 5 lost, 4 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took Peru from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "mouse",
-        [
-          180,
-          180,
-          180
-        ]
-      ],
-      [
-        ": 0 lost, 1 defeated",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took Japan from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "mouse",
-        [
-          180,
-          180,
-          180
-        ]
-      ]
-    ],
-    [
-      [
-        "Bot 6",
-        [
-          238,
-          180,
-          115
-        ]
-      ],
-      [
-        " took Spanje from ",
-        [
-          255,
-          255,
-          255
-        ]
-      ],
-      [
-        "mouse",
-        [
-          180,
-          180,
-          180
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " placed a tank in Kazachstan",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " placed a tank in Kazachstan",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " placed a tank in Kazachstan",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " placed a tank in Kazachstan",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " placed a tank in Kazachstan",
-        [
-          255,
-          255,
-          255
-        ]
-      ]
-    ],
-    [
-      [
-        "Hugs",
-        [
-          128,
-          160,
-          238
-        ]
-      ],
-      [
-        " moved by air: -1 Arabi\u00eb, -1 Gold Coast, +2 Kazachstan, -1 planes Arabi\u00eb, +1 planes Kazachstan",
-        [
-          255,
-          255,
-          255
         ]
       ]
     ]
   ],
   "players": [
     {
-      "name": "Hugs",
+      "name": "Fuug",
       "color": [
         60.0,
         110.0,
         230.0
       ],
-      "food": 30,
-      "wood": 55,
-      "steel": 27,
-      "nuclear": 6,
-      "oil": 94,
-      "troops": 4,
+      "food": 32,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 2,
+      "attack": 0,
+      "boat_to_deploy": false,
+      "repositioned_this_turn": true,
+      "developed_this_turn": true,
+      "eliminated": true,
+      "is_bot": false,
+      "bot_level": "normal",
+      "bot_personality": "balanced",
+      "cards": []
+    },
+    {
+      "name": "Joeri",
+      "color": [
+        40.0,
+        160.0,
+        70.0
+      ],
+      "food": 7,
+      "wood": 22,
+      "steel": 13,
+      "nuclear": 8,
+      "oil": 11,
+      "troops": 5,
       "attack": 1,
+      "boat_to_deploy": false,
+      "repositioned_this_turn": true,
+      "developed_this_turn": false,
+      "eliminated": false,
+      "is_bot": false,
+      "bot_level": "normal",
+      "bot_personality": "balanced",
+      "cards": [
+        1,
+        2,
+        1
+      ]
+    },
+    {
+      "name": "Tete",
+      "color": [
+        210.0,
+        40.0,
+        40.0
+      ],
+      "food": 11,
+      "wood": 14,
+      "steel": 29,
+      "nuclear": 0,
+      "oil": 27,
+      "troops": 3,
+      "attack": 0,
       "boat_to_deploy": false,
       "repositioned_this_turn": false,
       "developed_this_turn": false,
@@ -2642,89 +2873,45 @@
       "bot_level": "normal",
       "bot_personality": "balanced",
       "cards": [
-        1,
-        0,
-        0,
+        3,
+        3,
         1
       ]
     },
     {
-      "name": "Hitomi EI",
+      "name": "Laarbot",
       "color": [
-        40.0,
-        160.0,
-        70.0
+        230.0,
+        200.0,
+        40.0
       ],
-      "food": 15,
-      "wood": 0,
-      "steel": 0,
-      "nuclear": 0,
-      "oil": 0,
-      "troops": 1,
+      "food": 30,
+      "wood": 7,
+      "steel": 1,
+      "nuclear": 1,
+      "oil": 18,
+      "troops": 2,
       "attack": 0,
       "boat_to_deploy": false,
       "repositioned_this_turn": true,
-      "developed_this_turn": false,
-      "eliminated": true,
-      "is_bot": false,
-      "bot_level": "normal",
-      "bot_personality": "balanced",
-      "cards": []
-    },
-    {
-      "name": "Bot 3",
-      "color": [
-        210.0,
-        40.0,
-        40.0
-      ],
-      "food": 65,
-      "wood": 0,
-      "steel": 0,
-      "nuclear": 0,
-      "oil": 0,
-      "troops": 1,
-      "attack": 0,
-      "boat_to_deploy": false,
-      "repositioned_this_turn": false,
-      "developed_this_turn": false,
-      "eliminated": true,
+      "developed_this_turn": true,
+      "eliminated": false,
       "is_bot": true,
       "bot_level": "hard",
-      "bot_personality": "aggressive",
-      "cards": []
+      "bot_personality": "builder",
+      "cards": [
+        2,
+        2
+      ]
     },
     {
-      "name": "Bot 4",
-      "color": [
-        240.0,
-        110.0,
-        170.0
-      ],
-      "food": 56,
-      "wood": 0,
-      "steel": 0,
-      "nuclear": 0,
-      "oil": 0,
-      "troops": 1,
-      "attack": 0,
-      "boat_to_deploy": false,
-      "repositioned_this_turn": false,
-      "developed_this_turn": false,
-      "eliminated": true,
-      "is_bot": true,
-      "bot_level": "hard",
-      "bot_personality": "aggressive",
-      "cards": []
-    },
-    {
-      "name": "Bot 5",
+      "name": "Marisbot",
       "color": [
         150.0,
         60.0,
         200.0
       ],
-      "food": 29,
+      "food": 30,
       "wood": 0,
       "steel": 0,
       "nuclear": 0,
@@ -2737,46 +2924,43 @@
       "eliminated": true,
       "is_bot": true,
       "bot_level": "hard",
-      "bot_personality": "turtle",
+      "bot_personality": "balanced",
       "cards": []
     },
     {
-      "name": "Bot 6",
+      "name": "Celestebot",
       "color": [
         230.0,
         140.0,
         40.0
       ],
-      "food": 135,
-      "wood": 5,
-      "steel": 15,
-      "nuclear": 1,
-      "oil": 44,
-      "troops": 12,
+      "food": 56,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 2,
       "attack": 0,
       "boat_to_deploy": false,
       "repositioned_this_turn": false,
       "developed_this_turn": false,
-      "eliminated": false,
+      "eliminated": true,
       "is_bot": true,
       "bot_level": "hard",
-      "bot_personality": "builder",
-      "cards": [
-        2,
-        2
-      ]
+      "bot_personality": "aggressive",
+      "cards": []
     }
   ],
   "countries": {
     "Redneck": {
-      "owner": "Bot 6",
+      "owner": "Tete",
       "food": 0,
       "wood": 0,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
       "troops": 3,
-      "units": 1,
+      "units": 6,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -2790,35 +2974,14 @@
       "voc_weakened": false
     },
     "Madagaskar": {
-      "owner": "Hugs",
+      "owner": "__default_player__",
       "food": 1,
       "wood": 2,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
       "troops": 1,
-      "units": 1,
-      "ships": 0,
-      "planes": 0,
-      "tanks": 0,
-      "fort_lvl": 0,
-      "radioactive": 0,
-      "developed": true,
-      "airport": true,
-      "dormant_owner": null,
-      "bombed_by": null,
-      "landmark_owner": null,
-      "voc_weakened": false
-    },
-    "Zuid-Afrika": {
-      "owner": "__default_player__",
-      "food": 1,
-      "wood": 0,
-      "steel": 0,
-      "nuclear": 0,
-      "oil": 0,
-      "troops": 2,
-      "units": 0,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -2829,7 +2992,28 @@
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
-      "voc_weakened": true
+      "voc_weakened": false
+    },
+    "Zuid-Afrika": {
+      "owner": "Laarbot",
+      "food": 1,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 2,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": true,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
     },
     "Belgisch Congo": {
       "owner": "__default_player__",
@@ -2839,7 +3023,7 @@
       "nuclear": 0,
       "oil": 0,
       "troops": 3,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -2850,7 +3034,7 @@
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
-      "voc_weakened": true
+      "voc_weakened": false
     },
     "Somali\u00eb": {
       "owner": "__default_player__",
@@ -2860,7 +3044,7 @@
       "nuclear": 0,
       "oil": 0,
       "troops": 3,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -2871,17 +3055,17 @@
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
-      "voc_weakened": true
+      "voc_weakened": false
     },
     "Nigeria": {
-      "owner": "__default_player__",
+      "owner": "Laarbot",
       "food": 0,
       "wood": 1,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
       "troops": 3,
-      "units": 1,
+      "units": 3,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -2892,7 +3076,7 @@
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
-      "voc_weakened": true
+      "voc_weakened": false
     },
     "Sahara": {
       "owner": "__default_player__",
@@ -2902,21 +3086,21 @@
       "nuclear": 1,
       "oil": 1,
       "troops": 2,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
       "developed": false,
-      "airport": true,
+      "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
-      "voc_weakened": true
+      "voc_weakened": false
     },
     "IJsland": {
-      "owner": "Bot 6",
+      "owner": "Tete",
       "food": 0,
       "wood": 2,
       "steel": 0,
@@ -2937,23 +3121,23 @@
       "voc_weakened": false
     },
     "Viking": {
-      "owner": "Bot 6",
+      "owner": "__default_player__",
       "food": 2,
       "wood": 1,
       "steel": 0,
       "nuclear": 0,
       "oil": 1,
       "troops": 0,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
-      "radioactive": 0,
+      "radioactive": 3,
       "developed": true,
       "airport": false,
       "dormant_owner": null,
-      "bombed_by": null,
+      "bombed_by": "Tete",
       "landmark_owner": null,
       "voc_weakened": false
     },
@@ -2965,6 +3149,27 @@
       "nuclear": 0,
       "oil": 1,
       "troops": 3,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Belarus": {
+      "owner": "Laarbot",
+      "food": 4,
+      "wood": 1,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 0,
       "units": 4,
       "ships": 0,
       "planes": 0,
@@ -2976,31 +3181,10 @@
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
-      "voc_weakened": true
-    },
-    "Belarus": {
-      "owner": "Bot 6",
-      "food": 4,
-      "wood": 1,
-      "steel": 0,
-      "nuclear": 0,
-      "oil": 0,
-      "troops": 0,
-      "units": 1,
-      "ships": 0,
-      "planes": 0,
-      "tanks": 0,
-      "fort_lvl": 0,
-      "radioactive": 0,
-      "developed": true,
-      "airport": false,
-      "dormant_owner": null,
-      "bombed_by": null,
-      "landmark_owner": null,
       "voc_weakened": false
     },
     "Nazi-Duitsland": {
-      "owner": "Bot 6",
+      "owner": "Laarbot",
       "food": 1,
       "wood": 0,
       "steel": 2,
@@ -3011,7 +3195,7 @@
       "ships": 0,
       "planes": 0,
       "tanks": 0,
-      "fort_lvl": 1,
+      "fort_lvl": 0,
       "radioactive": 0,
       "developed": false,
       "airport": false,
@@ -3021,7 +3205,7 @@
       "voc_weakened": false
     },
     "Romeinse Rijk": {
-      "owner": "Bot 6",
+      "owner": "Laarbot",
       "food": 4,
       "wood": 0,
       "steel": 0,
@@ -3030,25 +3214,46 @@
       "troops": 0,
       "units": 1,
       "ships": 0,
-      "planes": 1,
+      "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
       "developed": true,
-      "airport": true,
-      "dormant_owner": null,
+      "airport": false,
+      "dormant_owner": "Laarbot",
       "bombed_by": null,
       "landmark_owner": null,
       "voc_weakened": false
     },
     "Spanje": {
-      "owner": "Bot 6",
+      "owner": "Laarbot",
       "food": 2,
       "wood": 0,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
       "troops": 1,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Londen": {
+      "owner": "Tete",
+      "food": 2,
+      "wood": 1,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 0,
       "units": 1,
       "ships": 0,
       "planes": 0,
@@ -3060,44 +3265,23 @@
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
-      "voc_weakened": true
-    },
-    "Londen": {
-      "owner": "Bot 6",
-      "food": 2,
-      "wood": 1,
-      "steel": 0,
-      "nuclear": 0,
-      "oil": 0,
-      "troops": 0,
-      "units": 2,
-      "ships": 1,
-      "planes": 0,
-      "tanks": 0,
-      "fort_lvl": 0,
-      "radioactive": 0,
-      "developed": true,
-      "airport": true,
-      "dormant_owner": null,
-      "bombed_by": null,
-      "landmark_owner": null,
       "voc_weakened": false
     },
     "Siberi\u00eb": {
-      "owner": "Bot 6",
+      "owner": "Joeri",
       "food": 1,
       "wood": 0,
       "steel": 1,
       "nuclear": 0,
       "oil": 1,
       "troops": 0,
-      "units": 1,
+      "units": 3,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": true,
+      "developed": false,
       "airport": true,
       "dormant_owner": null,
       "bombed_by": null,
@@ -3105,56 +3289,56 @@
       "voc_weakened": false
     },
     "Kazachstan": {
-      "owner": "Hugs",
+      "owner": "Laarbot",
       "food": 1,
       "wood": 0,
       "steel": 0,
       "nuclear": 1,
       "oil": 1,
       "troops": 1,
-      "units": 7,
+      "units": 1,
       "ships": 0,
-      "planes": 1,
-      "tanks": 5,
+      "planes": 0,
+      "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": true,
-      "airport": true,
+      "developed": false,
+      "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
       "voc_weakened": false
     },
     "China": {
-      "owner": "__default_player__",
+      "owner": "Laarbot",
       "food": 8,
       "wood": 0,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
       "troops": 0,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
       "developed": true,
-      "airport": true,
+      "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
-      "landmark_owner": null,
-      "voc_weakened": true
+      "landmark_owner": "Laarbot",
+      "voc_weakened": false
     },
     "Mongoli\u00eb": {
-      "owner": "__default_player__",
+      "owner": "Laarbot",
       "food": 1,
       "wood": 0,
       "steel": 1,
       "nuclear": 0,
       "oil": 0,
       "troops": 1,
-      "units": 0,
+      "units": 1,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -3165,17 +3349,17 @@
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
-      "voc_weakened": true
+      "voc_weakened": false
     },
     "Noord-Korea": {
-      "owner": "__default_player__",
+      "owner": "Tete",
       "food": 0,
       "wood": 0,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
       "troops": 2,
-      "units": 0,
+      "units": 1,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -3186,33 +3370,54 @@
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
-      "voc_weakened": true
+      "voc_weakened": false
     },
     "Maleisi\u00eb": {
-      "owner": "__default_player__",
+      "owner": "Joeri",
       "food": 1,
       "wood": 2,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
       "troops": 0,
-      "units": 0,
+      "units": 1,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
-      "radioactive": 1,
-      "developed": true,
+      "radioactive": 0,
+      "developed": false,
       "airport": false,
       "dormant_owner": null,
-      "bombed_by": "Bot 6",
+      "bombed_by": null,
       "landmark_owner": null,
-      "voc_weakened": true
+      "voc_weakened": false
     },
     "Sri Lanka": {
-      "owner": "Hugs",
+      "owner": "__default_player__",
       "food": 1,
       "wood": 2,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "India": {
+      "owner": "Joeri",
+      "food": 1,
+      "wood": 1,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
@@ -3223,36 +3428,15 @@
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": true,
-      "airport": true,
-      "dormant_owner": null,
-      "bombed_by": null,
-      "landmark_owner": null,
-      "voc_weakened": false
-    },
-    "India": {
-      "owner": "__default_player__",
-      "food": 1,
-      "wood": 1,
-      "steel": 0,
-      "nuclear": 0,
-      "oil": 0,
-      "troops": 1,
-      "units": 0,
-      "ships": 0,
-      "planes": 0,
-      "tanks": 0,
-      "fort_lvl": 0,
-      "radioactive": 0,
       "developed": false,
       "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
-      "voc_weakened": true
+      "voc_weakened": false
     },
     "Ottomaanse Rijk": {
-      "owner": "__default_player__",
+      "owner": "Laarbot",
       "food": 2,
       "wood": 0,
       "steel": 0,
@@ -3270,10 +3454,10 @@
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
-      "voc_weakened": true
+      "voc_weakened": false
     },
     "Arabi\u00eb": {
-      "owner": "Hugs",
+      "owner": "Laarbot",
       "food": 0,
       "wood": 0,
       "steel": 0,
@@ -3284,9 +3468,9 @@
       "ships": 0,
       "planes": 0,
       "tanks": 0,
-      "fort_lvl": 2,
+      "fort_lvl": 0,
       "radioactive": 0,
-      "developed": true,
+      "developed": false,
       "airport": true,
       "dormant_owner": null,
       "bombed_by": null,
@@ -3294,7 +3478,7 @@
       "voc_weakened": false
     },
     "Japan": {
-      "owner": "Bot 6",
+      "owner": "Joeri",
       "food": 1,
       "wood": 1,
       "steel": 1,
@@ -3303,25 +3487,46 @@
       "troops": 0,
       "units": 1,
       "ships": 0,
-      "planes": 1,
-      "tanks": 1,
+      "planes": 0,
+      "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
       "developed": true,
       "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
-      "landmark_owner": "Bot 6",
-      "voc_weakened": true
+      "landmark_owner": "Joeri",
+      "voc_weakened": false
     },
     "Nederlands-Indi\u00eb": {
-      "owner": "Hugs",
+      "owner": "Joeri",
       "food": 1,
       "wood": 2,
       "steel": 1,
       "nuclear": 0,
       "oil": 0,
       "troops": 0,
+      "units": 4,
+      "ships": 0,
+      "planes": 1,
+      "tanks": 1,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": true,
+      "airport": true,
+      "dormant_owner": "Marisbot",
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Outback": {
+      "owner": "Joeri",
+      "food": 1,
+      "wood": 0,
+      "steel": 3,
+      "nuclear": 1,
+      "oil": 0,
+      "troops": 0,
       "units": 1,
       "ships": 0,
       "planes": 0,
@@ -3329,35 +3534,14 @@
       "fort_lvl": 0,
       "radioactive": 0,
       "developed": true,
-      "airport": false,
+      "airport": true,
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
       "voc_weakened": false
     },
-    "Outback": {
-      "owner": "__default_player__",
-      "food": 1,
-      "wood": 0,
-      "steel": 3,
-      "nuclear": 1,
-      "oil": 0,
-      "troops": 0,
-      "units": 3,
-      "ships": 0,
-      "planes": 0,
-      "tanks": 0,
-      "fort_lvl": 0,
-      "radioactive": 0,
-      "developed": true,
-      "airport": false,
-      "dormant_owner": null,
-      "bombed_by": null,
-      "landmark_owner": null,
-      "voc_weakened": true
-    },
     "Gold Coast": {
-      "owner": "__default_player__",
+      "owner": "Joeri",
       "food": 1,
       "wood": 0,
       "steel": 2,
@@ -3375,10 +3559,10 @@
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
-      "voc_weakened": true
+      "voc_weakened": false
     },
     "Papoea Nieuw Guinea": {
-      "owner": "__default_player__",
+      "owner": "Tete",
       "food": 1,
       "wood": 1,
       "steel": 1,
@@ -3392,14 +3576,14 @@
       "fort_lvl": 0,
       "radioactive": 0,
       "developed": false,
-      "airport": true,
+      "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
-      "voc_weakened": true
+      "voc_weakened": false
     },
     "Argentini\u00eb": {
-      "owner": "Bot 6",
+      "owner": "Tete",
       "food": 1,
       "wood": 0,
       "steel": 2,
@@ -3412,7 +3596,7 @@
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": true,
+      "developed": false,
       "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
@@ -3420,14 +3604,14 @@
       "voc_weakened": false
     },
     "Venezuela": {
-      "owner": "Bot 6",
+      "owner": "__default_player__",
       "food": 0,
       "wood": 0,
       "steel": 3,
       "nuclear": 1,
       "oil": 0,
       "troops": 1,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -3435,13 +3619,13 @@
       "radioactive": 0,
       "developed": true,
       "airport": true,
-      "dormant_owner": null,
+      "dormant_owner": "Fuug",
       "bombed_by": null,
       "landmark_owner": null,
       "voc_weakened": false
     },
     "Brazili\u00eb": {
-      "owner": "Bot 6",
+      "owner": "Tete",
       "food": 0,
       "wood": 3,
       "steel": 1,
@@ -3449,46 +3633,25 @@
       "oil": 0,
       "troops": 0,
       "units": 1,
-      "ships": 0,
+      "ships": 1,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": true,
-      "airport": true,
+      "developed": false,
+      "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
       "voc_weakened": false
     },
     "Peru": {
-      "owner": "Bot 6",
+      "owner": "Tete",
       "food": 1,
       "wood": 0,
       "steel": 3,
       "nuclear": 0,
       "oil": 0,
-      "troops": 1,
-      "units": 3,
-      "ships": 0,
-      "planes": 0,
-      "tanks": 0,
-      "fort_lvl": 0,
-      "radioactive": 3,
-      "developed": true,
-      "airport": false,
-      "dormant_owner": null,
-      "bombed_by": "Bot 6",
-      "landmark_owner": null,
-      "voc_weakened": true
-    },
-    "Alaska": {
-      "owner": "Bot 6",
-      "food": 1,
-      "wood": 0,
-      "steel": 1,
-      "nuclear": 0,
-      "oil": 1,
       "troops": 1,
       "units": 1,
       "ships": 0,
@@ -3496,7 +3659,28 @@
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": true,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Alaska": {
+      "owner": "__default_player__",
+      "food": 1,
+      "wood": 0,
+      "steel": 1,
+      "nuclear": 0,
+      "oil": 1,
+      "troops": 1,
+      "units": 2,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
       "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
@@ -3504,112 +3688,28 @@
       "voc_weakened": false
     },
     "New York": {
-      "owner": "Bot 6",
+      "owner": "__default_player__",
       "food": 4,
       "wood": 0,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
       "troops": 0,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": true,
-      "airport": true,
-      "dormant_owner": null,
-      "bombed_by": null,
-      "landmark_owner": null,
-      "voc_weakened": false
-    },
-    "Los Angeles": {
-      "owner": "Bot 6",
-      "food": 2,
-      "wood": 1,
-      "steel": 0,
-      "nuclear": 0,
-      "oil": 0,
-      "troops": 1,
-      "units": 1,
-      "ships": 0,
-      "planes": 0,
-      "tanks": 0,
-      "fort_lvl": 1,
-      "radioactive": 0,
-      "developed": true,
+      "developed": false,
       "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
       "voc_weakened": false
     },
-    "Canada": {
-      "owner": "Bot 6",
-      "food": 0,
-      "wood": 2,
-      "steel": 0,
-      "nuclear": 1,
-      "oil": 1,
-      "troops": 0,
-      "units": 1,
-      "ships": 0,
-      "planes": 0,
-      "tanks": 0,
-      "fort_lvl": 0,
-      "radioactive": 0,
-      "developed": true,
-      "airport": true,
-      "dormant_owner": null,
-      "bombed_by": null,
-      "landmark_owner": null,
-      "voc_weakened": true
-    },
-    "Mexico": {
-      "owner": "Bot 6",
-      "food": 1,
-      "wood": 1,
-      "steel": 0,
-      "nuclear": 0,
-      "oil": 0,
-      "troops": 1,
-      "units": 1,
-      "ships": 0,
-      "planes": 0,
-      "tanks": 0,
-      "fort_lvl": 1,
-      "radioactive": 0,
-      "developed": true,
-      "airport": true,
-      "dormant_owner": null,
-      "bombed_by": null,
-      "landmark_owner": null,
-      "voc_weakened": false
-    },
-    "Groenland": {
-      "owner": "Bot 6",
-      "food": 2,
-      "wood": 0,
-      "steel": 0,
-      "nuclear": 0,
-      "oil": 1,
-      "troops": 0,
-      "units": 1,
-      "ships": 0,
-      "planes": 0,
-      "tanks": 0,
-      "fort_lvl": 0,
-      "radioactive": 0,
-      "developed": true,
-      "airport": true,
-      "dormant_owner": null,
-      "bombed_by": null,
-      "landmark_owner": null,
-      "voc_weakened": false
-    },
-    "Cuba": {
-      "owner": "Bot 6",
+    "Los Angeles": {
+      "owner": "__default_player__",
       "food": 2,
       "wood": 1,
       "steel": 0,
@@ -3622,6 +3722,69 @@
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Canada": {
+      "owner": "Tete",
+      "food": 0,
+      "wood": 2,
+      "steel": 0,
+      "nuclear": 1,
+      "oil": 1,
+      "troops": 0,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": true,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Mexico": {
+      "owner": "Tete",
+      "food": 1,
+      "wood": 1,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Groenland": {
+      "owner": "Tete",
+      "food": 2,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 1,
+      "troops": 0,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
       "developed": true,
       "airport": false,
       "dormant_owner": null,
@@ -3629,8 +3792,29 @@
       "landmark_owner": null,
       "voc_weakened": false
     },
+    "Cuba": {
+      "owner": "Tete",
+      "food": 2,
+      "wood": 1,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 1,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 3,
+      "developed": true,
+      "airport": false,
+      "dormant_owner": null,
+      "bombed_by": "Tete",
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
     "Pearl Harbor": {
-      "owner": "Bot 6",
+      "owner": "Tete",
       "food": 0,
       "wood": 0,
       "steel": 0,
@@ -3644,7 +3828,7 @@
       "fort_lvl": 0,
       "radioactive": 0,
       "developed": false,
-      "airport": true,
+      "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
@@ -3655,169 +3839,7 @@
     {
       "between": [
         "Los Angeles",
-        "Redneck"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Londen",
-        "Spanje"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "China",
-        "Noord-Korea"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Alaska",
-        "Los Angeles"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Brazili\u00eb",
-        "Peru"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Cuba",
-        "New York"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Argentini\u00eb",
-        "Peru"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Canada",
-        "Los Angeles"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Belarus",
-        "Nazi-Duitsland"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Mexico",
-        "Redneck"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Londen",
-        "Viking"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "India",
-        "Nederlands-Indi\u00eb"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Japan",
-        "Papoea Nieuw Guinea"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Arabi\u00eb",
-        "Ottomaanse Rijk"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Nazi-Duitsland",
-        "Viking"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Canada",
-        "Groenland"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Groenland",
-        "IJsland"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Nazi-Duitsland",
-        "Spanje"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "India",
-        "Sri Lanka"
+        "Pearl Harbor"
       ],
       "kind": "sea",
       "rails": false,
@@ -3834,8 +3856,8 @@
     },
     {
       "between": [
-        "Gold Coast",
-        "Papoea Nieuw Guinea"
+        "Madagaskar",
+        "Somali\u00eb"
       ],
       "kind": "sea",
       "rails": false,
@@ -3843,8 +3865,107 @@
     },
     {
       "between": [
-        "Cuba",
-        "Venezuela"
+        "Japan",
+        "Pearl Harbor"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Ottomaanse Rijk",
+        "Romeinse Rijk"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Arabi\u00eb",
+        "Somali\u00eb"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Los Angeles",
+        "Redneck"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Belarus",
+        "Nazi-Duitsland"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Sahara",
+        "Somali\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Canada",
+        "Groenland"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Belarus",
+        "Ottomaanse Rijk"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Arabi\u00eb",
+        "Sahara"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Canada",
+        "Redneck"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Kazachstan",
+        "Mongoli\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Arabi\u00eb",
+        "India"
       ],
       "kind": "sea",
       "rails": false,
@@ -3861,8 +3982,161 @@
     },
     {
       "between": [
-        "Ottomaanse Rijk",
-        "Romeinse Rijk"
+        "New York",
+        "Redneck"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Kazachstan",
+        "Sovjet-Rusland"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "India",
+        "Sri Lanka"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Argentini\u00eb",
+        "Peru"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Mongoli\u00eb",
+        "Noord-Korea"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Londen",
+        "New York"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Siberi\u00eb",
+        "Sovjet-Rusland"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "India",
+        "Kazachstan"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Brazili\u00eb",
+        "Peru"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "China",
+        "Japan"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Groenland",
+        "IJsland"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "China",
+        "Mongoli\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "China",
+        "Noord-Korea"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Kazachstan",
+        "Ottomaanse Rijk"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Brazili\u00eb",
+        "Venezuela"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Japan",
+        "Noord-Korea"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Cuba",
+        "New York"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "China",
+        "India"
       ],
       "kind": "land",
       "rails": true,
@@ -3871,7 +4145,25 @@
     {
       "between": [
         "Arabi\u00eb",
-        "India"
+        "Ottomaanse Rijk"
+      ],
+      "kind": "land",
+      "rails": true,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Peru",
+        "Venezuela"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Japan",
+        "Siberi\u00eb"
       ],
       "kind": "sea",
       "rails": false,
@@ -3879,10 +4171,19 @@
     },
     {
       "between": [
-        "Kazachstan",
-        "Mongoli\u00eb"
+        "Cuba",
+        "Venezuela"
       ],
       "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Ottomaanse Rijk",
+        "Sahara"
+      ],
+      "kind": "sea",
       "rails": false,
       "temporary": false
     },
@@ -3897,53 +4198,35 @@
     },
     {
       "between": [
-        "Sovjet-Rusland",
-        "Viking"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Alaska",
-        "Canada"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Londen",
-        "New York"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Sahara",
-        "Somali\u00eb"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
         "China",
         "Maleisi\u00eb"
       ],
       "kind": "land",
-      "rails": true,
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Cuba",
+        "Mexico"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Nigeria",
+        "Spanje"
+      ],
+      "kind": "sea",
+      "rails": false,
       "temporary": false
     },
     {
       "between": [
         "Belgisch Congo",
-        "Zuid-Afrika"
+        "Nigeria"
       ],
       "kind": "land",
       "rails": false,
@@ -3952,16 +4235,7 @@
     {
       "between": [
         "India",
-        "Kazachstan"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Londen",
-        "Nazi-Duitsland"
+        "Maleisi\u00eb"
       ],
       "kind": "land",
       "rails": false,
@@ -3969,8 +4243,17 @@
     },
     {
       "between": [
-        "Madagaskar",
-        "Zuid-Afrika"
+        "Los Angeles",
+        "Mexico"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Sahara",
+        "Spanje"
       ],
       "kind": "sea",
       "rails": false,
@@ -3978,8 +4261,71 @@
     },
     {
       "between": [
-        "Gold Coast",
+        "Belgisch Congo",
+        "Somali\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Maleisi\u00eb",
+        "Nederlands-Indi\u00eb"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Canada",
+        "Los Angeles"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Romeinse Rijk",
+        "Sahara"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Nigeria",
+        "Somali\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Nederlands-Indi\u00eb",
         "Outback"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Nigeria",
+        "Zuid-Afrika"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Mexico",
+        "Redneck"
       ],
       "kind": "land",
       "rails": false,
@@ -3988,7 +4334,7 @@
     {
       "between": [
         "Nazi-Duitsland",
-        "Romeinse Rijk"
+        "Spanje"
       ],
       "kind": "land",
       "rails": false,
@@ -3996,89 +4342,8 @@
     },
     {
       "between": [
-        "Madagaskar",
-        "Somali\u00eb"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Arabi\u00eb",
-        "Sahara"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Peru",
-        "Venezuela"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "New York",
-        "Redneck"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
-        "China",
-        "Mongoli\u00eb"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
-        "IJsland",
-        "Viking"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Kazachstan",
-        "Sovjet-Rusland"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Siberi\u00eb",
-        "Sovjet-Rusland"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "China",
-        "India"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Japan",
-        "Siberi\u00eb"
+        "India",
+        "Nederlands-Indi\u00eb"
       ],
       "kind": "sea",
       "rails": false,
@@ -4095,8 +4360,8 @@
     },
     {
       "between": [
-        "Los Angeles",
-        "Mexico"
+        "Nazi-Duitsland",
+        "Romeinse Rijk"
       ],
       "kind": "land",
       "rails": false,
@@ -4104,8 +4369,8 @@
     },
     {
       "between": [
-        "Nigeria",
-        "Somali\u00eb"
+        "Gold Coast",
+        "Outback"
       ],
       "kind": "land",
       "rails": false,
@@ -4113,35 +4378,8 @@
     },
     {
       "between": [
-        "Belgisch Congo",
-        "Somali\u00eb"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Brazili\u00eb",
-        "Venezuela"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Los Angeles",
-        "Pearl Harbor"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Sahara",
-        "Spanje"
+        "Sovjet-Rusland",
+        "Viking"
       ],
       "kind": "sea",
       "rails": false,
@@ -4149,17 +4387,8 @@
     },
     {
       "between": [
-        "Canada",
-        "Redneck"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Mongoli\u00eb",
-        "Noord-Korea"
+        "Belarus",
+        "Romeinse Rijk"
       ],
       "kind": "land",
       "rails": false,
@@ -4167,89 +4396,8 @@
     },
     {
       "between": [
-        "Japan",
-        "Noord-Korea"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "India",
-        "Maleisi\u00eb"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Ottomaanse Rijk",
-        "Sahara"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Maleisi\u00eb",
-        "Nederlands-Indi\u00eb"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Madagaskar",
-        "Sri Lanka"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Belgisch Congo",
-        "Nigeria"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Kazachstan",
-        "Ottomaanse Rijk"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Arabi\u00eb",
-        "Somali\u00eb"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Alaska",
-        "Siberi\u00eb"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Japan",
-        "Pearl Harbor"
+        "Gold Coast",
+        "Papoea Nieuw Guinea"
       ],
       "kind": "sea",
       "rails": false,
@@ -4266,47 +4414,110 @@
     },
     {
       "between": [
-        "Belarus",
-        "Romeinse Rijk"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Cuba",
-        "Mexico"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Nederlands-Indi\u00eb",
-        "Outback"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "China",
-        "Japan"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Nigeria",
+        "Londen",
         "Spanje"
       ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Japan",
+        "Papoea Nieuw Guinea"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Londen",
+        "Nazi-Duitsland"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Alaska",
+        "Siberi\u00eb"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Madagaskar",
+        "Zuid-Afrika"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Londen",
+        "Viking"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Alaska",
+        "Canada"
+      ],
       "kind": "land",
-      "rails": true,
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Belgisch Congo",
+        "Zuid-Afrika"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Nazi-Duitsland",
+        "Viking"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Alaska",
+        "Los Angeles"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Madagaskar",
+        "Sri Lanka"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "IJsland",
+        "Viking"
+      ],
+      "kind": "sea",
+      "rails": false,
       "temporary": false
     }
   ]

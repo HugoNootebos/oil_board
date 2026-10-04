@@ -1,12 +1,15 @@
 from contextlib import contextmanager
 
 import pygame as pg
+import sounds
+from fonts import game_font
 import numpy as np
 from board import get_connections, get_countries
 from models import Position, Image, Player, Io, View, Gui, Shop, Button, CardMenu, LANDMARKS
 from phases import TurnManager
+import random
 from random import sample
-from player_colors import COUNT_MODE_COLORS
+from player_colors import COUNT_MODE_COLORS, light_tint
 from save_load import AUTOSAVE_PATH, SAVE_SLOT_COUNT, slot_path, read_save_name, save_game
 
 # Curated starting-country pools, keyed by player count: one is dealt to
@@ -33,7 +36,7 @@ class Engine:
         self.player_names = player_names
         pg.init()
         pg.font.init()
-        self.font = pg.font.SysFont('Times New Roman', 20)
+        self.font = game_font(20)
         self.logical_size = (width, height)
         self.fullscreen = True
         window = self._set_display()
@@ -157,9 +160,12 @@ class Engine:
         # save slots, and the exit request the main loop (runner.py) polls
         # for, since only it can cleanly exit.
         self.settings_open = False
-        self.settings = {"assets": False, "sea": True, "land": True, "sea_route": True, "tank": True,
-                         "landmarks": True}
+        self.settings = {"assets": False, "sea": True, "land": True,
+                         "landmarks": True, "fast_bots": False}
         self.pending_quit = False
+        # The event info menu (event button, top right): the active event
+        # and how long until the next one is drawn.
+        self.event_info_open = False
         # Save As panel: open or not, which slot is being named (None while
         # still picking one), and the name typed so far.
         self.save_as_open = False
@@ -169,10 +175,22 @@ class Engine:
         self.save_path = AUTOSAVE_PATH
 
         self.default_player = Player("mouse", color=(140, 140, 140))
+        # What the box at the bottom left says: one line per thing that
+        # happened, each a list of [text, (r, g, b)] pieces (see log_action).
+        self.action_log = []
+        self.hint_rows = 0
+        self.action_log_open = False
+        self.action_scroll = 0  # lines back from the newest, while open
         self.players = self.get_players(mode)
-        # player_bots: which of the players (in order) the computer plays.
+        # player_bots: which of the players (in order) the computer plays:
+        # False for a human, else the bot's level (True: the default one).
+        # Each bot gets a random personality (see bot.PERSONALITIES).
+        import bot
         for player, is_bot in zip(self.players, player_bots or []):
             player.is_bot = bool(is_bot)
+            if is_bot:
+                player.bot_level = is_bot if isinstance(is_bot, str) else bot.DEFAULT_LEVEL
+                player.bot_personality = random.choice(list(bot.PERSONALITIES))
         self.countries = get_countries(self.default_player)
         self.connections = get_connections()
 
@@ -212,8 +230,8 @@ class Engine:
         for index, country in enumerate(starting_countries):
             self.countries[country].owner = self.players[index]
             self.countries[country].units = 15
-            # No boat here: each player deploys their one free boat
-            # themselves during a recruitment phase (Player.start_ship).
+            # No boat here: each player's first ship from the shop is free
+            # (Player.start_ship).
             self.countries[country].airport = True
 
     # --- display / map rendering ----------------------------------------
@@ -237,7 +255,7 @@ class Engine:
         view.ox = (sw - width * scale) / 2
         view.oy = (sh - height * scale) / 2
         self._layer_key = None
-        self.map_font = pg.font.SysFont('Times New Roman', max(8, int(20 * scale)))
+        self.map_font = game_font(max(8, int(20 * scale)))
 
         def sized(name, w, h):
             return Image(name, scale=(max(1, int(w * scale)), max(1, int(h * scale))))
@@ -289,7 +307,9 @@ class Engine:
         view = self.view
         view_key = (view.scale, view.ox, view.oy, view.window.get_size(), view.zoom, view.offset.x, view.offset.y)
         state_key = (
-            tuple((tuple(int(x) for x in c.owner.color), c.shade, c.radioactive > 0) for c in self.countries.values()),
+            tuple((tuple(int(x) for x in c.owner.color), c.shade, c.radioactive > 0, c.developed,
+                   c.dormant_owner is not None)
+                  for c in self.countries.values()),
             tuple((c.kind, c.rails) for c in self.connections),
             self.settings["sea"], self.settings["land"],
             self.settings["landmarks"], tuple(self._landmark_shown(name) for name in LANDMARKS),
@@ -307,7 +327,7 @@ class Engine:
     # Country borders and connections are drawn partly see-through.
     BORDER_COLOR = (120, 120, 120)
     BORDER_OPACITY = 204      # 80%
-    CONNECTION_OPACITY = 153  # 60%
+    CONNECTION_OPACITY = 178  # 70%
 
     @staticmethod
     @contextmanager
@@ -382,12 +402,7 @@ class Engine:
         view.draw_oy = view.oy
         view.window.set_clip(self._logical_clip())
         for country in self.countries.values():
-            # The ship/plane and tank lines on the marker can each be
-            # switched off in the settings menu.
-            country.draw_troops(
-                self.map_font, view,
-                show_ships_planes=self.settings["sea_route"], show_tanks=self.settings["tank"],
-            )
+            country.draw_troops(self.map_font, view)
             country.draw_assets(
                 view=view,
                 img_ship=self.map_images["spr_ship"],
@@ -400,23 +415,164 @@ class Engine:
     def present(self):
         """Scale the UI layer over the map (call right before flip)."""
         view = self.view
+        self._draw_action_box()
         width, height = self.logical_size
         size = (int(round(width * view.scale)), int(round(height * view.scale)))
         ui = self.ui if size == (width, height) else pg.transform.smoothscale(self.ui, size)
         view.window.blit(ui, (int(view.ox), int(view.oy)))
 
+    def log_action(self, *parts):
+        """Add a line to the bottom-left box's history: strings are drawn
+        white, a Player as their name in (a light shade of) their colour."""
+        self.action_log.append([
+            [part.name, light_tint(part.color, self.NAME_TINT)] if isinstance(part, Player)
+            else [str(part), (255, 255, 255)]
+            for part in parts
+        ])
+        del self.action_log[:-self.ACTION_LOG_MAX]
+        if self.action_log_open and self.action_scroll:
+            # Reading further back: keep the same lines in view.
+            self.action_scroll = min(self.action_scroll + 1, self._action_scroll_max())
+
+    def log_destroyed(self, owner, country_name, ships=0, tanks=0, planes=0, fort=0):
+        """Log the loss of `owner`'s assets in a country, e.g. "Player 2's
+        ship was destroyed in Japan". Nothing is logged when nothing was
+        lost."""
+        items = ["{} {}s".format(k, word) if k > 1 else word
+                 for k, word in ((ships, "ship"), (tanks, "tank"), (planes, "plane"))
+                 if k > 0]
+        if fort > 0:
+            items.append("fort")
+        if not items or owner is None:
+            return
+        text = items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+        single = len(items) == 1 and max(ships, tanks, planes, 1) == 1
+        self.log_action(owner, "'s {} {} destroyed in {}".format(
+            text, "was" if single else "were", country_name))
+
+    def log_wiped(self, country):
+        """Log every asset (ships, tanks, planes, fort) in `country` that's
+        about to be wiped out, as its current owner's loss."""
+        self.log_destroyed(country.owner, country.name, country.ships, country.tanks,
+                           country.planes, country.fort_lvl)
+
+    NAME_TINT = 0.35
+    ACTION_BOX_H = 30          # collapsed: one line
+    ACTION_BOX_MAX_W = 620
+    ACTION_LOG_MAX = 500       # lines of history kept
+    ACTION_LOG_ROWS = 10       # lines shown when expanded
+    ACTION_ROW_H = 24
+    ACTION_OPEN_W = 520
+
+    def _action_box_rect(self):
+        """The bottom-left box's rect in logical UI coordinates, or None
+        while there's nothing to show."""
+        if not self.action_log:
+            return None
+        view = self.view
+        if self.action_log_open:
+            width = min(max(self.ACTION_OPEN_W, self._action_log_width() + 26), view.WIDTH)
+            height = self.ACTION_LOG_ROWS * self.ACTION_ROW_H + 12
+        else:
+            pieces = [self.font.size(text)[0] for text, _ in self.action_log[-1]]
+            width = min(sum(pieces) + 22, self.ACTION_BOX_MAX_W)
+            height = self.ACTION_BOX_H
+        return pg.Rect(0, view.HEIGHT - height, width, height)
+
+    def _action_log_width(self):
+        """Width of the longest line in the whole history (so the open box
+        doesn't change size while scrolling); cached until a line is added."""
+        key = (len(self.action_log), id(self.action_log[-1]))
+        if getattr(self, "_action_width_key", None) != key:
+            self._action_width_key = key
+            self._action_width = max(sum(self.font.size(text)[0] for text, _ in line)
+                                     for line in self.action_log)
+        return self._action_width
+
+    def _action_scroll_max(self):
+        return max(len(self.action_log) - self.ACTION_LOG_ROWS, 0)
+
+    def _handle_action_box(self):
+        """A click on the box opens/closes the history. Runs before the
+        phases each frame so the click doesn't also hit what's under it."""
+        rect = self._action_box_rect()
+        if rect is None or self.modal_open:
+            return
+        io = self.io
+        if rect.collidepoint(io.mouse_position.x, io.mouse_position.y):
+            if io.left_pressed:
+                self.action_log_open = not self.action_log_open
+                self.action_scroll = 0
+            if io.left_pressed or io.right_clicked:
+                io.left_pressed = 0
+                io.right_clicked = False
+
+    def scroll_action_log(self, direction):
+        """Mouse wheel over the open history: direction +1 scrolls back into
+        the past, -1 forward. True when the wheel was used up by it."""
+        rect = self._action_box_rect()
+        if rect is None or not self.action_log_open or self.modal_open:
+            return False
+        if not rect.collidepoint(self.io.mouse_position.x, self.io.mouse_position.y):
+            return False
+        self.action_scroll = max(0, min(self.action_scroll + direction, self._action_scroll_max()))
+        return True
+
+    def _draw_action_box(self):
+        """Black 80% box flush with the bottom-left corner of the screen:
+        the last line, or (opened) the last 10 with the older ones a
+        scroll away. Drawn last, over everything else."""
+        rect = self._action_box_rect()
+        if rect is None:
+            return
+        box = pg.Surface(rect.size, pg.SRCALPHA)
+        pg.draw.rect(box, (0, 0, 0, 204), box.get_rect(), border_top_right_radius=6)
+        if self.action_log_open:
+            self.action_scroll = min(self.action_scroll, self._action_scroll_max())
+            end = len(self.action_log) - self.action_scroll
+            lines = self.action_log[max(end - self.ACTION_LOG_ROWS, 0):end]
+            # Newest at the bottom, like the collapsed line it grew from.
+            top = rect.h - 6 - len(lines) * self.ACTION_ROW_H
+            for n, line in enumerate(lines):
+                self._blit_action_line(box, line, 10, top + n * self.ACTION_ROW_H, self.ACTION_ROW_H, rect.w - 26)
+            if self._action_scroll_max():
+                track = pg.Rect(rect.w - 10, 8, 4, rect.h - 16)
+                pg.draw.rect(box, (255, 255, 255, 50), track, border_radius=2)
+                total = len(self.action_log)
+                thumb_h = max(18, track.h * self.ACTION_LOG_ROWS // total)
+                room = track.h - thumb_h
+                thumb_y = track.y + room - room * self.action_scroll // self._action_scroll_max()
+                pg.draw.rect(box, (255, 255, 255, 170), pg.Rect(track.x, thumb_y, 4, thumb_h), border_radius=2)
+        else:
+            self._blit_action_line(box, self.action_log[-1], 10, 0, rect.h, rect.w - 12)
+        self.ui.blit(box, rect.topleft)
+
+    def _blit_action_line(self, surface, line, x, y, height, max_x):
+        for text, color in line:
+            piece = self.font.render(text, True, tuple(color))
+            surface.blit(piece, (x, y + (height - piece.get_height()) // 2))
+            x += piece.get_width()
+            if x > max_x:
+                break
+
     def draw_gui(self):
         def handle_card_menu():
             if self.turn_manager.must_trade():
+                sounds.play("error")
                 return  # can't close the menu until enough cards are traded
             if not self.card_menu.show and self.turn_manager.attack_in_progress():
+                sounds.play("error")
                 return  # dice are cast: the attack has to finish first
+            if not self.card_menu.show and not self.players[self.turn].cards:
+                sounds.play("error")
+                return  # nothing to show
             self.card_menu.player = self.players[self.turn]
             self.card_menu.trade_mode = False
             self.card_menu.show = not self.card_menu.show
             self.card_menu.organize_cards()
             self.card_menu.use_cards_automatic()
 
+        self._handle_action_box()
         self.gui.draw_overlay(self.view)
         if self.io.hover_country is not None:
             hovered = self.countries[self.io.hover_country]
@@ -439,7 +595,9 @@ class Engine:
         self.gui.draw_player_stats(self.view, player, self.font, self.hud_images, self.production(player))
         self.gui.draw_attack_phase(
             self.view, self.players[self.turn], images=self.hud_images, outline_color=self.colors["outlines"],
+            end_turn_enabled=self.turn_manager.can_end_turn(),
         )
+        self.gui.draw_player_outline(self.view)
 
         # Settings sits top-left on its own.
         settings_button = self._settings_button()
@@ -462,10 +620,18 @@ class Engine:
         if not blocked:
             shop_menu_button.release_button(self.turn_manager.toggle_shop, self.io)
 
+        # Event info sits top-left too, after the cards button.
+        event_button = self._event_button()
+        event_button.draw(self.view, self.io)
+        if not self.turn_manager.dialog_active and not self.settings_open:
+            event_button.release_button(self.toggle_event_info, self.io)
+
         if self.settings_open:
             self._draw_settings_menu()
+        elif self.event_info_open:
+            self._draw_event_info()
 
-    _top_button_x = 100  # shop, then cards to its right, both right of settings
+    BUTTON_STEP = 68  # top-left row: settings, shop, cards, event cards (60 wide + 8 gap)
 
     @property
     def bot_turn(self):
@@ -476,9 +642,14 @@ class Engine:
     def modal_open(self):
         """Whether some full-screen-ish overlay (an elimination/win dialog
         or the settings menu) should freeze everything else."""
-        return self.turn_manager.dialog_active or self.settings_open
+        return self.turn_manager.dialog_active or self.settings_open or self.event_info_open
+
+    def toggle_event_info(self):
+        self.event_info_open = not self.event_info_open
+        self.io.left_pressed = 0  # the click shouldn't reach the map behind the button
 
     def toggle_settings(self):
+        self.event_info_open = False
         self.settings_open = not self.settings_open
         self.dragging_landmark = None
         self._close_save_as()
@@ -531,7 +702,10 @@ class Engine:
         pg.draw.rect(screen, (0, 0, 0), rect, 2)
         label = self.font.render(text, True, (0, 0, 0))
         screen.blit(label, (rect.centerx - label.get_width() // 2, rect.centery - label.get_height() // 2))
-        return hovered and self.io.left_pressed
+        clicked = self.io.button(("r", rect.x, rect.y, rect.w, rect.h))
+        if clicked and not enabled:
+            sounds.play("error")
+        return bool(enabled and clicked)
 
     def _draw_save_as(self, x, y, w, h, mouse):
         """Save As: pick one of the save slots, type a name for it, Save."""
@@ -588,10 +762,20 @@ class Engine:
         dim.fill((0, 0, 0, 140))
         screen.blit(dim, (0, 0))
 
-        w, h = 340, 562
+        # Two columns; the Save As name picker keeps the narrow tall panel.
+        w, h = (340, 562) if self.save_as_open else (600, 440)
         x, y = view.WIDTH * 0.5 - w * 0.5, view.HEIGHT * 0.5 - h * 0.5
         pg.draw.rect(screen, self.SETTINGS_COLOR, pg.Rect(x, y, w, h))
         pg.draw.rect(screen, (0, 0, 0), pg.Rect(x, y, w, h), 3)
+
+        # A click outside the panel closes the menu (the settings button
+        # itself toggles it, so leave that click to the button).
+        btn = self._settings_button()
+        on_button = pg.Rect(btn.pos.x, btn.pos.y, btn.width, btn.height).collidepoint(mouse)
+        if io.left_pressed and not on_button and not pg.Rect(x, y, w, h).collidepoint(mouse):
+            self.toggle_settings()
+            io.left_pressed = 0
+            return
 
         if self.save_as_open:
             self._draw_save_as(x, y, w, h, mouse)
@@ -599,32 +783,30 @@ class Engine:
 
         screen.blit(self.font.render("Settings", True, (0, 0, 0)), (x + 15, y + 10))
 
-        quit_rect = pg.Rect(x + 20, y + 45, w - 40, 40)
+        col_w = (w - 60) // 2
+        col_x = (x + 20, x + 40 + col_w)
+
+        quit_rect = pg.Rect(col_x[0], y + 45, col_w, 40)
         if self._menu_button(quit_rect, "Exit Game", (245, 150, 150), mouse):
             self.pending_quit = True
 
-        save_as_rect = pg.Rect(x + 20, quit_rect.bottom + 10, w - 40, 40)
+        save_as_rect = pg.Rect(col_x[1], y + 45, col_w, 40)
         if self._menu_button(save_as_rect, "Save As", (150, 200, 245), mouse):
             self.save_as_open = True
             self.save_as_slot = None
             self.save_as_names = [read_save_name(slot_path(i)) for i in range(SAVE_SLOT_COUNT)]
 
-        toggles = [
-            ("assets", "Show assets"), ("sea", "Show sea connections"), ("land", "Show land connections"),
-            ("sea_route", "Ship / plane lines"), ("tank", "Tank lines"),
-            ("landmarks", "Show torii/pagoda"),
+        # Left column: what the map shows; right column: markers and bots.
+        columns = [
+            [("assets", "Show assets"), ("sea", "Show sea connections"), ("land", "Show land connections"),
+             ("landmarks", "Show torii/pagoda")],
+            [("fast_bots", "Fast bots")],
         ]
-        for i, (key, text) in enumerate(toggles):
-            row_y = save_as_rect.bottom + 20 + i * 42
-            box = pg.Rect(x + 20, row_y, 26, 26)
-            pg.draw.rect(screen, (255, 255, 255), box)
-            pg.draw.rect(screen, (0, 0, 0), box, 2)
-            if self.settings[key]:
-                pg.draw.line(screen, (0, 150, 0), (box.x + 4, box.y + 13), (box.x + 11, box.y + 21), 3)
-                pg.draw.line(screen, (0, 150, 0), (box.x + 11, box.y + 21), (box.x + 22, box.y + 5), 3)
-            screen.blit(self.font.render(text, True, (0, 0, 0)), (box.right + 10, box.y + 3))
-            if io.left_pressed and box.collidepoint(mouse):
-                self.settings[key] = not self.settings[key]
+        for c, toggles in enumerate(columns):
+            for i, (key, text) in enumerate(toggles):
+                row = pg.Rect(col_x[c], save_as_rect.bottom + 25 + i * 46, col_w, 34)
+                if self._toggle_switch(row, text, self.settings[key], mouse):
+                    self.settings[key] = not self.settings[key]
 
         # China's pagoda and Japan's torii: owed by whoever holds that
         # country without one, who drags it from here onto the map. Once
@@ -647,6 +829,23 @@ class Engine:
         # a control above -- nothing behind the dimmed overlay should react.
         if io.left_pressed:
             io.left_pressed = 0
+
+    def _toggle_switch(self, row, text, on, mouse):
+        """A labelled on/off switch filling `row`; returns True when clicked."""
+        screen = self.view.screen
+        track = pg.Rect(row.x, row.centery - 12, 46, 24)
+        hovered = row.collidepoint(mouse)
+        color = (60, 180, 80) if on else (170, 170, 170)
+        if hovered:
+            color = tuple(min(255, c + 20) for c in color)
+        pg.draw.rect(screen, color, track, border_radius=12)
+        pg.draw.rect(screen, (0, 0, 0), track, 2, border_radius=12)
+        knob_x = track.right - 12 if on else track.x + 12
+        pg.draw.circle(screen, (255, 255, 255), (knob_x, track.centery), 9)
+        pg.draw.circle(screen, (0, 0, 0), (knob_x, track.centery), 9, 2)
+        label = self.font.render(text, True, (0, 0, 0))
+        screen.blit(label, (track.right + 12, row.centery - label.get_height() // 2))
+        return self.io.button(("r", row.x, row.y, row.w, row.h))
 
     def _drag_landmark(self):
         """A pagoda/torii follows the mouse over the (undimmed) map;
@@ -685,25 +884,104 @@ class Engine:
             image=self.hud_images['spr_settings'],
         )
 
+    SHOP_COLOR = (165, 165, 255)  # same blue as the shop menu's background
+
     def _shop_button(self, outline_width=2):
         return Button(
-            pos=Position(self._top_button_x, 20),
+            pos=Position(20 + self.BUTTON_STEP, 20),
             width=60,
             height=60,
-            color=(170, 230, 170),
+            color=self.SHOP_COLOR,
             outline_width=outline_width,
             image=self.hud_images['spr_shop'],
         )
 
     def _card_button(self, outline_width=2):
         return Button(
-            pos=Position(self._top_button_x + 80, 20),
+            pos=Position(20 + 2 * self.BUTTON_STEP, 20),
             width=60,
             height=60,
-            color=(100, 100, 255),
+            color=CardMenu.PANEL_COLOR,
             outline_width=outline_width,
             image=self.hud_images['spr_cards'],
         )
+
+    EVENT_COLOR = (250, 225, 130)  # same yellow as the event card dialog
+
+    def _event_button(self):
+        return Button(
+            pos=Position(20 + 3 * self.BUTTON_STEP, 20),
+            width=60,
+            height=60,
+            color=self.EVENT_COLOR,
+            outline_width=4 if self.event_info_open else 2,
+            image=self.hud_images['spr_event'],
+        )
+
+    def _draw_event_info(self):
+        """The active event card (as shown when it was drawn), or "No
+        active event card", plus how many turns until the next one."""
+        view = self.view
+        screen = view.screen
+        manager = self.turn_manager
+        event = manager.current_event
+
+        dim = pg.Surface((view.WIDTH, view.HEIGHT), pg.SRCALPHA)
+        dim.fill((0, 0, 0, 140))
+        screen.blit(dim, (0, 0))
+
+        name_font = game_font(28, bold=True)
+        desc_font = game_font(19)
+        w = 520
+        text_w = w - 80
+        name = event.name if event is not None else "No active event card"
+        lines = manager._wrap_text(event.description, desc_font, text_w) if event is not None else []
+
+        upcoming = manager.turns_until_next_event()
+        if upcoming is None:
+            next_text = "No more event cards"
+        else:
+            turns, player = upcoming
+            if turns == 1:
+                next_text = "Next event card: next turn ({})".format(player.name)
+            else:
+                next_text = "Next event card: in {} turns ({})".format(turns, player.name)
+
+        icon = self.hud_images["spr_event"]
+        iw, ih = icon.image.get_size()
+        name_h = name_font.get_height()
+        line_h = desc_font.get_height() + 4
+        hint_font = game_font(14)
+        top_pad, gap1, gap2, gap3, bottom_pad = 24, 16, 16, 18, 20
+        h = (top_pad + ih + gap1 + name_h + gap2 + line_h * len(lines) + gap3 + line_h + gap3
+             + 4 + hint_font.get_height() + bottom_pad)
+        x, y = view.WIDTH * 0.5 - w * 0.5, view.HEIGHT * 0.5 - h * 0.5
+        pg.draw.rect(screen, self.EVENT_COLOR, pg.Rect(x, y, w, h))
+        pg.draw.rect(screen, (0, 0, 0), pg.Rect(x, y, w, h), 3)
+
+        cy = y + top_pad
+        icon.draw(screen, Position(int(x + w * 0.5 - iw * 0.5), int(cy)))
+        cy += ih + gap1
+        name_surf = name_font.render(name, True, (0, 0, 0))
+        screen.blit(name_surf, (x + w * 0.5 - name_surf.get_width() * 0.5, cy))
+        cy += name_h + gap2
+        for line in lines:
+            line_surf = desc_font.render(line, True, (0, 0, 0))
+            screen.blit(line_surf, (x + w * 0.5 - line_surf.get_width() * 0.5, cy))
+            cy += line_h
+
+        cy += gap3
+        pg.draw.line(screen, (0, 0, 0), (x + 40, cy - gap3 * 0.5), (x + w - 40, cy - gap3 * 0.5), 1)
+        next_surf = desc_font.render(next_text, True, (0, 0, 0))
+        screen.blit(next_surf, (x + w * 0.5 - next_surf.get_width() * 0.5, cy))
+
+        # A click anywhere closes it (the event button itself already had
+        # its chance to, earlier in draw_gui), and goes no further.
+        hint = hint_font.render("click anywhere to continue", True, (90, 50, 50))
+        screen.blit(hint, (x + w * 0.5 - hint.get_width() * 0.5, y + h - bottom_pad - hint.get_height()))
+        if self.io.left_pressed:
+            self.event_info_open = False
+            self.io.left_pressed = 0
 
     def production(self, player):
         """What `player`'s countries would yield right now: the resources
@@ -715,8 +993,10 @@ class Engine:
             if country.owner != player:
                 continue
             units += country.units
-            totals["helmets"] += country.troops
             if country.radioactive == 0:
+                # A radioactive country yields nothing while it heals, helmets
+                # included (ReinforcementPhase._produce).
+                totals["helmets"] += country.troops
                 mult = income_multiplier(self, country, player)
                 amounts = {r: getattr(country, r) * mult for r in ("food", "wood", "steel", "oil", "nuclear")}
                 target = player
@@ -731,7 +1011,8 @@ class Engine:
         return totals
 
     def update_turn(self):
-        if self.settings_open:
+        self.hint_rows = 0  # stacked hint boxes drawn so far this frame
+        if self.settings_open or self.event_info_open:
             return  # frozen: drawing already happened in draw_gui
         if not self.turn_manager.dialog_active and not self.bot_turn:
             player = self.players[self.turn]
@@ -748,6 +1029,7 @@ class Engine:
             self._settings_button().draw(self.view, self.io)
             self._shop_button(outline_width=4).draw(self.view, self.io)
             self._card_button().draw(self.view, self.io)
+            self._event_button().draw(self.view, self.io)
 
     def control_card_menu(self):
         if self.modal_open or self.bot_turn:
@@ -758,6 +1040,12 @@ class Engine:
 
     def io_handle(self):
         self.io.update(self.view, self.countries.values())
+        shopper = self.players[self.turn]
+        if shopper.attack == 3 and shopper.subattack < 8:
+            # Shop menu open: the map behind it is inert (no hover panels,
+            # no country clicks); placing a bought item (subattack > 8)
+            # still needs the map.
+            self.io.hover_country = None
         self.view.offset = self.io.drag_map(self.view.offset)
 
     def get_players(self, mode="prompt"):

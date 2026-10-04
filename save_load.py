@@ -30,6 +30,10 @@ assets are queued in the asset-transport panel, a movement's partially
 dragged troop split -- is not preserved; the safe/idle entry point of
 whichever phase the player was in is used instead. In-progress rail
 redistribution pools are likewise not preserved and are simply cleared.
+The reinforcement phase's sub 0 is the turn start itself (feeding, income,
+reinforcements), so a save taken after it (`turn_started`) resumes at
+deploying, or at the starvation popup with the troops picked so far put
+back.
 """
 
 import json
@@ -117,6 +121,8 @@ def _player_to_dict(player):
         "developed_this_turn": player.developed_this_turn,
         "eliminated": player.eliminated,
         "is_bot": player.is_bot,
+        "bot_level": player.bot_level,
+        "bot_personality": player.bot_personality,
         # Cards only need their type (0-3); Kaertske re-derives everything
         # else (name, sprite, layout position) from that plus engine.images.
         "cards": [card.type for card in player.cards],
@@ -168,12 +174,18 @@ def save_game(engine, manager, path=AUTOSAVE_PATH, event_schedule_pending=False,
             "all_reinforcements_deployed": manager.all_reinforcements_deployed,
             "attacked": list(manager.attacked),
             "defending_tanks": dict(manager.defending_tanks),
+            "tank_fees": {k: list(v) for k, v in manager.tank_fees.items()},
             "landmarks_punished": sorted(manager.landmarks_punished),
             "conquered_enemy_this_turn": manager.conquered_enemy_this_turn,
             "pending_event_cards": manager.pending_event_cards,
             "initial_units": dict(manager.initial_units),
             "saved_attack": manager.saved_attack,
             "saved_subattack": manager.saved_subattack,
+            # So loading a reinforcement phase doesn't feed the army and
+            # pay the income twice (see ReinforcementPhase.update).
+            "turn_started": manager.turn_started,
+            "starved": manager.phases[0].starved,
+            "pending_troops": manager.pending_troops,
             # World events, saved by name (events and players alike) so
             # they survive round-trips even if EVENTS has changed since
             # the save was written (see load).
@@ -187,6 +199,7 @@ def save_game(engine, manager, path=AUTOSAVE_PATH, event_schedule_pending=False,
             "awaiting_gap": manager.awaiting_gap,
             "event_schedule_pending": event_schedule_pending,
         },
+        "action_log": [[[text, list(color)] for text, color in line] for line in engine.action_log[-100:]],
         "players": [_player_to_dict(p) for p in engine.players],
         "countries": {
             name: _country_to_dict(country, engine.default_player)
@@ -202,6 +215,15 @@ def save_game(engine, manager, path=AUTOSAVE_PATH, event_schedule_pending=False,
             for c in engine.connections
         ],
     }
+    # Saved while picking who starves (possibly from the shop opened
+    # there): loading resumes at the starvation popup, so the troops
+    # already taken off go back on.
+    current = engine.players[engine.turn]
+    state = (manager.saved_attack, manager.saved_subattack) if current.attack == 3 else \
+        (current.attack, current.subattack)
+    if state == (0, 4):
+        for name, units in manager.phases[0].starve_initial.items():
+            data["countries"][name]["units"] = units
     directory = os.path.dirname(path)
     if directory:
         os.makedirs(directory, exist_ok=True)
@@ -223,6 +245,7 @@ def load_game(path, engine, manager):
         text = text.replace(json.dumps(old_name)[1:-1], json.dumps(new_name)[1:-1])
         text = text.replace(old_name, new_name)
     data = json.loads(text)
+    engine._owner_snapshot = None  # loading changes owners without a sound
 
     # --- players ------------------------------------------------------
     new_players = []
@@ -247,6 +270,8 @@ def load_game(path, engine, manager):
         player.developed_this_turn = pdata.get("developed_this_turn", False)
         player.eliminated = pdata.get("eliminated", False)
         player.is_bot = pdata.get("is_bot", False)
+        player.bot_level = pdata.get("bot_level", player.bot_level)
+        player.bot_personality = pdata.get("bot_personality", player.bot_personality)
         player.cards = [Kaertske(card_type, images=engine.images) for card_type in pdata["cards"]]
         new_players.append(player)
     engine.players = new_players
@@ -299,6 +324,9 @@ def load_game(path, engine, manager):
 
     # --- turn / manager state ------------------------------------------
     engine.turn = data["turn"]["current_player_index"]
+    engine.action_log = [[[text, tuple(color)] for text, color in line] for line in data.get("action_log", [])]
+    engine.action_log_open = False
+    engine.action_scroll = 0
     engine.default_game = data.get("default_game", engine.default_game)
     # Settings toggles; keys missing from older saves keep their defaults.
     for key, value in data.get("settings", {}).items():
@@ -310,12 +338,20 @@ def load_game(path, engine, manager):
     manager.all_reinforcements_deployed = mdata["all_reinforcements_deployed"]
     manager.attacked = list(mdata["attacked"])
     manager.defending_tanks = dict(mdata.get("defending_tanks", {}))
+    manager.tank_fees = {k: tuple(v) for k, v in mdata.get("tank_fees", {}).items()
+                         if k in engine.countries and v[0] in engine.countries}
     manager.landmarks_punished = set(mdata.get("landmarks_punished", []))
     manager.conquered_enemy_this_turn = mdata["conquered_enemy_this_turn"]
     manager.pending_event_cards = mdata.get("pending_event_cards", 0)
     manager.initial_units = dict(mdata["initial_units"])
     manager.saved_attack = mdata["saved_attack"]
     manager.saved_subattack = mdata["saved_subattack"]
+    if (manager.saved_attack, manager.saved_subattack) == (0, 4):
+        manager.saved_subattack = 3  # starvation: back to the popup (see save_game)
+    # Old saves: the turn start runs again, as it always did.
+    manager.turn_started = mdata.get("turn_started", False)
+    manager.phases[0].starved = mdata.get("starved", 0)
+    manager.pending_troops = mdata.get("pending_troops", 0)
 
     # World events: resolve saved names back to Event objects. If any name
     # isn't found (EVENTS changed since the save was written), the whole

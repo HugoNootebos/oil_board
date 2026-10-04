@@ -6,120 +6,1519 @@
     "assets": false,
     "sea": true,
     "land": true,
-    "sea_route": true,
-    "tank": true,
-    "landmarks": true
+    "landmarks": true,
+    "fast_bots": false
   },
   "turn": {
     "current_player_index": 1,
-    "turn_num": 17
+    "turn_num": 11
   },
   "manager": {
     "reinforcements": 0,
     "all_reinforcements_deployed": true,
     "attacked": [
-      "Sovjet-Rusland",
-      "Kazachstan",
-      "Mongoli\u00eb",
-      "Mongoli\u00eb",
-      "Noord-Korea",
-      "China",
-      "India",
-      "India",
-      "Maleisi\u00eb"
+      "Belgisch Congo",
+      "Belgisch Congo",
+      "Belgisch Congo"
     ],
     "defending_tanks": {},
+    "tank_fees": {
+      "Zuid-Afrika": [
+        "Belgisch Congo",
+        0
+      ]
+    },
     "landmarks_punished": [],
     "conquered_enemy_this_turn": false,
     "pending_event_cards": 0,
     "initial_units": {
-      "Redneck": 3,
-      "Madagaskar": 2,
-      "Zuid-Afrika": 0,
-      "Belgisch Congo": 1,
+      "Redneck": 1,
+      "Madagaskar": 1,
+      "Zuid-Afrika": 1,
+      "Belgisch Congo": 2,
       "Somali\u00eb": 2,
-      "Nigeria": 1,
+      "Nigeria": 2,
       "Sahara": 2,
-      "IJsland": 1,
-      "Viking": 1,
-      "Sovjet-Rusland": 2,
-      "Belarus": 2,
+      "IJsland": 2,
+      "Viking": 2,
+      "Sovjet-Rusland": 1,
+      "Belarus": 1,
       "Nazi-Duitsland": 2,
-      "Romeinse Rijk": 2,
+      "Romeinse Rijk": 1,
       "Spanje": 1,
       "Londen": 1,
-      "Siberi\u00eb": 7,
-      "Kazachstan": 2,
-      "China": 2,
-      "Mongoli\u00eb": 1,
+      "Siberi\u00eb": 1,
+      "Kazachstan": 1,
+      "China": 1,
+      "Mongoli\u00eb": 2,
       "Noord-Korea": 1,
       "Maleisi\u00eb": 1,
-      "Sri Lanka": 4,
-      "India": 1,
-      "Ottomaanse Rijk": 2,
+      "Sri Lanka": 1,
+      "India": 2,
+      "Ottomaanse Rijk": 1,
       "Arabi\u00eb": 2,
-      "Japan": 3,
-      "Nederlands-Indi\u00eb": 1,
+      "Japan": 1,
+      "Nederlands-Indi\u00eb": 2,
       "Outback": 2,
-      "Gold Coast": 1,
-      "Papoea Nieuw Guinea": 1,
+      "Gold Coast": 2,
+      "Papoea Nieuw Guinea": 2,
       "Argentini\u00eb": 1,
-      "Venezuela": 5,
-      "Brazili\u00eb": 1,
-      "Peru": 5,
+      "Venezuela": 2,
+      "Brazili\u00eb": 2,
+      "Peru": 2,
       "Alaska": 2,
       "New York": 1,
       "Los Angeles": 2,
-      "Canada": 4,
-      "Mexico": 2,
+      "Canada": 8,
+      "Mexico": 1,
       "Groenland": 1,
-      "Cuba": 1,
+      "Cuba": 2,
       "Pearl Harbor": 1
     },
-    "saved_attack": 1,
+    "saved_attack": 0,
     "saved_subattack": 1,
-    "event_turn_index": 17,
+    "turn_started": false,
+    "starved": 0,
+    "pending_troops": 0,
+    "event_turn_index": 11,
     "event_bag": [
-      "goede economie",
-      "Slavernij",
-      "de nazi's breiden uit",
-      "drugs",
-      "japanse agressie",
-      "Ontwikkelingshulp",
-      "strenge winter",
-      "Einde van de mensheid",
       "covid",
-      "bedevaart",
-      "kinderarbeid",
-      "storm of zee",
+      "kindsoldaten",
       "Muur van Trump",
-      "Verkeerde knop",
-      "Eer van de keizer",
-      "klimaatverandering blijkt hoax",
       "ebola",
+      "kinderarbeid",
+      "maak van de VOC een deel 2",
+      "Eer van de keizer",
+      "Ontwikkelingshulp",
+      "bedevaart",
+      "inboorlingen vechten terug",
+      "storm of zee",
+      "Einde van de mensheid",
+      "klimaatverandering blijkt hoax",
+      "De Japanners worden gek",
       "nucleaire winter",
-      "plunderingen"
+      "Verkeerde knop",
+      "de nazi's breiden uit",
+      "Slavernij",
+      "goede economie",
+      "strenge winter",
+      "japanse agressie"
     ],
     "event_history": [
-      "maak van de VOC een deel 2",
-      "De Japanners worden gek",
-      "kindsoldaten",
-      "inboorlingen vechten terug"
+      "drugs",
+      "plunderingen"
     ],
-    "current_event": "inboorlingen vechten terug",
-    "event_state": {
-      "pending": []
-    },
+    "current_event": "plunderingen",
+    "event_state": {},
     "event_pending_players": [
-      "Joeri"
+      "Noes",
+      "Hitobot"
     ],
     "reveal_pool": [
-      "Hugo",
-      "Joeri"
+      "Noes",
+      "Hugo"
     ],
     "awaiting_gap": false,
     "event_schedule_pending": true
   },
+  "action_log": [
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " placed a ship in Siberi\u00eb",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " took Japan from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 1 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " took China from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 0 lost, 2 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " took Maleisi\u00eb from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 0 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " took Sovjet-Rusland from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 0 lost, 2 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " took Belarus from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 0 lost, 2 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " took Nazi-Duitsland from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 1 lost, 2 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " took Mongoli\u00eb from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 1 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        " in India: 2 lost, 0 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " took Spanje from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 0 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " started developing China",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        " took Romeinse Rijk from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 2 lost, 2 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        " took Belarus from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        ": 0 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        " took Sovjet-Rusland from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        ": 0 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        " took Siberi\u00eb from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        ": 0 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        " took Kazachstan from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 3 lost, 2 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        " took Mongoli\u00eb from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        ": 1 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        " started developing Romeinse Rijk",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        " moved 1 troops from Siberi\u00eb to Mongoli\u00eb",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " placed a ship in Zuid-Afrika",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " took Madagaskar from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 2 lost, 2 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " took Sri Lanka from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 2 lost, 2 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " took India from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 2 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " took China from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        ": 1 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        "'s ship was destroyed in China",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " forgot the pagoda: lost 3 troops in China",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Noes",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " took Redneck from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 2 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Noes",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " started developing New York",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Event: drugs",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " took Romeinse Rijk from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        ": 0 lost, 2 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " took Ottomaanse Rijk from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        ": 0 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " took Kazachstan from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        ": 0 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " started developing Japan",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " moved 1 troops from Spanje to Kazachstan",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        " took Romeinse Rijk from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        ": 1 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " took Maleisi\u00eb from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        ": 1 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " moved: -2 Maleisi\u00eb, +2 China",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " started developing Sri Lanka",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " forgot the pagoda: lost 3 troops in China",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Noes",
+        [
+          115,
+          193,
+          134
+        ]
+      ],
+      [
+        " took Canada from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        ": 7 lost, 2 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " took India from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        ": 0 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        "'s ship was destroyed in India",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        " took China from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        ": 0 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Event: plunderingen",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        " took China from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        ": 0 lost, 3 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        " took India from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        ": 1 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        " took Ottomaanse Rijk from ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "Hitobot",
+        [
+          225,
+          115,
+          115
+        ]
+      ],
+      [
+        ": 1 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "dumbbot",
+        [
+          245,
+          160,
+          199
+        ]
+      ],
+      [
+        " started developing Siberi\u00eb",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " built a fort in Sri Lanka",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ],
+    [
+      [
+        "Hugo",
+        [
+          128,
+          160,
+          238
+        ]
+      ],
+      [
+        " attacked ",
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      [
+        "mouse",
+        [
+          180,
+          180,
+          180
+        ]
+      ],
+      [
+        " in Belgisch Congo: 4 lost, 1 defeated",
+        [
+          255,
+          255,
+          255
+        ]
+      ]
+    ]
+  ],
   "players": [
     {
       "name": "Hugo",
@@ -128,59 +1527,60 @@
         110.0,
         230.0
       ],
-      "food": 20,
-      "wood": 6,
+      "food": 58,
+      "wood": 0,
       "steel": 0,
-      "nuclear": 3,
-      "oil": 15,
-      "troops": 2,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 4,
       "attack": 0,
       "boat_to_deploy": false,
-      "repositioned_this_turn": true,
+      "repositioned_this_turn": false,
       "developed_this_turn": false,
       "eliminated": false,
       "is_bot": false,
+      "bot_level": "normal",
+      "bot_personality": "balanced",
       "cards": [
+        0,
         0
       ]
     },
     {
-      "name": "Joeri",
+      "name": "Noes",
       "color": [
         40.0,
         160.0,
         70.0
       ],
-      "food": 46,
-      "wood": 5,
-      "steel": 6,
-      "nuclear": 3,
-      "oil": 31,
-      "troops": 5,
+      "food": 28,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 3,
       "attack": 0,
-      "boat_to_deploy": false,
-      "repositioned_this_turn": true,
+      "boat_to_deploy": true,
+      "repositioned_this_turn": false,
       "developed_this_turn": false,
       "eliminated": false,
       "is_bot": false,
-      "cards": [
-        1,
-        3,
-        3
-      ]
+      "bot_level": "normal",
+      "bot_personality": "balanced",
+      "cards": []
     },
     {
-      "name": "Visnet",
+      "name": "Hitobot",
       "color": [
         210.0,
         40.0,
         40.0
       ],
-      "food": 4,
-      "wood": 6,
+      "food": 36,
+      "wood": 2,
       "steel": 4,
-      "nuclear": 8,
-      "oil": 8,
+      "nuclear": 1,
+      "oil": 2,
       "troops": 4,
       "attack": 0,
       "boat_to_deploy": false,
@@ -188,19 +1588,51 @@
       "developed_this_turn": false,
       "eliminated": false,
       "is_bot": true,
-      "cards": []
+      "bot_level": "hard",
+      "bot_personality": "aggressive",
+      "cards": [
+        0,
+        3
+      ]
+    },
+    {
+      "name": "dumbbot",
+      "color": [
+        240.0,
+        110.0,
+        170.0
+      ],
+      "food": 39,
+      "wood": 4,
+      "steel": 3,
+      "nuclear": 0,
+      "oil": 3,
+      "troops": 4,
+      "attack": 0,
+      "boat_to_deploy": true,
+      "repositioned_this_turn": false,
+      "developed_this_turn": true,
+      "eliminated": false,
+      "is_bot": true,
+      "bot_level": "hard",
+      "bot_personality": "turtle",
+      "cards": [
+        3,
+        2,
+        1
+      ]
     }
   ],
   "countries": {
     "Redneck": {
-      "owner": "Joeri",
+      "owner": "Noes",
       "food": 0,
       "wood": 0,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
       "troops": 3,
-      "units": 3,
+      "units": 1,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -214,35 +1646,14 @@
       "voc_weakened": false
     },
     "Madagaskar": {
-      "owner": "__default_player__",
+      "owner": "Hugo",
       "food": 1,
       "wood": 2,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
       "troops": 1,
-      "units": 2,
-      "ships": 0,
-      "planes": 0,
-      "tanks": 0,
-      "fort_lvl": 0,
-      "radioactive": 0,
-      "developed": true,
-      "airport": true,
-      "dormant_owner": "Hugo",
-      "bombed_by": null,
-      "landmark_owner": null,
-      "voc_weakened": false
-    },
-    "Zuid-Afrika": {
-      "owner": "__default_player__",
-      "food": 1,
-      "wood": 0,
-      "steel": 0,
-      "nuclear": 0,
-      "oil": 0,
-      "troops": 2,
-      "units": 0,
+      "units": 1,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -250,6 +1661,27 @@
       "radioactive": 0,
       "developed": false,
       "airport": false,
+      "dormant_owner": null,
+      "bombed_by": null,
+      "landmark_owner": null,
+      "voc_weakened": false
+    },
+    "Zuid-Afrika": {
+      "owner": "Hugo",
+      "food": 1,
+      "wood": 0,
+      "steel": 0,
+      "nuclear": 0,
+      "oil": 0,
+      "troops": 2,
+      "units": 1,
+      "ships": 0,
+      "planes": 0,
+      "tanks": 0,
+      "fort_lvl": 0,
+      "radioactive": 0,
+      "developed": false,
+      "airport": true,
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
@@ -305,7 +1737,7 @@
       "nuclear": 0,
       "oil": 0,
       "troops": 3,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -340,14 +1772,14 @@
       "voc_weakened": false
     },
     "IJsland": {
-      "owner": "Joeri",
+      "owner": "__default_player__",
       "food": 0,
       "wood": 2,
       "steel": 0,
       "nuclear": 0,
       "oil": 1,
       "troops": 1,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -373,23 +1805,23 @@
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
-      "radioactive": 3,
+      "radioactive": 0,
       "developed": false,
-      "airport": true,
+      "airport": false,
       "dormant_owner": null,
-      "bombed_by": "Hugo",
+      "bombed_by": null,
       "landmark_owner": null,
       "voc_weakened": false
     },
     "Sovjet-Rusland": {
-      "owner": "__default_player__",
+      "owner": "dumbbot",
       "food": 0,
       "wood": 1,
       "steel": 0,
       "nuclear": 0,
       "oil": 1,
       "troops": 3,
-      "units": 2,
+      "units": 1,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -403,14 +1835,14 @@
       "voc_weakened": false
     },
     "Belarus": {
-      "owner": "__default_player__",
+      "owner": "dumbbot",
       "food": 4,
       "wood": 1,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
       "troops": 0,
-      "units": 2,
+      "units": 1,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -424,7 +1856,7 @@
       "voc_weakened": false
     },
     "Nazi-Duitsland": {
-      "owner": "__default_player__",
+      "owner": "Hitobot",
       "food": 1,
       "wood": 0,
       "steel": 2,
@@ -445,20 +1877,20 @@
       "voc_weakened": false
     },
     "Romeinse Rijk": {
-      "owner": "__default_player__",
+      "owner": "dumbbot",
       "food": 4,
       "wood": 0,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
       "troops": 0,
-      "units": 2,
+      "units": 1,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": false,
+      "developed": true,
       "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
@@ -466,7 +1898,7 @@
       "voc_weakened": false
     },
     "Spanje": {
-      "owner": "Joeri",
+      "owner": "Hitobot",
       "food": 2,
       "wood": 0,
       "steel": 0,
@@ -487,7 +1919,7 @@
       "voc_weakened": false
     },
     "Londen": {
-      "owner": "Joeri",
+      "owner": "__default_player__",
       "food": 2,
       "wood": 1,
       "steel": 0,
@@ -508,7 +1940,7 @@
       "voc_weakened": false
     },
     "Siberi\u00eb": {
-      "owner": "Hugo",
+      "owner": "dumbbot",
       "food": 1,
       "wood": 0,
       "steel": 1,
@@ -521,15 +1953,15 @@
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": false,
-      "airport": false,
-      "dormant_owner": null,
+      "developed": true,
+      "airport": true,
+      "dormant_owner": "dumbbot",
       "bombed_by": null,
       "landmark_owner": null,
       "voc_weakened": false
     },
     "Kazachstan": {
-      "owner": "Hugo",
+      "owner": "Hitobot",
       "food": 1,
       "wood": 0,
       "steel": 0,
@@ -550,35 +1982,35 @@
       "voc_weakened": false
     },
     "China": {
-      "owner": "__default_player__",
+      "owner": "dumbbot",
       "food": 8,
       "wood": 0,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
       "troops": 0,
-      "units": 4,
+      "units": 1,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": false,
+      "developed": true,
       "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
-      "landmark_owner": null,
+      "landmark_owner": "dumbbot",
       "voc_weakened": false
     },
     "Mongoli\u00eb": {
-      "owner": "__default_player__",
+      "owner": "dumbbot",
       "food": 1,
       "wood": 0,
       "steel": 1,
       "nuclear": 0,
       "oil": 0,
       "troops": 1,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -592,7 +2024,7 @@
       "voc_weakened": false
     },
     "Noord-Korea": {
-      "owner": "Hugo",
+      "owner": "__default_player__",
       "food": 0,
       "wood": 0,
       "steel": 0,
@@ -613,7 +2045,7 @@
       "voc_weakened": false
     },
     "Maleisi\u00eb": {
-      "owner": "Hugo",
+      "owner": "__default_player__",
       "food": 1,
       "wood": 2,
       "steel": 0,
@@ -645,7 +2077,7 @@
       "ships": 0,
       "planes": 0,
       "tanks": 0,
-      "fort_lvl": 2,
+      "fort_lvl": 1,
       "radioactive": 0,
       "developed": true,
       "airport": false,
@@ -655,7 +2087,7 @@
       "voc_weakened": false
     },
     "India": {
-      "owner": "Hugo",
+      "owner": "dumbbot",
       "food": 1,
       "wood": 1,
       "steel": 0,
@@ -663,7 +2095,7 @@
       "oil": 0,
       "troops": 1,
       "units": 2,
-      "ships": 1,
+      "ships": 0,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
@@ -676,21 +2108,21 @@
       "voc_weakened": false
     },
     "Ottomaanse Rijk": {
-      "owner": "__default_player__",
+      "owner": "dumbbot",
       "food": 2,
       "wood": 0,
       "steel": 0,
       "nuclear": 0,
       "oil": 1,
       "troops": 1,
-      "units": 2,
+      "units": 1,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
       "developed": false,
-      "airport": false,
+      "airport": true,
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
@@ -718,35 +2150,35 @@
       "voc_weakened": false
     },
     "Japan": {
-      "owner": "__default_player__",
+      "owner": "Hitobot",
       "food": 1,
       "wood": 1,
       "steel": 1,
       "nuclear": 0,
       "oil": 0,
       "troops": 0,
-      "units": 3,
+      "units": 1,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": false,
+      "developed": true,
       "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
-      "landmark_owner": null,
+      "landmark_owner": "Hitobot",
       "voc_weakened": false
     },
     "Nederlands-Indi\u00eb": {
-      "owner": "Hugo",
+      "owner": "__default_player__",
       "food": 1,
       "wood": 2,
       "steel": 1,
       "nuclear": 0,
       "oil": 0,
       "troops": 0,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -773,7 +2205,7 @@
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": true,
+      "developed": false,
       "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
@@ -781,20 +2213,20 @@
       "voc_weakened": false
     },
     "Gold Coast": {
-      "owner": "Hugo",
+      "owner": "__default_player__",
       "food": 1,
       "wood": 0,
       "steel": 2,
       "nuclear": 0,
       "oil": 0,
       "troops": 1,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": true,
+      "developed": false,
       "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
@@ -809,7 +2241,7 @@
       "nuclear": 0,
       "oil": 0,
       "troops": 1,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -823,7 +2255,7 @@
       "voc_weakened": false
     },
     "Argentini\u00eb": {
-      "owner": "Visnet",
+      "owner": "__default_player__",
       "food": 1,
       "wood": 0,
       "steel": 2,
@@ -836,7 +2268,7 @@
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": true,
+      "developed": false,
       "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
@@ -844,20 +2276,20 @@
       "voc_weakened": false
     },
     "Venezuela": {
-      "owner": "Visnet",
+      "owner": "__default_player__",
       "food": 0,
       "wood": 0,
       "steel": 3,
       "nuclear": 1,
       "oil": 0,
       "troops": 1,
-      "units": 5,
+      "units": 2,
       "ships": 0,
       "planes": 0,
-      "tanks": 1,
+      "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": true,
+      "developed": false,
       "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
@@ -865,20 +2297,20 @@
       "voc_weakened": false
     },
     "Brazili\u00eb": {
-      "owner": "Visnet",
+      "owner": "__default_player__",
       "food": 0,
       "wood": 3,
       "steel": 1,
       "nuclear": 0,
       "oil": 0,
       "troops": 0,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": true,
+      "developed": false,
       "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
@@ -893,7 +2325,7 @@
       "nuclear": 0,
       "oil": 0,
       "troops": 1,
-      "units": 5,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -907,7 +2339,7 @@
       "voc_weakened": false
     },
     "Alaska": {
-      "owner": "Joeri",
+      "owner": "__default_player__",
       "food": 1,
       "wood": 0,
       "steel": 1,
@@ -928,7 +2360,7 @@
       "voc_weakened": false
     },
     "New York": {
-      "owner": "Joeri",
+      "owner": "Noes",
       "food": 4,
       "wood": 0,
       "steel": 0,
@@ -941,15 +2373,15 @@
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": false,
-      "airport": false,
+      "developed": true,
+      "airport": true,
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
       "voc_weakened": false
     },
     "Los Angeles": {
-      "owner": "Joeri",
+      "owner": "__default_player__",
       "food": 2,
       "wood": 1,
       "steel": 0,
@@ -970,20 +2402,20 @@
       "voc_weakened": false
     },
     "Canada": {
-      "owner": "__default_player__",
+      "owner": "Noes",
       "food": 0,
       "wood": 2,
       "steel": 0,
       "nuclear": 1,
       "oil": 1,
       "troops": 0,
-      "units": 4,
+      "units": 8,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
       "fort_lvl": 0,
       "radioactive": 0,
-      "developed": true,
+      "developed": false,
       "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
@@ -991,14 +2423,14 @@
       "voc_weakened": false
     },
     "Mexico": {
-      "owner": "Visnet",
+      "owner": "__default_player__",
       "food": 1,
       "wood": 1,
       "steel": 0,
       "nuclear": 0,
       "oil": 0,
       "troops": 1,
-      "units": 2,
+      "units": 1,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -1012,7 +2444,7 @@
       "voc_weakened": false
     },
     "Groenland": {
-      "owner": "Joeri",
+      "owner": "__default_player__",
       "food": 2,
       "wood": 0,
       "steel": 0,
@@ -1040,7 +2472,7 @@
       "nuclear": 0,
       "oil": 0,
       "troops": 1,
-      "units": 1,
+      "units": 2,
       "ships": 0,
       "planes": 0,
       "tanks": 0,
@@ -1054,7 +2486,7 @@
       "voc_weakened": false
     },
     "Pearl Harbor": {
-      "owner": "Visnet",
+      "owner": "__default_player__",
       "food": 0,
       "wood": 0,
       "steel": 0,
@@ -1068,7 +2500,7 @@
       "fort_lvl": 0,
       "radioactive": 0,
       "developed": false,
-      "airport": true,
+      "airport": false,
       "dormant_owner": null,
       "bombed_by": null,
       "landmark_owner": null,
@@ -1076,51 +2508,6 @@
     }
   },
   "connections": [
-    {
-      "between": [
-        "Nigeria",
-        "Zuid-Afrika"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "India",
-        "Sri Lanka"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Kazachstan",
-        "Sovjet-Rusland"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Japan",
-        "Pearl Harbor"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "India",
-        "Kazachstan"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
     {
       "between": [
         "Los Angeles",
@@ -1132,8 +2519,17 @@
     },
     {
       "between": [
-        "Siberi\u00eb",
-        "Sovjet-Rusland"
+        "Londen",
+        "Spanje"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "China",
+        "Noord-Korea"
       ],
       "kind": "land",
       "rails": false,
@@ -1141,8 +2537,17 @@
     },
     {
       "between": [
-        "Kazachstan",
-        "Ottomaanse Rijk"
+        "Alaska",
+        "Los Angeles"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Brazili\u00eb",
+        "Peru"
       ],
       "kind": "land",
       "rails": false,
@@ -1150,8 +2555,8 @@
     },
     {
       "between": [
-        "Canada",
-        "Groenland"
+        "Cuba",
+        "New York"
       ],
       "kind": "sea",
       "rails": false,
@@ -1160,7 +2565,7 @@
     {
       "between": [
         "Argentini\u00eb",
-        "Brazili\u00eb"
+        "Peru"
       ],
       "kind": "land",
       "rails": false,
@@ -1168,10 +2573,55 @@
     },
     {
       "between": [
-        "China",
-        "Mongoli\u00eb"
+        "Canada",
+        "Los Angeles"
       ],
       "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Belarus",
+        "Nazi-Duitsland"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Mexico",
+        "Redneck"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Londen",
+        "Viking"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "India",
+        "Nederlands-Indi\u00eb"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Japan",
+        "Papoea Nieuw Guinea"
+      ],
+      "kind": "sea",
       "rails": false,
       "temporary": false
     },
@@ -1186,107 +2636,17 @@
     },
     {
       "between": [
+        "Nazi-Duitsland",
+        "Viking"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
         "Canada",
-        "Redneck"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Argentini\u00eb",
-        "Peru"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "China",
-        "India"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Ottomaanse Rijk",
-        "Sahara"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "New York",
-        "Redneck"
-      ],
-      "kind": "land",
-      "rails": true,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Brazili\u00eb",
-        "Peru"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "China",
-        "Noord-Korea"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Nigeria",
-        "Spanje"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Londen",
-        "New York"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Brazili\u00eb",
-        "Venezuela"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Mongoli\u00eb",
-        "Noord-Korea"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Sahara",
-        "Spanje"
+        "Groenland"
       ],
       "kind": "sea",
       "rails": false,
@@ -1303,8 +2663,8 @@
     },
     {
       "between": [
-        "Peru",
-        "Venezuela"
+        "Nazi-Duitsland",
+        "Spanje"
       ],
       "kind": "land",
       "rails": false,
@@ -1312,28 +2672,73 @@
     },
     {
       "between": [
-        "China",
-        "Japan"
+        "India",
+        "Sri Lanka"
       ],
-      "kind": "land",
+      "kind": "sea",
       "rails": false,
       "temporary": false
     },
     {
       "between": [
-        "Romeinse Rijk",
-        "Sahara"
+        "IJsland",
+        "Londen"
       ],
-      "kind": "land",
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Gold Coast",
+        "Papoea Nieuw Guinea"
+      ],
+      "kind": "sea",
       "rails": false,
       "temporary": false
     },
     {
       "between": [
         "Cuba",
-        "New York"
+        "Venezuela"
       ],
       "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Argentini\u00eb",
+        "Brazili\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Ottomaanse Rijk",
+        "Romeinse Rijk"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Arabi\u00eb",
+        "India"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Kazachstan",
+        "Mongoli\u00eb"
+      ],
+      "kind": "land",
       "rails": false,
       "temporary": false
     },
@@ -1348,26 +2753,8 @@
     },
     {
       "between": [
-        "Japan",
-        "Noord-Korea"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Nazi-Duitsland",
-        "Spanje"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Cuba",
-        "Venezuela"
+        "Sovjet-Rusland",
+        "Viking"
       ],
       "kind": "sea",
       "rails": false,
@@ -1375,8 +2762,8 @@
     },
     {
       "between": [
-        "Belgisch Congo",
-        "Nigeria"
+        "Alaska",
+        "Canada"
       ],
       "kind": "land",
       "rails": false,
@@ -1384,26 +2771,8 @@
     },
     {
       "between": [
-        "Japan",
-        "Siberi\u00eb"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Nazi-Duitsland",
-        "Romeinse Rijk"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Cuba",
-        "Mexico"
+        "Londen",
+        "New York"
       ],
       "kind": "sea",
       "rails": false,
@@ -1411,7 +2780,7 @@
     },
     {
       "between": [
-        "Belgisch Congo",
+        "Sahara",
         "Somali\u00eb"
       ],
       "kind": "land",
@@ -1429,8 +2798,152 @@
     },
     {
       "between": [
-        "Belarus",
+        "Belgisch Congo",
+        "Zuid-Afrika"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "India",
+        "Kazachstan"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Londen",
+        "Nazi-Duitsland"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Madagaskar",
+        "Zuid-Afrika"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Gold Coast",
+        "Outback"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Nazi-Duitsland",
         "Romeinse Rijk"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Madagaskar",
+        "Somali\u00eb"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Arabi\u00eb",
+        "Sahara"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Peru",
+        "Venezuela"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "New York",
+        "Redneck"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "China",
+        "Mongoli\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "IJsland",
+        "Viking"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Kazachstan",
+        "Sovjet-Rusland"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Siberi\u00eb",
+        "Sovjet-Rusland"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "China",
+        "India"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Japan",
+        "Siberi\u00eb"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Mexico",
+        "Venezuela"
       ],
       "kind": "land",
       "rails": false,
@@ -1456,8 +2969,8 @@
     },
     {
       "between": [
-        "India",
-        "Maleisi\u00eb"
+        "Belgisch Congo",
+        "Somali\u00eb"
       ],
       "kind": "land",
       "rails": false,
@@ -1465,28 +2978,10 @@
     },
     {
       "between": [
-        "Londen",
-        "Spanje"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Canada",
-        "Los Angeles"
+        "Brazili\u00eb",
+        "Venezuela"
       ],
       "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Maleisi\u00eb",
-        "Nederlands-Indi\u00eb"
-      ],
-      "kind": "sea",
       "rails": false,
       "temporary": false
     },
@@ -1501,8 +2996,8 @@
     },
     {
       "between": [
-        "Londen",
-        "Nazi-Duitsland"
+        "Sahara",
+        "Spanje"
       ],
       "kind": "sea",
       "rails": false,
@@ -1510,7 +3005,7 @@
     },
     {
       "between": [
-        "Mexico",
+        "Canada",
         "Redneck"
       ],
       "kind": "land",
@@ -1519,26 +3014,8 @@
     },
     {
       "between": [
-        "Nederlands-Indi\u00eb",
-        "Outback"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Londen",
-        "Viking"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Mexico",
-        "Venezuela"
+        "Mongoli\u00eb",
+        "Noord-Korea"
       ],
       "kind": "land",
       "rails": false,
@@ -1546,8 +3023,8 @@
     },
     {
       "between": [
-        "Madagaskar",
-        "Zuid-Afrika"
+        "Japan",
+        "Noord-Korea"
       ],
       "kind": "sea",
       "rails": false,
@@ -1556,6 +3033,24 @@
     {
       "between": [
         "India",
+        "Maleisi\u00eb"
+      ],
+      "kind": "land",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Ottomaanse Rijk",
+        "Sahara"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Maleisi\u00eb",
         "Nederlands-Indi\u00eb"
       ],
       "kind": "sea",
@@ -1564,17 +3059,8 @@
     },
     {
       "between": [
-        "Nazi-Duitsland",
-        "Viking"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Sovjet-Rusland",
-        "Viking"
+        "Madagaskar",
+        "Sri Lanka"
       ],
       "kind": "sea",
       "rails": false,
@@ -1583,7 +3069,7 @@
     {
       "between": [
         "Belgisch Congo",
-        "Zuid-Afrika"
+        "Nigeria"
       ],
       "kind": "land",
       "rails": false,
@@ -1591,8 +3077,8 @@
     },
     {
       "between": [
-        "Gold Coast",
-        "Outback"
+        "Kazachstan",
+        "Ottomaanse Rijk"
       ],
       "kind": "land",
       "rails": false,
@@ -1600,8 +3086,26 @@
     },
     {
       "between": [
-        "IJsland",
-        "Viking"
+        "Arabi\u00eb",
+        "Somali\u00eb"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Alaska",
+        "Siberi\u00eb"
+      ],
+      "kind": "sea",
+      "rails": false,
+      "temporary": false
+    },
+    {
+      "between": [
+        "Japan",
+        "Pearl Harbor"
       ],
       "kind": "sea",
       "rails": false,
@@ -1618,52 +3122,7 @@
     },
     {
       "between": [
-        "Madagaskar",
-        "Sri Lanka"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Gold Coast",
-        "Papoea Nieuw Guinea"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "IJsland",
-        "Londen"
-      ],
-      "kind": "sea",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Madagaskar",
-        "Somali\u00eb"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Japan",
-        "Papoea Nieuw Guinea"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Ottomaanse Rijk",
+        "Belarus",
         "Romeinse Rijk"
       ],
       "kind": "land",
@@ -1672,17 +3131,8 @@
     },
     {
       "between": [
-        "Arabi\u00eb",
-        "Somali\u00eb"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Alaska",
-        "Siberi\u00eb"
+        "Cuba",
+        "Mexico"
       ],
       "kind": "sea",
       "rails": false,
@@ -1690,53 +3140,8 @@
     },
     {
       "between": [
-        "Belarus",
-        "Nazi-Duitsland"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Sahara",
-        "Somali\u00eb"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Alaska",
-        "Canada"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Belarus",
-        "Ottomaanse Rijk"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Arabi\u00eb",
-        "Sahara"
-      ],
-      "kind": "land",
-      "rails": false,
-      "temporary": false
-    },
-    {
-      "between": [
-        "Alaska",
-        "Los Angeles"
+        "Nederlands-Indi\u00eb",
+        "Outback"
       ],
       "kind": "sea",
       "rails": false,
@@ -1744,17 +3149,17 @@
     },
     {
       "between": [
-        "Kazachstan",
-        "Mongoli\u00eb"
+        "China",
+        "Japan"
       ],
-      "kind": "land",
+      "kind": "sea",
       "rails": false,
       "temporary": false
     },
     {
       "between": [
-        "Arabi\u00eb",
-        "India"
+        "Nigeria",
+        "Spanje"
       ],
       "kind": "sea",
       "rails": false,

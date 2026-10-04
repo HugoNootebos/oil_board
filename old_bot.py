@@ -100,85 +100,6 @@ BASE = {
     "horizon": 3,             # turns a conquered country's income is counted for
     "develop_horizon": 4,     # turns a development is expected to pay out
     "hold_weak_sets": True,   # keep a card set worth less than 10 unless it's needed
-    # How likely a country is to be taken before the bot's next turn (_danger).
-    # 0: only the stacks next to it count, over sea only with a ship or plane
-    # in place. 1: also chains (an enemy takes a country on the way and
-    # strikes from there: half of all losses), sea strikes the enemy can still
-    # buy a crossing for, and enemies that have not moved yet.
-    "exposure": 1,
-    "chain_weight": 0.5,      # a strike out of a country the enemy conquers on the way counts this much
-    "chain_depth": 2,         # conquests an enemy chains on the way
-    "chain_min_win": 0.25,    # ... each of them at least this likely
-    "chain_sea_weight": 0.5,  # a chain whose last hop is over sea counts this much of that
-    "chain_buy_weight": 0.4,  # ... and this much per crossing the enemy still has to buy
-    "sea_buy_weight": 0.2,    # a sea strike the enemy can buy a crossing for counts this much
-    "exposure_scale": 1.0,    # scales enemy_aggression for all of the above
-    # 1: the chance of being wiped out (_elimination_risk) comes from the same
-    # exposure of every country (all of them have to fall) instead of from
-    # neighbours that border every part of the bot's territory -- which missed
-    # chains: players down to 3 countries rated safe were wiped out 14% of the
-    # time. Needs "exposure". 0: the old model.
-    "risk_exposure": 0,
-    # What a conquest is worth only counts while it is kept (_target_value),
-    # with e the exposure of the country held by conquest_garrison troops.
-    # 1: its income counts for the sum of (1-e)^k over the horizon instead of
-    # the whole horizon (a country about to be lost yields nothing). 2: the
-    # value without the card is multiplied by 1 - retention_weight x e. 0: off.
-    # Needs "exposure".
-    "retention": 1,
-    "retention_weight": 1.0,
-    "conquest_garrison": 2,
-    # The strike step (_strike_step): at the start of the reinforcement phase,
-    # against a player down to hunt_max_countries countries, the cheapest mix
-    # of nukes, card sets, a crossing and massing the new troops that makes
-    # taking all their countries this turn worth it -- by the measure _hunt
-    # uses -- is bought and played before trade, deploy and shop. 0: off.
-    # (Saving resources up for it does not pay: holding a stock back cost as
-    # much as it gained, a card set cannot wait more than ~2 turns, and a
-    # nuke's worth of nuclear is at hand in a third of all turns anyway.)
-    "strike": 1,
-    "strike_min_net": 1.0,    # worth at least this, after what it costs
-    "strike_max_nukes": 3,
-    "strike_max_tanks": 0,    # tanks bought for it (2 tanks add ~4 points of chance: not worth it)
-    "strike_place": 0,        # 1: also plans that only mass the new troops (no nuke, set or crossing)
-    "strike_troop_cost": 0.5, # per new troop taken off the borders
-    "strike_filter": 0.15,    # skip players the best case gives less than this chance against
-    # A player whose nukes can bring every country of a player to nothing (it takes
-    # floor(log2 troops) + 1 nukes per country) does so, up to this many nukes: a
-    # sure elimination. 0: off.
-    "finish_max": 8,
-    "loot_card": 3.0,         # a card in an eliminated player's loot, in troops (measured ~4.2)
-    "rival_value": 6.0,       # an elimination's prize on top of the loot: one rival less
-    # Endgame (_endgame): the leader, once at most endgame_alive players are left
-    # or it holds endgame_lead of all strength, spends: the shop's price factor
-    # is multiplied by endgame_price (0: buy anything that is worth something)
-    # and weak card sets are traded at once. Only the leader has stock left at
-    # the end (a trailer's survival logic already spends everything). 0 / 1.1: off.
-    "endgame_alive": 2,
-    "endgame_lead": 0.70,
-    "endgame_price": 0.0,
-    # Conquests after the turn's card (_attack_ev): each costs the exposure it
-    # creates -- the troops stranded on it and the card handed to whoever takes
-    # it back (extra_gift), and the origin stack left weaker (extra_origin) --
-    # times extra_exposure. The card conquest and mouse land stay free (pricing
-    # them cut card turns by 13-19 points for nothing). Needs "exposure"; pays
-    # only when all bots do it (a lone restrained bot loses ground). 0: off.
-    "extra_exposure": 0.0,
-    "extra_origin": 1.0,
-    "extra_gift": 0.3,
-    # Emptying a thin country on purpose (_buffer_run): its troops walk to another
-    # country and it goes back to the mouse with its native 1-2 troops, which
-    # gives whoever takes it no card. Measured: about worth nothing under the
-    # current rules (the mouse garrison is too thin a wall, and what is saved
-    # is almost exactly what is lost), so it ships off (0).
-    "buffer": 0,
-    "buffer_max_units": 2,       # only countries holding at most this many troops
-    "buffer_min_exposure": 0.5,  # ... that are probably lost anyway (_danger)
-    "buffer_card_value": 4.2,    # what a card is worth, in troops
-    "buffer_card_weight": 0.4,   # how much of the card the taker would have earned counts
-    "buffer_min_gain": 1.0,      # the gain it has to show
-    "buffer_keep": 3,            # the bot keeps at least this many countries
-    "buffer_cool": 2,            # rounds the bot leaves an emptied country alone, while it is exposed
     "noise": 0.0,             # how much its choices are off, at random (0: never)
 }
 LEVELS = {
@@ -187,16 +108,14 @@ LEVELS = {
     # underestimates threats, never shuffles troops by rail or air and
     # holds on to its resources.
     "normal": dict(BASE, noise=0.4, follow_discount=0.3, enemy_aggression=0.6, hunt_min_p=0.5,
-                   reposition_min_gain=2.0, redistribute_min_gain=99.0, price_factor=1.3,
-                   exposure=0, retention=0, strike=0, finish_max=0, endgame_alive=0, endgame_lead=1.1),
+                   reposition_min_gain=2.0, redistribute_min_gain=99.0, price_factor=1.3),
     # Mostly picks at random among what looks good, only attacks sure
     # things, barely sees threats coming (not even its own end), never plans
     # ahead, never hunts anyone down and rarely buys anything.
     "easy": dict(BASE, noise=0.8, attack_min_p=0.75, free_attack_min_p=0.6, kill_value=0.2,
                  enemy_aggression=0.3, follow_discount=0.0, hunt_min_p=1.1, hold_weak_sets=False,
                  price_factor=2.0, reposition_min_gain=4.0, redistribute_min_gain=99.0,
-                 survival_value=0.0, survival_weight=0.0, exposure=0, retention=0, strike=0, finish_max=0,
-                 endgame_alive=0, endgame_lead=1.1),
+                 survival_value=0.0, survival_weight=0.0),
 }
 DEFAULT_LEVEL = "normal"
 
@@ -266,29 +185,6 @@ def conquer_probability(attackers, defenders, mods=(0, 0, 0, 0)):
     return battle(attackers, defenders, mods)[0]
 
 
-def card_sets(cards):
-    """The base value of every set of cards that could be traded now (a
-    mirror of CardMenu.use_cards_automatic): 10 for three different, 2m + 4
-    for three of type m; a Joker (3) counts as any."""
-    types = [c.type for c in cards]
-    bases = []
-    while len(types) >= 3:
-        same = [i for i in range(3) if sum(1 for t in types if t in (i, 3)) >= 3]
-        different = len(set(t for t in types if t != 3)) + sum(1 for t in types if t == 3) >= 3
-        if different:
-            for i in range(3):
-                types.remove(i if i in types else 3)
-            bases.append(10)
-        elif same:
-            m = max(same)
-            for _ in range(3):
-                types.remove(m if m in types else 3)
-            bases.append(2 * m + 4)
-        else:
-            break
-    return bases
-
-
 def bot_params(player):
     """`player`'s tunables: their level's (LEVELS), shifted by their
     personality (PERSONALITIES)."""
@@ -317,11 +213,6 @@ class BotController:
         self._turn_key = None
         self._done = set()     # things already dealt with this turn
         self._failed = set()   # attacks (from, to) that didn't start or were called off
-        self._endgame_params = {}  # level params -> the same with the endgame's changes
-        self._risk_frozen = None   # while set, _elimination_risk is this (see _buffer_best)
-        self._vacated = {}         # country -> turn_num the bot emptied it on purpose
-        self._strike_turn = None   # (turn, player) the strike queue is for
-        self._strike_queue = None  # what's left of this turn's strike, one action a step
         # What the bot is doing, shown at the bottom of the screen during
         # its turn (see _say).
         self.status = ""
@@ -398,39 +289,8 @@ class BotController:
     @property
     def params(self):
         """The deciding bot's tunables: its level's, shifted by its
-        personality -- and, for the leader once the game is nearly over, the
-        endgame's (see _endgame)."""
-        base = bot_params(self.player)
-        if not self._endgame():
-            return base
-        overlay = self._endgame_params.get(id(base))
-        if overlay is None:
-            overlay = dict(base, price_factor=base["price_factor"] * base["endgame_price"], hold_weak_sets=False)
-            self._endgame_params[id(base)] = overlay
-        return overlay
-
-    def _endgame(self):
-        """Whether the deciding bot is the strongest player (strength: 3 a
-        country plus its troops) at a time the game is nearly over: at most
-        endgame_alive players left, or a share of all strength of at least
-        endgame_lead. Measured: alive <= 2 comes 4-6 rounds before the end
-        (94% of games), the share is the steadiest sign across bots; alive <= 3
-        comes 11-15 rounds too early."""
-        def compute():
-            engine = self.engine
-            base = bot_params(self.player)
-            strength = {}
-            for c in engine.countries.values():
-                if self._is_real(c.owner) and not c.owner.eliminated:
-                    strength[c.owner] = strength.get(c.owner, 0) + 3 + c.units
-            mine = strength.get(self.player, 0)
-            top = max(strength.values(), default=0)
-            if mine <= 0 or mine < top:
-                return False
-            alive = sum(1 for q in engine.players if not q.eliminated)
-            share = top / (sum(strength.values()) or 1)
-            return bool((base["endgame_alive"] and alive <= base["endgame_alive"]) or share >= base["endgame_lead"])
-        return self._cached("endgame", compute)
+        personality."""
+        return bot_params(self.player)
 
     # --- decisions on someone else's turn ------------------------------------
 
@@ -480,6 +340,7 @@ class BotController:
             # Their tank/dice choice or event pick, with the mouse; an
             # event's mouse attack (attack 6) runs itself.
             phase.update()
+            self._draw_status()
             return
 
         # Draw the phase as usual, but it gets no clicks: the bot plays.
@@ -492,6 +353,7 @@ class BotController:
 
         if self.player is not player:
             return  # the phase ended the turn (e.g. nothing left to feed)
+        self._draw_status()
         if not self._ready(player):
             return
         self._act(player)
@@ -667,7 +529,7 @@ class BotController:
         oil and cards."""
         w = self._weights()
         value = sum(w[r] * getattr(loser, r) for r in ("wood", "steel", "nuclear", "oil")) \
-            + self.params["loot_card"] * len(loser.cards)
+            + CARD_VALUE * len(loser.cards)
         event = self.manager.current_event
         if event is not None:
             value += sum(w[r] * n for r, n in event.bot_extra_loot(self.engine, loser).items())
@@ -700,23 +562,7 @@ class BotController:
             elif target.owner in self._hunt():
                 # A step towards finishing them off this turn.
                 value += self._prize(target.owner) * self._hunt()[target.owner] / left
-        if self.params["retention"] and self.params["exposure"] and target.owner is not player:
-            value = self._retained_value(target, value)
         return value
-
-    def _retained_value(self, target, value):
-        """`value` of taking `target`, counting only what is kept: of the
-        conquests the bots made, 40% were lost before their next turn
-        (islands 4%, countries with three land links 48%), and the value did
-        not know."""
-        p = self.params
-        exposure = self._danger(target, units=p["conquest_garrison"], fort=0, tanks=0)
-        if p["retention"] == 2:
-            card = (0.5 if self.manager.conquered_enemy_this_turn else CARD_VALUE) if self._is_real(target.owner) else 0.0
-            return (value - card) * (1 - p["retention_weight"] * exposure) + card
-        horizon = p["horizon"]
-        kept = sum((1 - exposure) ** k for k in range(1, horizon + 1))
-        return value + self._income_value(target) * (kept - horizon)
 
     def _lead(self, player):
         """How far `player` is ahead of an even share of all the players'
@@ -740,7 +586,7 @@ class BotController:
 
     def _prize(self, loser):
         """What eliminating `loser` brings: their loot, and one rival less."""
-        return self.params["rival_value"] + self.params["loot_weight"] * self._loot_value(loser)
+        return 6 + self.params["loot_weight"] * self._loot_value(loser)
 
     def _campaign(self, victim):
         """(chance, troops lost) for taking every country `victim` holds
@@ -795,338 +641,14 @@ class BotController:
                 chance, lost = self._campaign(other)
                 if chance < p["hunt_min_p"]:
                     continue
-                if self._hunt_worth(other, chance, lost, risk, troop_cost) > 0:
+                # Once wiped out, they're no threat to us any more.
+                gone = {other: sum(c.units for c in theirs) + 99}
+                worth = chance * self._prize(other) - troop_cost * lost \
+                    - self._survival_value() * (self._elimination_risk(lost, gone) - risk)
+                if worth > 0:
                     hunted[other] = chance
             return hunted
         return self._cached("hunt", compute)
-
-    def _hunt_worth(self, victim, chance, lost, risk=None, troop_cost=None):
-        """What going for `victim` is worth, in troops, given the `chance` of
-        taking all their countries this turn and the troops `lost` doing it:
-        chance x prize, less the troops it costs and the extra danger of being
-        wiped out ourselves once they're spent."""
-        if troop_cost is None:
-            e = self._economy()
-            troop_cost = 1 - min(1.0, e["starving"] / max(e["units"], 1))
-        risk = self._elimination_risk() if risk is None else risk
-        # Once wiped out, they're no threat to us any more.
-        gone = {victim: sum(c.units for c in self._owned(victim)) + 99}
-        return chance * self._prize(victim) - troop_cost * lost \
-            - self._survival_value() * (self._elimination_risk(lost, gone) - risk)
-
-    # --- the strike step -------------------------------------------------------
-    # Eliminating a player is what decides games (a player that makes 0 / 1 / 2
-    # / 3 eliminations wins 2 / 28 / 73 / 100% of the time in a 4-player game),
-    # but the bot only looked at what the board allowed at the moment it started
-    # attacking, after it had traded, placed and bought. The step works backwards:
-    # for each player it could finish off, what does the stock it holds buy --
-    # nukes (half a garrison each, nothing to roll), a card set (troops), a ship,
-    # plane or bridge where water is in the way, the new troops massed on one
-    # stack -- and is that worth it by the measure of _hunt? Then do it first.
-
-    def _hypo_campaign(self, victim, troops=None, tanks=None, nukes=(), reach=()):
-        """(chance, lost) of _campaign(victim) with something added: `troops` and
-        `tanks` {country: n}, `nukes` country names (one entry per nuke), `reach`
-        [("ship" | "plane", country) | ("bridge", (a, b))]."""
-        engine = self.engine
-        changes = []
-        for name, n in (troops or {}).items():
-            c = engine.countries[name]
-            changes.append((c, "units", c.units + n))
-        for name, n in (tanks or {}).items():
-            c = engine.countries[name]
-            changes.append((c, "tanks", c.tanks + n))
-        for kind, what in reach:
-            if kind == "ship":
-                c = engine.countries[what]
-                changes.append((c, "ships", c.ships + 1))
-            elif kind == "plane":
-                c = engine.countries[what]
-                changes.append((c, "planes", c.planes + 1))
-            elif kind == "bridge":
-                link = self._connection(what[0], what[1], "sea")
-                if link is not None:
-                    changes.append((link, "kind", "land"))
-        if nukes:
-            state = {}
-            for name in nukes:
-                c = engine.countries[name]
-                units, owner, radioactive = state.get(name, (c.units, c.owner, c.radioactive))
-                units //= 2
-                radioactive += 3
-                if units == 0 and owner is not engine.default_player:
-                    owner, units = engine.default_player, engine.initial_country_units.get(name, 2)
-                state[name] = (units, owner, radioactive)
-            for name, (units, owner, radioactive) in state.items():
-                c = engine.countries[name]
-                changes += [(c, "units", units), (c, "owner", owner), (c, "radioactive", radioactive)]
-        with self._what_if(*changes):
-            if not self._owned(victim):
-                return 1.0, 0.0
-            return self._campaign(victim)
-
-    def _strike_victims(self):
-        """The other players with at most hunt_max_countries countries."""
-        limit = self.params["hunt_max_countries"]
-        return [other for other in self.engine.players
-                if other is not self.player and not other.eliminated and 1 <= len(self._owned(other)) <= limit]
-
-    def _best_lump(self, victim, troops=0, tanks=0, nukes=(), reach=()):
-        """(chance, lost, recipient): the added troops and tanks all go to ONE
-        own stack next to the victim, the one that does the most."""
-        engine = self.engine
-        names = set()
-        for target in self._owned(victim):
-            for other in self._links(target.name):
-                if engine.countries[other].owner is self.player:
-                    names.add(other)
-        candidates = sorted(names, key=lambda n: (-engine.countries[n].units, n))[:4] or [None]
-        for kind, what in reach:
-            if kind in ("ship", "plane") and what not in candidates:
-                candidates.append(what)
-        best = None
-        for name in candidates:
-            chance, lost = self._hypo_campaign(
-                victim, {name: troops} if name and troops else None, {name: tanks} if name and tanks else None,
-                nukes, reach)
-            if best is None or (chance, -lost) > (best[0], -best[1]):
-                best = (chance, lost, name)
-        return best
-
-    def _reach_candidates(self, victim, ship_ok, plane_ok, bridge_ok):
-        """Crossings that would open a sea link from an own stack (2+ troops) to a
-        country of the victim: [("ship" | "plane", country) | ("bridge", (a, b))]."""
-        engine = self.engine
-        items, seen = [], set()
-        for target in self._owned(victim):
-            for other, kind in self._links(target.name).items():
-                origin = engine.countries[other]
-                if kind != "sea" or origin.owner is not self.player or origin.units < 2:
-                    continue
-                if ship_ok and not origin.ships and ("ship", other) not in seen:
-                    items.append(("ship", other))
-                    seen.add(("ship", other))
-                if plane_ok and not origin.planes and ("plane", other) not in seen:
-                    items.append(("plane", other))
-                    seen.add(("plane", other))
-                if bridge_ok and ("bridge", (other, target.name)) not in seen:
-                    items.append(("bridge", (other, target.name)))
-                    seen.add(("bridge", (other, target.name)))
-        return items
-
-    def _strike_ceiling(self, victim, reinforcements):
-        """The best chance of taking all the victim's countries this turn with
-        everything held converted: the new troops, every card set traded for
-        troops, nukes, and one crossing."""
-        player = self.player
-        card_troops = int(round(sum(card_sets(player.cards))))
-        tanks = player.steel // TANK_STEEL if self.params["strike_max_tanks"] else 0
-        best = self._best_lump(victim, reinforcements + card_troops, tanks)
-        nukes = []
-        names = sorted(n.name for n in self._owned(victim)
-                       if any(self.engine.countries[o].owner is player for o in self._links(n.name)))
-        for _ in range(int(player.nuclear // NUKE_NUCLEAR)):
-            step = None
-            for name in names:
-                trial = self._best_lump(victim, reinforcements + card_troops, tanks, nukes + [name])
-                if step is None or (trial[0], -trial[1]) > (step[0][0], -step[0][1]):
-                    step = (trial, name)
-            if step is None or step[0][0] <= best[0] + 1e-9:
-                break
-            best = step[0]
-            nukes.append(step[1])
-        ship_ok = bool(player.start_ship) or player.wood >= 15
-        for item in self._reach_candidates(victim, ship_ok, player.steel >= 10 and player.oil >= 1, player.wood >= 10):
-            trial = self._best_lump(victim, reinforcements + card_troops, tanks, nukes, (item,))
-            if (trial[0], -trial[1]) > (best[0], -best[1]):
-                best = trial
-        return best[0]
-
-    def _strike_bundle(self, victim, bundle, pool, risk):
-        """(net, chance, lost, recipient, troops) of `bundle` against `victim`:
-        the best share of the troop pool to mass on one stack, and what that
-        is worth after the troops and resources it uses."""
-        p = self.params
-        troops_in_pool = pool + (bundle["card_troops"] if bundle["cards"] else 0)
-        best = None
-        for k in sorted({0, troops_in_pool // 4, troops_in_pool // 2, 3 * troops_in_pool // 4, troops_in_pool}) \
-                if troops_in_pool > 0 else [0]:
-            chance, lost, recipient = self._best_lump(victim, k, bundle["tanks"], bundle["nukes"], bundle["reach"])
-            net = self._hunt_worth(victim, chance, lost, risk) - p["strike_troop_cost"] * k - bundle["price"]
-            if chance < p["hunt_min_p"]:
-                net = -1e9
-            if best is None or net > best[0]:
-                best = (net, chance, lost, recipient, k)
-        return best
-
-    def _strike_plan(self):
-        """(victim, bundle, evaluation) of the strike worth the most, or None."""
-        player, manager, p = self.player, self.manager, self.params
-        shop = manager.phases[3]
-        pool = int(manager.reinforcements)
-        sets = card_sets(player.cards)
-        card_troops = int(round(sum(sets)))
-        tank_cost = shop._cost({"steel": TANK_STEEL})["steel"]
-        nuke_cost = shop._cost({"nuclear": NUKE_NUCLEAR})["nuclear"]
-        ship_cost = shop.ship_cost()["wood"]
-        plane_cost = shop._cost({"steel": 10})["steel"]
-        bridge_cost = shop._cost({"wood": 10})["wood"]
-        risk = self._elimination_risk()
-        found = None
-        for victim in self._strike_victims():
-            if self._strike_ceiling(victim, pool) < p["strike_filter"]:
-                continue
-            adjacent = [c.name for c in self._owned(victim)
-                        if any(self.engine.countries[o].owner is player for o in self._links(c.name))]
-            bundle = dict(cards=False, tanks=0, nukes=[], reach=[], price=0.0, card_troops=card_troops)
-            current = self._strike_bundle(victim, bundle, pool, risk)
-            for _ in range(10):  # hill climbing: one more item at a time while it pays
-                moves = []
-                if sets and not bundle["cards"]:
-                    moves.append(dict(bundle, cards=True))
-                if bundle["tanks"] < p["strike_max_tanks"] and player.oil >= 1 \
-                        and player.steel >= (bundle["tanks"] + 1) * tank_cost:
-                    moves.append(dict(bundle, tanks=bundle["tanks"] + 1,
-                                      price=bundle["price"] + self._price({"steel": tank_cost})))
-                if len(bundle["nukes"]) < p["strike_max_nukes"] \
-                        and player.nuclear >= (len(bundle["nukes"]) + 1) * nuke_cost:
-                    for name in adjacent:
-                        moves.append(dict(bundle, nukes=bundle["nukes"] + [name],
-                                          price=bundle["price"] + self._price({"nuclear": nuke_cost})))
-                if not bundle["reach"]:
-                    ship_ok = bool(player.start_ship) or player.wood >= ship_cost
-                    plane_ok = player.steel - bundle["tanks"] * tank_cost >= plane_cost and player.oil >= 1
-                    for item in self._reach_candidates(victim, ship_ok, plane_ok, player.wood >= bridge_cost):
-                        cost = {"ship": {"wood": ship_cost}, "plane": {"steel": plane_cost},
-                                "bridge": {"wood": bridge_cost}}[item[0]]
-                        moves.append(dict(bundle, reach=[item], price=bundle["price"] + self._price(cost)))
-                best_move = None
-                for move in moves:
-                    evaluation = self._strike_bundle(victim, move, pool, risk)
-                    if evaluation[0] > current[0] + 1e-6 and (best_move is None or evaluation[0] > best_move[1][0]):
-                        best_move = (move, evaluation)
-                if best_move is None:
-                    break
-                bundle, current = best_move
-            uses_chest = bundle["cards"] or bundle["tanks"] or bundle["nukes"] or bundle["reach"]
-            if current[0] > p["strike_min_net"] and (uses_chest or p["strike_place"]):
-                if found is None or current[0] > found[2][0]:
-                    found = (victim, bundle, current)
-        return found
-
-    def _strike_actions(self, victim, bundle, evaluation):
-        """The plan as [(what it says, action)], one carried out per bot step."""
-        actions = []
-        recipient = evaluation[3]
-        for name in bundle["nukes"]:
-            actions.append(("nuke " + name, lambda name=name: self._strike_nuke(name)))
-        if bundle["tanks"] and recipient:
-            for _ in range(bundle["tanks"]):
-                actions.append(("tank", lambda: self._strike_buy("tanks", {"steel": TANK_STEEL}, recipient)))
-        for kind, what in bundle["reach"]:
-            if kind == "ship":
-                actions.append(("ship", lambda what=what: self._strike_buy("ships", None, what)))
-            elif kind == "plane":
-                actions.append(("plane", lambda what=what: self._strike_buy("planes", {"steel": 10}, what)))
-            else:
-                actions.append(("bridge", lambda what=what: self._strike_bridge(what)))
-        if bundle["cards"]:
-            actions.append(("trade", self._strike_trade))
-        actions.append(("deploy", lambda: self._strike_deploy(victim)))
-        return actions
-
-    def _strike_nuke(self, name):
-        shop = self.manager.phases[3]
-        if self.player.nuclear >= shop._cost({"nuclear": NUKE_NUCLEAR})["nuclear"] and name in shop._nuke_targets():
-            self._drop_nuke(name)
-            self._say("strikes " + name)
-
-    def _strike_buy(self, attr, cost, name):
-        shop = self.manager.phases[3]
-        cost = shop.ship_cost() if attr == "ships" else shop._cost(cost)
-        if self.engine.countries[name].owner is self.player and all(getattr(self.player, r) >= n for r, n in cost.items()):
-            shop.place_unit(attr, cost, name)
-            self._say("buys a {} for the strike".format(attr[:-1]))
-
-    def _strike_bridge(self, ends):
-        if self.manager.phases[3].build_bridge(ends[0], ends[1]):
-            self._say("builds a bridge for the strike")
-
-    def _strike_trade(self):
-        while self.manager.can_trade() and self._trade(need_troops=True):
-            pass
-
-    def _strike_deploy(self, victim):
-        """Mass the new troops on the stack the strike works best from."""
-        manager = self.manager
-        pool = int(manager.reinforcements)
-        if pool > 0:
-            risk = self._elimination_risk()
-            best = None
-            for k in sorted({0, pool // 4, pool // 2, 3 * pool // 4, pool}):
-                chance, lost, recipient = self._best_lump(victim, k, 0, ())
-                net = self._hunt_worth(victim, chance, lost, risk) - self.params["strike_troop_cost"] * k
-                if best is None or net > best[0]:
-                    best = (net, k, recipient)
-            _, k, recipient = best
-            if k > 0 and recipient:
-                self.engine.countries[recipient].units += k
-                manager.reinforcements -= k
-                self._say("masses {} troops on {} against {}".format(k, recipient, victim.name))
-        self._strike_queue = []
-
-    def _finish_step(self):
-        """Fire ONE nuke of a sure elimination: a player whose every country
-        the nukes in stock can bring to 0 troops (floor(log2 troops) + 1 each,
-        no dice). True if it fired."""
-        shop = self.manager.phases[3]
-        player, engine = self.player, self.engine
-        cost = shop._cost({"nuclear": NUKE_NUCLEAR})["nuclear"]
-        have = player.nuclear // cost if cost else 0
-        if have < 1:
-            return False
-        targets = shop._nuke_targets()
-        best = None
-        for victim in engine.players:
-            if victim is player or victim.eliminated:
-                continue
-            owned = [c for c in engine.countries.values() if c.owner is victim and c.units > 0]
-            if not owned or any(c.name not in targets for c in owned):
-                continue
-            plan = []
-            for c in owned:
-                plan += [c.name] * int(c.units).bit_length()  # floor(log2 units) + 1 (units can be a numpy int)
-            if len(plan) <= have and len(plan) <= self.params["finish_max"] and (best is None or len(plan) < len(best)):
-                best = plan
-        if best is None:
-            return False
-        self._drop_nuke(best[0])
-        self._say("wipes a player out with {} nukes".format(len(best)))
-        return True
-
-    def _strike_step(self):
-        """One bot step of the strike (see above): True if it did something."""
-        player, manager = self.player, self.manager
-        if self.params["finish_max"] and self._finish_step():
-            return True
-        if not self.params["strike"] or "strike" in self._done:
-            return False
-        turn = (manager.turn_num, player.name)
-        if self._strike_turn != turn:
-            self._strike_turn, self._strike_queue = turn, None
-        if self._strike_queue is None:
-            plan = self._strike_plan()
-            if plan is None:
-                self._done.add("strike")
-                return True  # looking for a plan took this step
-            self._strike_queue = self._strike_actions(*plan)
-            return True  # planning took this step
-        if self._strike_queue:
-            self._strike_queue.pop(0)[1]()
-            return True
-        self._strike_queue = None
-        self._done.add("strike")
-        return False
 
     def _territory_parts(self):
         """The bot's countries, in groups connected through its own territory."""
@@ -1146,10 +668,6 @@ class BotController:
         ({player: troops}) of theirs. A neighbour that borders every part of
         the bot's territory throws everything it has there, plus its next
         reinforcements and a card set, at all of the bot's troops."""
-        if self._risk_frozen is not None:
-            return 1.0 if lost >= 10 ** 6 else self._risk_frozen
-        if self.params["risk_exposure"] and self.params["exposure"]:
-            return self._exposure_risk(lost, killed)
         killed = killed or {}
         lost = int(round(lost))
         key = ("doom", lost, tuple(sorted((p.name, int(round(n))) for p, n in killed.items())))
@@ -1228,10 +746,6 @@ class BotController:
                 theirs = {target.owner: killed} if self._is_real(target.owner) else None
                 ev -= self._survival_value() * (
                     self._elimination_risk(attackers - left, theirs) - self._elimination_risk())
-            if not seen and chance > 0.05 and self.params["extra_exposure"] and self.params["exposure"] \
-                    and self._is_real(target.owner) and self.manager.conquered_enemy_this_turn:
-                ev -= self.params["extra_exposure"] * chance * self._extra_cost(
-                    from_c, target, attackers, left, chance, troop_cost)
             if depth > 1 and chance > 0.05:
                 # The survivors move in (one stays behind) and go on.
                 onward = int(left / chance) - 1
@@ -1247,22 +761,6 @@ class BotController:
                 ev += chance * self.params["follow_discount"] * best
             return ev
         return self._cached(key, compute)
-
-    def _extra_cost(self, from_c, target, attackers, left, chance, troop_cost):
-        """What taking `target` from `from_c` exposes, in troops: the dice of the
-        winning roll (up to 3) have to move in and are likely to be lost with
-        it, and so is a card for whoever takes it back; plus how much weaker
-        that leaves `from_c`."""
-        p = self.params
-        total = int(round(left / chance)) + 1      # troops on the target and the origin together after a win
-        moved = max(1, min(3, total - 1, attackers))
-        exposure = self._danger(target, moved, 0, 0)
-        cost = exposure * (moved * troop_cost + p["extra_gift"] * CARD_VALUE)
-        rest = total - moved
-        if rest >= 1:
-            weaker = self._danger(from_c, rest) - self._danger(from_c, attackers + 1)
-            cost += p["extra_origin"] * max(0.0, weaker) * self._hold_value(from_c)
-        return cost
 
     def _can_reach(self, from_c, kind):
         """Whether an attack from from_c over a `kind` link can be made."""
@@ -1304,8 +802,6 @@ class BotController:
                 continue
             for target, kind in self._targets_from(from_c):
                 options.append((from_c, target, kind == "land"))
-        if self._vacated:
-            options = [o for o in options if self._retake_ok(o[1])]
         return options
 
     # --- defence and positioning ---------------------------------------------
@@ -1323,19 +819,10 @@ class BotController:
 
     def _danger(self, country, units=None, fort=None, tanks=None):
         """Chance another player takes `country` (with `units` troops, a
-        `fort` level and `tanks`) before our next turn: _exposure, or with
-        the "exposure" tunable at 0 the old model, _danger_adjacent."""
-        if self.params["exposure"]:
-            return self._exposure(country, units, fort, tanks)
-        return self._danger_adjacent(country, units, fort, tanks)
-
-    def _danger_adjacent(self, country, units=None, fort=None, tanks=None):
-        """The old model of _danger: the strongest attack a neighbour can
-        make on `country` -- over sea only with a ship, or a plane and oil --
-        with what they can add there first, their tanks, and our fort and
-        tanks against it. It misses what has not happened yet: strikes from
-        a country the enemy takes first (half of all losses), a crossing the
-        enemy can still buy, and enemies that have not moved."""
+        `fort` level and `tanks`) before our next turn: the strongest attack
+        a neighbour can make on it -- over sea only with a ship, or a plane
+        and oil -- with what they can add there first, their tanks, and our
+        fort and tanks against it."""
         units = country.units if units is None else units
         fort = country.fort_lvl if fort is None else fort
         tanks = country.tanks if tanks is None else tanks
@@ -1364,180 +851,6 @@ class BotController:
                 worst = max(worst, battle(attackers, units, mods)[0])
             return worst * self.params["enemy_aggression"]
         return self._cached(("danger", country.name, units, fort, tanks), compute)
-
-    # --- exposure: the chance a country is taken before our next turn ---------
-    # Measured on whole games, the chance of losing a country had little to do
-    # with the stacks next to it: 51% of losses were a chain (the enemy first
-    # takes a mouse or other country the same turn and strikes from there),
-    # 37% a direct land attack, and only ~2% a ship or plane already in
-    # place. So for every other player the exposure takes the strongest of
-    #   - a stack next to the country over land (weight 1),
-    #   - over sea with a crossing in place (1), or one the player can still
-    #     get at their next turn (sea_buy_weight),
-    #   - a chain: they conquer up to chain_depth countries on the way (each
-    #     at least chain_min_win likely) and strike from the last one
-    #     (chain_weight, less over sea or with a crossing still to buy),
-    # and the players combine as independent chances.
-
-    def _not_moved_yet(self, owner):
-        """Whether `owner` has not had their first turn yet (they still hold
-        their start stack and a free ship, and have no income)."""
-        manager, engine = self.manager, self.engine
-        count = len(engine.players)
-        if manager.turn_num >= count:
-            return False
-        first = (engine.turn - manager.turn_num) % count  # the seat that moved first
-        return (engine.players.index(owner) - first) % count > manager.turn_num
-
-    def _crossing_means(self, owner):
-        """(ship, bridge, plane): whether `owner` can get that crossing over
-        water at their next turn start -- the free first ship, wood for a
-        ship (15) or a bridge (10), steel (10) and oil for a plane. Income
-        arrives at the turn start, but not on a first turn."""
-        def compute():
-            first_turn = self._not_moved_yet(owner)
-            income = self.engine.production(owner)
-            wood = owner.wood + (0 if first_turn else income["wood"])
-            steel = owner.steel + (0 if first_turn else income["steel"])
-            oil = owner.oil + (0 if first_turn else income["oil"])
-            return bool(owner.start_ship) or wood >= 15, wood >= 10, steel >= 10 and oil >= 1
-        return self._cached(("means", owner.name), compute)
-
-    def _chain_map(self, owner, ghost):
-        """{country: (force, chance, last hop over sea, crossings bought)}: the
-        strikes `owner` can make by first conquering at least one country on
-        the way. `ghost` (country names) pretends those countries are ours,
-        for a conquest being weighed."""
-        def compute():
-            engine, p = self.engine, self.params
-            countries = engine.countries
-            ghosts = set(ghost)
-            extra = self._enemy_extra(owner)
-            ship_ok, bridge_ok, plane_ok = self._crossing_means(owner)
-            can_buy = ship_ok or bridge_ok or plane_ok
-            buy = p["chain_buy_weight"]
-            reach = {}
-            for start, origin in countries.items():
-                if origin.owner is not owner or start in ghosts:
-                    continue
-                force0 = origin.units - 1 + extra
-                if force0 < 1:
-                    continue
-                carries = bool(origin.ships or (origin.planes and owner.oil))
-                best = {start: (force0, 1.0, carries, 0)}
-                depth = {start: 0}
-                todo = [start]
-                guard = 0
-                while todo and guard < 300:
-                    guard += 1
-                    here = todo.pop()
-                    force, chance, carried, bought = best[here]
-                    if depth[here] > p["chain_depth"]:
-                        continue
-                    for there, kind in self._links(here).items():
-                        if countries[there].owner is owner and there not in ghosts:
-                            continue
-                        hop_buy = 0
-                        if kind == "sea" and not carried:
-                            if not can_buy or here != start:
-                                continue
-                            hop_buy = 1
-                        target = countries[there]
-                        win, survivors, _ = battle(int(force), target.units,
-                                                   (0, 0, target.fort_lvl if there not in ghosts else 0, 0))
-                        if here != start:
-                            current = reach.get(there)
-                            score = force * chance * buy ** (bought + hop_buy)
-                            if current is None or score > current[0] * current[1] * buy ** current[3]:
-                                reach[there] = (int(force), chance, kind == "sea", bought + hop_buy)
-                        if win < p["chain_min_win"]:
-                            continue
-                        onward = int(survivors / win) - 1
-                        if onward < 1:
-                            continue
-                        onward_chance = chance * win
-                        onward_carried = (carried or hop_buy == 1) if kind == "sea" else False
-                        onward_bought = bought + hop_buy
-                        old = best.get(there)
-                        if old is None or onward * onward_chance * buy ** onward_bought \
-                                > old[0] * old[1] * buy ** old[3] + 1e-9:
-                            best[there] = (onward, onward_chance, onward_carried, onward_bought)
-                            depth[there] = depth[here] + 1
-                            todo.append(there)
-            return reach
-        return self._cached(("chain", owner.name, tuple(ghost)), compute)
-
-    def _exposure(self, country, units=None, fort=None, tanks=None, skip=frozenset()):
-        """Chance another player takes `country` (with `units` troops, a
-        `fort` level and `tanks`) before our next turn, leaving the players in
-        `skip` out of it; see above."""
-        units = country.units if units is None else units
-        fort = country.fort_lvl if fort is None else fort
-        tanks = country.tanks if tanks is None else tanks
-        if units <= 0:
-            return 1.0
-
-        def compute():
-            engine, player, event = self.engine, self.player, self.manager.current_event
-            p = self.params
-            ghost = (country.name,) if country.owner is not player else ()
-            safe = 1.0
-            for owner in engine.players:
-                if owner is player or owner.eliminated or owner in skip:
-                    continue
-                best = 0.0
-                can_buy = any(self._crossing_means(owner))
-                for name, kind in self._links(country.name).items():
-                    enemy = engine.countries[name]
-                    if enemy.owner is not owner:
-                        continue
-                    if event is not None and not (event.can_attack_from(engine, enemy)
-                                                  and event.can_attack_target(engine, country)):
-                        continue
-                    weight = 1.0
-                    if kind == "sea" and not (enemy.ships > 0 or (enemy.planes > 0 and owner.oil > 0)):
-                        weight = p["sea_buy_weight"] if can_buy else 0.0
-                    if weight <= 0:
-                        continue
-                    a_all, d_all = 0, fort
-                    if event is not None:
-                        a_all = event.attack_bonus(engine, enemy) - event.dice_penalty(engine, owner)
-                        d_all = fort - event.dice_penalty(engine, player)
-                    mods = (int(a_all), min(enemy.tanks, owner.oil), int(d_all), min(tanks, player.oil))
-                    attackers = enemy.units - 1 + self._enemy_extra(owner)
-                    best = max(best, weight * battle(attackers, units, mods)[0])
-                hit = self._chain_map(owner, ghost).get(country.name)
-                if hit is not None:
-                    force, chance, via_sea, bought = hit
-                    weight = p["chain_weight"] * chance * (p["chain_sea_weight"] if via_sea else 1.0) \
-                        * p["chain_buy_weight"] ** bought
-                    if event is not None and not event.can_attack_target(engine, country):
-                        weight = 0.0
-                    best = max(best, weight * battle(int(force), units, (0, 0, int(fort), min(tanks, player.oil)))[0])
-                safe *= 1 - min(1.0, p["enemy_aggression"] * p["exposure_scale"] * best)
-            return 1 - safe
-        return self._cached(("exposure", country.name, units, fort, tanks, skip), compute)
-
-    def _exposure_risk(self, lost=0, killed=None):
-        """_elimination_risk from the exposure of the bot's countries: all of them
-        have to fall, so the mean exposure to the power of their number (measured:
-        AUC 0.92 for who gets wiped out, against 0.71 for the old model). `lost`
-        troops are taken off the countries in proportion; a player in `killed`
-        that is wiped out is no threat any more."""
-        killed = killed or {}
-        lost = int(round(lost))
-        wiped = frozenset(p for p, n in killed.items() if n >= sum(c.units for c in self._owned(p)))
-        key = ("doom_exposure", lost, wiped)
-
-        def compute():
-            owned = self._owned()
-            troops = sum(c.units for c in owned)
-            if not owned or troops - lost <= 0:
-                return 1.0
-            scale = (troops - lost) / troops
-            exposures = [self._exposure(c, max(1, int(round(c.units * scale))), skip=wiped) for c in owned]
-            return (sum(exposures) / len(exposures)) ** len(exposures)
-        return self._cached(key, compute)
 
     def _hold_value(self, country):
         """What keeping `country` is worth, in troops: what losing it costs."""
@@ -1582,8 +895,6 @@ class BotController:
             return
         if sub not in (1, 2):
             return  # sub 0: the phase itself works out the income
-        if self._strike_step():
-            return
         if self._trade():
             return
         if manager.reinforcements > 0:
@@ -2009,14 +1320,13 @@ class BotController:
         # Planes only when they're the way across (they cost oil), and
         # tanks -- while oil is short -- only if they make a real difference.
         if self._weights()["oil"] >= 0.2 and self._win_probability(from_c, target, active_tanks=0) >= 0.9:
-            attack.active_tanks = min(attack.tank_fee_paid, attack.active_tanks)  # paid ones are free
+            attack.active_tanks = 0
         if land or attack.selected_ships > 0:
             attack.selected_planes = 0
         else:
             # Over sea without a ship: one plane (1 oil) carries them.
             attack.selected_planes = 1
-            attack.active_tanks = min(attack.active_tanks,
-                                      max(player.oil - 1 + attack.prepaid_planes, 0) + attack.tank_fee_paid)
+            attack.active_tanks = min(attack.active_tanks, max(player.oil - 1 + attack.prepaid_planes, 0))
 
     def _free_share(self, from_c):
         """How much of an attack from `from_c` is made with troops that
@@ -2125,99 +1435,6 @@ class BotController:
                     todo.append(other)
         return seen
 
-    # --- emptying a country on purpose (off by default) -----------------------
-    # The rules let a player empty a country (moving the last troop out in the move
-    # phase); it goes back to the mouse with its native garrison, and taking it
-    # earns nobody a card. A country that is probably lost anyway, held by a
-    # troop or two, is then worth more as a mouse country than as a card for the
-    # enemy -- on paper. In play it comes out about even (see "buffer" in BASE).
-
-    def _buffer_event_ok(self):
-        """No event that changes what an abandoned country becomes (VOC part 2)."""
-        event = self.manager.current_event
-        if event is None:
-            return True
-        from events import Event
-        return type(event).abandoned_units is Event.abandoned_units
-
-    def _buffer_eligible(self, country):
-        p = self.params
-        if country.owner is not self.player or country.units <= 0 or country.units > p["buffer_max_units"]:
-            return False
-        if country.fort_lvl or country.tanks or country.ships or country.planes or country.developed \
-                or country.radioactive or country.landmark_owner is not None:
-            return False  # abandoning destroys these, and a developed country pays double to the next owner
-        return not self._holds_continent_of(country.name)
-
-    def _buffer_best(self, phase):
-        """(gain, country to empty, country the troops go to, troops) of the best
-        vacate, or None."""
-        engine, player, p = self.engine, self.player, self.params
-        owned = self._owned()
-        if len(owned) < p["buffer_keep"] or not self._buffer_event_ok():
-            return None
-        weight = p["next_turn_weight"]
-        risk = self._elimination_risk()
-        best = None
-        for country in owned:
-            if not self._buffer_eligible(country):
-                continue
-            exposure = self._danger(country)
-            if exposure < p["buffer_min_exposure"]:
-                continue
-            reachable = phase._land_flood_fill(country.name) - {country.name}
-            if not reachable:
-                continue
-            troops = country.units
-            hold = self._hold_value(country)
-            near = {n for n in self._links(country.name) if engine.countries[n].owner is player}
-            garrison = engine.initial_country_units.get(country.name, 2)
-            for name in sorted(reachable, key=lambda n: (-(n in near), -engine.countries[n].units, n))[:6]:
-                target = engine.countries[name]
-                names = near | {name}
-
-                def value(n):
-                    return self._position_value(engine.countries[n], engine.countries[n].units, weight, 1)
-                before = sum(value(n) for n in names | {country.name})
-                # The elimination model only sees adjacent enemy stacks: emptying the front country
-                # would make the bot "safe" in its own eyes. Keep the risk fixed so the what-if
-                # measures the buffer, not that blind spot.
-                self._risk_frozen = risk
-                try:
-                    with self._what_if((country, "owner", engine.default_player), (country, "units", garrison),
-                                       (target, "units", target.units + troops)):
-                        after = sum(value(n) for n in names if engine.countries[n].owner is player)
-                finally:
-                    self._risk_frozen = None
-                    self._cache = {}
-                # what is gained: the troops (and the card the taker would have earned); what is lost: the country
-                gain = after - before - hold + exposure * p["buffer_card_weight"] * p["buffer_card_value"]
-                if best is None or gain > best[0]:
-                    best = (gain, country, target, troops)
-        return best
-
-    def _buffer_run(self, phase):
-        """Empty the best candidate as the turn's one move. True if it did."""
-        best = self._buffer_best(phase)
-        if best is None or best[0] <= self.params["buffer_min_gain"]:
-            return False
-        gain, country, target, troops = best
-        target.units += troops
-        country.units = 0
-        self._vacated[country.name] = self.manager.turn_num
-        phase.abandon(country)
-        self.player.repositioned_this_turn = True
-        self.engine.log_action(self.player, " withdrew {} troops from {} to {}".format(troops, country.name, target.name))
-        self._say("withdraws from {} (mouse buffer, {:+.1f})".format(country.name, gain))
-        return True
-
-    def _retake_ok(self, target):
-        """A country the bot emptied is left alone for a few rounds while it is exposed."""
-        since = self._vacated.get(target.name)
-        if since is None or self.manager.turn_num - since >= self.params["buffer_cool"] * len(self.engine.players):
-            return True
-        return self._danger(target, 2, 0, 0) <= self.params["buffer_min_exposure"]
-
     def _reposition(self, phase):
         """The one move a turn: troops (and their tanks) from where they're
         worth least to where they're worth most (see _position_value), over
@@ -2225,8 +1442,6 @@ class BotController:
         plane or ship to where it opens up attacks over sea. True if
         something moved."""
         engine, player = self.engine, self.player
-        if self.params["buffer"] and self._buffer_run(phase):
-            return True
         weight = self.params["next_turn_weight"]
         oil_cost = self._weights()["oil"]
 
