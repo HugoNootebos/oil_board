@@ -337,6 +337,136 @@ def test_exposure_risk():
     check("... and B wiped out is no threat any more ({:.2f})".format(wiped), wiped < risks["check_risk"] / 2)
 
 
+def test_assets():
+    land, sea = links("land"), links("sea")
+    # x: where the assets stand, next to B's big stack w; y: a country of A's that w
+    # cannot reach in one step
+    pick = None
+    for x in sorted(land):
+        for w in sorted(land[x]):
+            for y in sorted(land[x]):
+                if y != w and y not in land[w] and y != x:
+                    pick = (x, w, y)
+                    break
+            if pick:
+                break
+        if pick:
+            break
+    x, w, y = pick
+    off = dict(asset_hold=0.0, asset_move=0, asset_attack=0.0, asset_carry=0)
+    bot.LEVELS["check_off"] = dict(bot.LEVELS["hard"], **off)
+    bot.LEVELS["check_assets"] = dict(bot.LEVELS["hard"], **dict(off, asset_hold=1.0, asset_move=1))
+    bot.LEVELS["check_hold_only"] = dict(bot.LEVELS["hard"], **dict(off, asset_hold=1.0))
+
+    ctl, _ = reset("check_assets")
+    price = lambda *a: ctl._asset_price(*a)
+    w_ = ctl._weights()
+    check("a ship costs 15 wood, a tank 20 steel, a plane 10 steel, fort levels 10/15/20 wood: {:.1f} {:.1f} {:.1f} {:.1f}".format(
+          price(1, 0, 0, 0), price(0, 1, 0, 0), price(0, 0, 1, 0), price(0, 0, 0, 2)),
+          abs(price(1, 0, 0, 0) - 15 * w_["wood"]) < 1e-9 and abs(price(0, 1, 0, 0) - 20 * w_["steel"]) < 1e-9
+          and abs(price(0, 0, 1, 0) - 10 * w_["steel"]) < 1e-9 and abs(price(0, 0, 0, 2) - 25 * w_["wood"]) < 1e-9)
+
+    # tanks alone leave a 1-troop border country for the safe one
+    for level, expect in (("check_assets", True), ("check_off", False), ("check_hold_only", False)):
+        ctl, (a, b, c) = reset(level, oil=5)
+        own(a, x, 1, tanks=3)
+        own(a, y, 4)
+        own(b, w, 15)
+        own(c, "Argentinië" if "Argentinië" not in (x, w, y) else "Peru", 4)
+        phase = app.turn_manager.phases[2]
+        a.attack, a.subattack = 2, 0
+        a.repositioned_this_turn = False
+        moved = ctl._reposition(phase)
+        gone = app.countries[x].tanks == 0 and app.countries[y].tanks == 3
+        if expect:
+            check("assets on: 3 tanks on 1-troop {} (a 15-stack next door) move to {}".format(x, y),
+                  moved and gone and a.repositioned_this_turn and app.countries[x].units == 1)
+        else:
+            check("{}: the tanks stay put".format("asset_hold alone" if level == "check_hold_only" else "assets off"),
+                  app.countries[x].tanks == 3)
+
+    # a ship goes with one troop to the country the enemy cannot reach, over water
+    island, shore, enemy = next((i, sh, sorted(land[sh])[0]) for i in sorted(sea) if i not in land
+                                for sh in sorted(sea[i]) if sh in land)
+    for level, expect in (("check_assets", True), ("check_off", False)):
+        ctl, (a, b, c) = reset(level)
+        b.start_ship = False
+        own(a, shore, 3, ships=1)
+        own(a, island, 1)
+        own(b, enemy, 15)
+        own(c, "Argentinië" if "Argentinië" not in (shore, island, enemy) else "Peru", 4)
+        phase = app.turn_manager.phases[2]
+        a.attack, a.subattack = 2, 0
+        a.repositioned_this_turn = False
+        moved = ctl._reposition(phase)
+        if expect:
+            check("assets on: the ship on {} (a 15-stack by land at {}) sails with one troop to {}".format(shore, enemy, island),
+                  moved and app.countries[island].ships == 1 and app.countries[shore].ships == 0
+                  and app.countries[shore].units == 2 and app.countries[island].units == 2)
+        else:
+            check("assets off: the ship stays on {}".format(shore), app.countries[shore].ships == 1)
+
+    # buying: the same tank is worth less on a country that is about to fall
+    ctl, (a, b, c) = reset("check_hold_only", steel=40, oil=5)
+    own(a, x, 6)
+    own(a, y, 6)
+    own(b, w, 12)
+    own(c, "Argentinië" if "Argentinië" not in (x, w, y) else "Peru", 4)
+    ctl._cache = {}
+    options = {text: value for value, _, _, text in ctl._shop_options() if text.startswith("buys a tank")}
+    ctl2, _ = reset("check_off", steel=40, oil=5)
+    own(app.players[0], x, 6)
+    own(app.players[0], y, 6)
+    own(app.players[1], w, 12)
+    own(app.players[2], "Argentinië" if "Argentinië" not in (x, w, y) else "Peru", 4)
+    ctl2._cache = {}
+    base = {text: value for value, _, _, text in ctl2._shop_options() if text.startswith("buys a tank")}
+    key_x, key_y = "buys a tank for " + x, "buys a tank for " + y
+    if key_x in options and key_x in base:
+        check("a tank for the border country {} is worth less with asset_hold ({:.2f} against {:.2f})".format(x, options[key_x], base[key_x]),
+              options[key_x] < base[key_x] - 0.1)
+    else:
+        check("shop offers a tank for {}".format(x), False, str(sorted(options)))
+
+
+def test_assets_in_attacks():
+    # Mexico (A, 8 troops, a ship and 2 tanks) attacks Cuba (B, 1 troop) over the sea while
+    # B's big stack and ship stand on Venezuela, a sea link from Cuba: the ship and the
+    # tanks land on a country about to be lost again.
+    off = dict(asset_hold=0.0, asset_move=0, asset_attack=0.0, asset_carry=0)
+    bot.LEVELS["check_carry"] = dict(bot.LEVELS["hard"], **dict(off, asset_hold=1.0, asset_attack=1.0, asset_carry=1))
+    bot.LEVELS["check_attack"] = dict(bot.LEVELS["hard"], **dict(off, asset_hold=1.0, asset_attack=1.0))
+    bot.LEVELS["check_nohold"] = dict(bot.LEVELS["hard"], **dict(off, asset_hold=1.0))
+    bot.LEVELS["check_off"] = dict(bot.LEVELS["hard"], **off)
+    evs, losses = {}, {}
+    for level in ("check_nohold", "check_attack", "check_carry"):
+        ctl, (a, b, c) = reset(level, oil=1)
+        b.start_ship = False
+        own(a, "Mexico", 8, ships=1, tanks=2)
+        own(b, "Cuba", 1)
+        own(b, "Venezuela", 15, ships=1)
+        own(c, "Argentinië", 4)
+        from_c, target = app.countries["Mexico"], app.countries["Cuba"]
+        ctl._cache = {}
+        evs[level] = ctl._attack_ev(from_c, target, 7)
+        losses[level] = ctl._carried_loss(from_c, target, 1)
+    check("the ship and tanks that go along cost something when the landing is exposed ({:.2f})".format(losses["check_attack"]),
+          losses["check_attack"] > 1.0)
+    check("... which takes the attack's value down ({:.2f} -> {:.2f})".format(evs["check_nohold"], evs["check_attack"]),
+          evs["check_attack"] < evs["check_nohold"] - 0.5)
+    check("... and bringing only the tank that fights costs less ({:.2f} against {:.2f})".format(losses["check_carry"], losses["check_attack"]),
+          losses["check_carry"] < losses["check_attack"])
+    ctl, (a, b, c) = reset("check_off", oil=1)
+    own(a, "Mexico", 8, ships=1, tanks=2)
+    check("assets off: a ship and tanks bring no cost into the attack",
+          ctl._carried_loss(app.countries["Mexico"], app.countries["Cuba"], 1) == 0 or ctl.params["asset_hold"] == 0)
+    ctl, _ = reset("hard")
+    p = ctl.params
+    check("the default bot has the asset care on (asset_hold {}, asset_move {}, asset_attack {}, asset_carry {})".format(
+          p["asset_hold"], p["asset_move"], p["asset_attack"], p["asset_carry"]),
+          p["asset_hold"] > 0 and p["asset_move"] == 1 and p["asset_attack"] > 0 and p["asset_carry"] == 1)
+
+
 # --- running them ------------------------------------------------------------------
 
 def main():

@@ -5,6 +5,7 @@ import numpy as np
 import pygame as pg
 import sounds
 from fonts import game_font
+from lang import t, Msg, Join
 from pygame import gfxdraw
 from matplotlib.path import Path
 from player_colors import name_text_color, light_tint
@@ -74,8 +75,9 @@ class Player:
         self.eliminated = False
         # Played by the computer (bot.py) instead of with the mouse.
         self.is_bot = is_bot
-        # Its difficulty and style (bot.LEVELS / bot.PERSONALITIES).
-        self.bot_level = "normal"
+        # Its tunables (bot.LEVELS; only the tuning tools pick another than
+        # "hard") and style (bot.PERSONALITIES).
+        self.bot_level = "hard"
         self.bot_personality = "balanced"
         if self.color is None:
             self.color = 255 * np.random.rand(3)
@@ -741,6 +743,9 @@ class Io:
         # behind it (the map, another button) doesn't get it too.
         self.buttons = []
         self.top_button = None
+        # What the pointer is: None for the mouse, else a game controller's
+        # cursor (controls.Pad), see `update`.
+        self.source = None
 
     @staticmethod
     def _contains(shape, p):
@@ -759,17 +764,31 @@ class Io:
             return False
         return self.top_button is None or self.top_button == shape
 
-    def update(self, view, countries):
+    def update(self, view, countries, source=None, fresh=None):
+        """Read the pointer: the mouse, or (`source`) a game controller's
+        cursor, which has `pos` (logical px) and `pressed` like
+        pg.mouse.get_pressed(). `fresh`: which of its buttons were pressed
+        this frame -- only used when the pointer just changed, so a button
+        already held on the new one isn't taken for a click."""
         self.previous_mouse_state = self.mouse_state
-        self.mouse_state = pg.mouse.get_pressed()
+        self.mouse_state = tuple(source.pressed if source is not None else pg.mouse.get_pressed())
+        if source is not self.source:
+            self.source = source
+            fresh = fresh or (False, False, False)
+            self.previous_mouse_state = tuple(
+                0 if new else held for held, new in zip(self.mouse_state, fresh))
+            self._right_down_at = None
         self.left_pressed = not self.previous_mouse_state[0] and self.mouse_state[0]
         self.previous_mouse_position = self.mouse_position
-        current_pos = pg.mouse.get_pos()
-        # Window pixels -> the logical 960x640 UI coordinates.
-        self.mouse_position = Position(
-            int((current_pos[0] - view.ox) / view.scale),
-            int((current_pos[1] - view.oy) / view.scale),
-        )
+        if source is not None:
+            self.mouse_position = Position(*source.pos)
+        else:
+            current_pos = pg.mouse.get_pos()
+            # Window pixels -> the logical 960x640 UI coordinates.
+            self.mouse_position = Position(
+                int((current_pos[0] - view.ox) / view.scale),
+                int((current_pos[1] - view.oy) / view.scale),
+            )
         self.transformed_mouse_position = self.mouse_position.screen_to_coordinates(view)
         self.right_clicked = False
         if self.mouse_state[2] and not self.previous_mouse_state[2]:
@@ -996,13 +1015,13 @@ class Gui:
             pg.draw.rect(view.screen, country.owner.color, pg.Rect(x0, 0, self.width, self.OWNER_BAND_H))
         banded = country.owner is not None
 
-        name = font.render(country.name, True, name_color)
+        name = font.render(t(country.name), True, name_color)
         avail = self.width - 16
         if name.get_width() > avail:
             # Long names (e.g. Papoea Nieuw Guinea) get a smaller font.
             if not hasattr(self, "small_font"):
                 self.small_font = game_font(15)
-            name = self.small_font.render(country.name, True, name_color)
+            name = self.small_font.render(t(country.name), True, name_color)
         view.screen.blit(name, (x0 + (self.width - name.get_width()) // 2,
                                 (self.OWNER_BAND_H - name.get_height()) // 2 if banded else 2))
         for index, image in enumerate(image_list):
@@ -1040,8 +1059,7 @@ class Gui:
             icon = images["spr_nuke"]
             iw, ih = icon.image.get_size()
             icon.draw(view.screen, Position(x0 + 8 + (20 - iw) // 2, ry + (22 - ih) // 2))
-            turns = "turn" if country.radioactive == 1 else "turns"
-            text = "{} {} left".format(country.radioactive, turns)
+            text = t("{} turn left" if country.radioactive == 1 else "{} turns left").format(country.radioactive)
             view.screen.blit(self.small_font.render(text, True, self.outline_color), (x0 + 34, ry + 3))
 
         # Dark outline round the panel below the band. With the owner box
@@ -1110,6 +1128,12 @@ class Gui:
     PLAYER_ROW_H = 42
     PLAYER_TEXT_X = 24         # left of the amount column (sprites sit at 8)
     PLAYER_AMOUNT_CX = 79      # centre line of the amounts
+    HELMET_ROW = 5
+
+    def player_row_center_y(self, view, index):
+        """Centre line of the index-th resource row (its 40 px icon box)."""
+        return (view.HEIGHT - self.height + self.PLAYER_HEADER_H + self.PLAYER_ROWS_TOP_PAD
+                + index * self.PLAYER_ROW_H + 20)
 
     def draw_player_stats(self, view, player, font, images, production=None):
         if not hasattr(self, "small_font"):
@@ -1236,7 +1260,7 @@ class Gui:
         pg.draw.rect(view.screen, outline_color, rect, 2 + hovered, border_radius=6)
         if not hasattr(self, "bold_font"):
             self.bold_font = game_font(20, bold=True)
-        label = self.bold_font.render("End turn", True, outline_color if end_turn_enabled else (110, 110, 110))
+        label = self.bold_font.render(t("End turn"), True, outline_color if end_turn_enabled else (110, 110, 110))
         view.screen.blit(label, (rect.centerx - label.get_width() // 2, rect.centery - label.get_height() // 2))
 
 
@@ -1394,9 +1418,9 @@ class CardMenu:
         player = self.player
         for card in self.trade_cards:
             player.cards.remove(card)
-        self.engine.log_action(player, " traded {} cards ({}) for {} {}".format(
-            len(self.trade_cards), ", ".join(card.name for card in self.trade_cards),
-            amount, "troops" if reward == "helmets" else reward))
+        self.engine.log_action(player, Msg(
+            " traded {} cards ({}) for {} {}", len(self.trade_cards),
+            Join(card.name for card in self.trade_cards), amount, "troops" if reward == "helmets" else reward))
         if reward == "helmets":
             self.engine.turn_manager.gain_troops(amount)
         else:
@@ -1411,7 +1435,7 @@ class CardMenu:
         if self.trade_mode:
             pg.draw.rect(screen, (235, 235, 245), pg.Rect(self.view.WIDTH * 0.5 - 130, 20, 260, 6 * 58 + 82))
             pg.draw.rect(screen, (0, 0, 0), pg.Rect(self.view.WIDTH * 0.5 - 130, 20, 260, 6 * 58 + 82), 3)
-            screen.blit(font.render("Trade cards for:", True, (0, 0, 0)), (self.view.WIDTH * 0.5 - 60, 30))
+            screen.blit(font.render(t("Trade cards for:"), True, (0, 0, 0)), (self.view.WIDTH * 0.5 - 60, 30))
             images = self.engine.hud_images
             mouse = (io.mouse_position.x, io.mouse_position.y)
             for index, (sprite, _, mult) in enumerate(self.TRADE_OPTIONS):
@@ -1427,7 +1451,8 @@ class CardMenu:
             back = self._back_rect()
             pg.draw.rect(screen, (245, 150, 150), back)
             pg.draw.rect(screen, (0, 0, 0), back, 2)
-            screen.blit(font.render("Back", True, (0, 0, 0)), (back.x + 38, back.y + 9))
+            label = font.render(t("Back"), True, (0, 0, 0))
+            screen.blit(label, label.get_rect(center=back.center))
             return
         if not self.show:
             return
@@ -1438,7 +1463,7 @@ class CardMenu:
             pg.draw.rect(screen, (0, 0, 0), panel, 3, border_radius=12)
         if getattr(self, "forced", False) and self.player.cards:
             warning = game_font(26).render(
-                "WARNING you currently hold too many cards", True, (255, 255, 255))
+                t("WARNING you currently hold too many cards"), True, (255, 255, 255))
             box = pg.Rect(0, 0, warning.get_width() + 30, warning.get_height() + 14)
             box.center = (int(self.view.WIDTH * 0.5), int(self.player.cards[0].pos.y) - 45)
             pg.draw.rect(screen, (190, 0, 0), box)
@@ -1461,7 +1486,7 @@ class CardMenu:
             draw_confirm_button(self.engine, Phase.CONFIRM_X, Phase.ROW_Y, allowed)
             if not allowed:
                 self.engine.turn_manager.phases[0].blit_hint(
-                    "Cards can only be traded in the recruitment phase")
+                    t("Cards can only be traded in the recruitment phase"))
 
     def use_cards_automatic(self):
         possible_equal_sets, possible_different_set = self.check_set(self.player.cards)

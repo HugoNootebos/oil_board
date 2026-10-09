@@ -34,6 +34,8 @@ import hashlib
 import json
 import multiprocessing
 
+import numpy as np
+
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
@@ -49,12 +51,19 @@ _worker = {}
 _trace = []
 
 
+def _plain(row):
+    """numpy scalars as Python ones: numpy 2 writes np.int64(5) where numpy 1
+    wrote 5, which would change every md5 without any play changing."""
+    return tuple(value.item() if isinstance(value, np.generic) else value for value in row)
+
+
 def _record(manager):
     engine = manager.engine
     _trace.append((
         manager.turn_num, engine.turn,
-        tuple((p.name, p.food, p.wood, p.steel, p.oil, p.nuclear, len(p.cards), p.eliminated) for p in engine.players),
-        tuple((name, c.owner.name, c.units, c.ships, c.tanks, c.planes, c.fort_lvl, c.developed, c.radioactive)
+        tuple(_plain((p.name, p.food, p.wood, p.steel, p.oil, p.nuclear, len(p.cards), p.eliminated))
+              for p in engine.players),
+        tuple(_plain((name, c.owner.name, c.units, c.ships, c.tanks, c.planes, c.fort_lvl, c.developed, c.radioactive))
               for name, c in engine.countries.items()),
     ))
 

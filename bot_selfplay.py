@@ -11,19 +11,16 @@ possible -- for testing and tuning bot.py.
         file (side B), e.g. a copy of an older version (old_bot.py).
         --botA FILE puts a file on side A instead of bot.py.
 
-    python3 bot_selfplay.py [games] [players] --levels hard,normal
-        A/B test between two difficulty levels of the current bot.
-
     python3 bot_selfplay.py [games] [players] --tweakA attack_min_p=0.5
-        A/B test of a tuning change: side A plays its level with the
-        tweaked values (--tweakA and --tweakB can be repeated; --tweak is
+        A/B test of a tuning change: side A plays with the tweaked
+        values (--tweakA and --tweakB can be repeated; --tweak is
         the same as --tweakA).
 
     python3 bot_selfplay.py [games] [players] --personality turtle
         A/B test of a personality: side A plays it, side B balanced.
 
-A/B tests play "hard" against "hard" unless --levels says otherwise, and
-every bot is "balanced" unless --personality says otherwise. --jobs N plays
+Every bot plays the "hard" tunables (tweaked where --tweakA/--tweakB say
+so) and is "balanced" unless --personality says otherwise. --jobs N plays
 N games at once (one per CPU core); --maxturns N stops a game after N turns
 (default 600; 24 turns is "6 rounds" at 4 players, a quick screen); --out
 FILE is where the results go (one JSON line per game, so a crashed run
@@ -340,6 +337,23 @@ def _init_worker(cfg):
     _worker["modules"] = {"A": module_a, "B": module_b}
     _worker["stats"] = Stats()
     _worker["kpi"] = None if cfg["no_kpi"] else Kpi(_worker["stats"])
+    if cfg.get("refund"):
+        install_refund(_worker["stats"], cfg["refund"])
+
+
+def install_refund(stats, side):
+    """A research oracle (--refund-assets A|B): `side` gets the price of every ship, tank,
+    plane and fort destroyed on it back, in wood and steel -- what perfect care of assets
+    could at most save, without changing how the bot plays."""
+    import engine as engine_module
+    original = engine_module.Engine.log_destroyed
+
+    def refund(self, owner, country_name, ships=0, tanks=0, planes=0, fort=0):
+        if owner is not None and stats.side_of.get(owner) == side:
+            owner.wood += 15 * ships + sum(10 + 5 * k for k in range(fort))
+            owner.steel += 20 * tanks + 10 * planes
+        return original(self, owner, country_name, ships, tanks, planes, fort)
+    engine_module.Engine.log_destroyed = refund
 
 
 def _alarm(signum, frame):
@@ -412,7 +426,6 @@ def main():
     parser.add_argument("players", nargs="?", default="4", help="player count, or a list such as 3,4,5,6")
     parser.add_argument("--vs", metavar="BOT_FILE", help="A/B test against the bot in this file (side B)")
     parser.add_argument("--botA", metavar="BOT_FILE", help="the bot in this file plays side A (default bot.py)")
-    parser.add_argument("--levels", metavar="A,B", help="A/B test between two levels (default hard,hard)")
     parser.add_argument("--tweak", "--tweakA", dest="tweakA", metavar="KEY=VALUE", action="append", default=[],
                         help="change one of side A's tunables (repeatable)")
     parser.add_argument("--tweakB", metavar="KEY=VALUE", action="append", default=[],
@@ -424,16 +437,16 @@ def main():
     parser.add_argument("--maxturns", type=int, default=MAX_TURNS, help="stop a game after this many turns")
     parser.add_argument("--timeout", type=int, default=900, help="seconds before a game counts as hung")
     parser.add_argument("--out", metavar="FILE", help="where the results go, one JSON line per game")
+    parser.add_argument("--refund-assets", choices=["A", "B"], help="research oracle: this side gets the price of every asset it loses back")
     parser.add_argument("--no-kpi", action="store_true", help="skip the KPI counters (a little faster)")
     parser.add_argument("--slim", action="store_true", help="leave the per-turn series out of the results")
     args = parser.parse_args()
 
     players = [int(n) for n in args.players.split(",")]
-    plain = not (args.vs or args.botA or args.levels or args.tweakA or args.tweakB or args.personality)
-    levels = (args.levels or "hard,hard").split(",")
-    cfg = dict(plain=plain, botA=args.botA, vs=args.vs, levels=[level.strip() for level in levels],
+    plain = not (args.vs or args.botA or args.tweakA or args.tweakB or args.personality or args.refund_assets)
+    cfg = dict(plain=plain, botA=args.botA, vs=args.vs, levels=["hard", "hard"],
                tweakA=args.tweakA, tweakB=args.tweakB, personality=args.personality,
-               maxturns=args.maxturns, timeout=args.timeout, no_kpi=args.no_kpi, slim=args.slim)
+               maxturns=args.maxturns, timeout=args.timeout, no_kpi=args.no_kpi, slim=args.slim, refund=args.refund_assets)
     out = args.out or os.path.join(tempfile.gettempdir(), "oil_selfplay_{}.jsonl".format(int(time.time())))
     run(cfg, args.games, players, args.seed, args.jobs, out)
     if not plain:

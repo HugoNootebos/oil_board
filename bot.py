@@ -44,8 +44,8 @@ The strategy, per phase:
   - move: develop a safe country if it pays, share out troops by rail or
     air, make the one move worth the most, and place any owed pagoda/torii.
 
-How far it looks and how sure it plays depends on its level (LEVELS:
-easy/normal/hard) and personality (PERSONALITIES).
+How it plays is set by its tunables (LEVELS) and personality
+(PERSONALITIES).
 """
 
 import itertools
@@ -57,6 +57,7 @@ from functools import lru_cache
 import pygame as pg
 
 from board import CONTINENTS
+from lang import t, Msg, Join
 from models import CardMenu
 from player_colors import light_tint
 from phases import CONTINENT_CARD_BONUS
@@ -67,10 +68,11 @@ DICE_MS = 900      # how long a roll stays visible before it's resolved
 NOTICE_MS = 2500   # a message on a bot's turn closes by itself after this
 FAST_BOTS = 0.3    # all of these, with "Fast bots" on in the settings menu
 
-# What a bot weighs its decisions with. Its difficulty level (a player's
-# `bot_level`) picks one of LEVELS, and its personality (`bot_personality`)
-# shifts a few of those values (see BotController.params). bot_selfplay.py
-# can pit levels and tweaks against each other to tune these.
+# What a bot weighs its decisions with. There is one bot (LEVELS["hard"]);
+# its personality (`bot_personality`) shifts a few of those values (see
+# BotController.params). The tuning tools (bot_selfplay.py, bot_checks.py,
+# bot_fork.py, bot_golden.py) add tweaked copies to LEVELS and point a
+# player's `bot_level` at one.
 BASE = {
     "attack_min_p": 0.65,     # start an attack only with at least this chance
     "retreat_p": 0.25,        # call a running attack off below this chance
@@ -179,28 +181,36 @@ BASE = {
     "buffer_min_gain": 1.0,      # the gain it has to show
     "buffer_keep": 3,            # the bot keeps at least this many countries
     "buffer_cool": 2,            # rounds the bot leaves an emptied country alone, while it is exposed
-    "noise": 0.0,             # how much its choices are off, at random (0: never)
+    # Ships, tanks, planes and forts are destroyed with their country, which what a
+    # country's loss costs (_hold_value) never counted: bots left them next to a big
+    # enemy army with one troop on guard. asset_hold: they count at their price in
+    # troops (times this) in that loss (_position_value), so troops go to defend
+    # them, the shop does not buy them for a country about to fall and the one
+    # move a turn can take them out of reach. asset_move: 1 lets that move also
+    # take tanks alone, a plane or a ship with one troop to any country of the bot's
+    # (not only to a border), and counts the tanks that go with a stack. 0: off.
+    # (Measured: they save a quarter of the assets lost to conquest but no gain in
+    # wins was shown; they are on because the owner asked for it. See
+    # bot_research/README.md, "Assets".)
+    "asset_hold": 1.0,
+    "asset_move": 1,
+    # An attack carries its assets onto the conquered country, where they are lost
+    # with it (a ship or plane over sea, the tanks): asset_attack (x asset_hold) takes
+    # that expected loss off the attack's value (_attack_ev). asset_carry: 1 brings
+    # only the tanks that fight (the oil-paid ones) -- the rest stay and guard the
+    # country they came from. 0: off.
+    "asset_attack": 1.0,
+    "asset_carry": 1,
+    # How much its choices are off, at random (0: never); only for A/B tests'
+    # noise-matched controls.
+    "noise": 0.0,
 }
 LEVELS = {
     "hard": dict(BASE),
-    # Often picks a lesser option, hardly looks past the next conquest,
-    # underestimates threats, never shuffles troops by rail or air and
-    # holds on to its resources.
-    "normal": dict(BASE, noise=0.4, follow_discount=0.3, enemy_aggression=0.6, hunt_min_p=0.5,
-                   reposition_min_gain=2.0, redistribute_min_gain=99.0, price_factor=1.3,
-                   exposure=0, retention=0, strike=0, finish_max=0, endgame_alive=0, endgame_lead=1.1),
-    # Mostly picks at random among what looks good, only attacks sure
-    # things, barely sees threats coming (not even its own end), never plans
-    # ahead, never hunts anyone down and rarely buys anything.
-    "easy": dict(BASE, noise=0.8, attack_min_p=0.75, free_attack_min_p=0.6, kill_value=0.2,
-                 enemy_aggression=0.3, follow_discount=0.0, hunt_min_p=1.1, hold_weak_sets=False,
-                 price_factor=2.0, reposition_min_gain=4.0, redistribute_min_gain=99.0,
-                 survival_value=0.0, survival_weight=0.0, exposure=0, retention=0, strike=0, finish_max=0,
-                 endgame_alive=0, endgame_lead=1.1),
 }
-DEFAULT_LEVEL = "normal"
+DEFAULT_LEVEL = "hard"
 
-# Shifts on top of the level, so bots of one level still play differently.
+# Shifts on top of the tunables, so bots still play differently.
 PERSONALITIES = {
     "balanced": {},
     "aggressive": {"attack_min_p": -0.1, "kill_value": 0.3, "enemy_aggression": -0.2, "follow_discount": 0.1},
@@ -290,8 +300,8 @@ def card_sets(cards):
 
 
 def bot_params(player):
-    """`player`'s tunables: their level's (LEVELS), shifted by their
-    personality (PERSONALITIES)."""
+    """`player`'s tunables: their level's (LEVELS; "hard" unless a tuning
+    tool says otherwise), shifted by their personality (PERSONALITIES)."""
     level = getattr(player, "bot_level", DEFAULT_LEVEL)
     personality = getattr(player, "bot_personality", DEFAULT_PERSONALITY)
     key = (level, personality)
@@ -329,8 +339,8 @@ class BotController:
         # board changes with every action).
         self._cache = {}
         self._acting = None
-        # For the random slips of the lower levels (see _jitter); its own,
-        # so it doesn't disturb the game's dice.
+        # For the random slips of a noisy bot (see _jitter); its own, so it
+        # doesn't disturb the game's dice.
         self.rng = random.Random(0)
 
     def _say(self, text):
@@ -352,8 +362,8 @@ class BotController:
         view.screen.blit(text, (rect.x + 12, rect.y + 6))
 
     def _jitter(self, score):
-        """`score` nudged up or down at random by the level's noise (lower
-        levels sometimes prefer a lesser option); unchanged at noise 0."""
+        """`score` nudged up or down at random by the bot's noise (it
+        sometimes prefers a lesser option); unchanged at noise 0."""
         noise = self.params["noise"]
         return score * math.exp(noise * self.rng.gauss(0, 1)) if noise else score
 
@@ -470,9 +480,8 @@ class BotController:
             self._failed = set()
             personality = getattr(player, "bot_personality", DEFAULT_PERSONALITY)
             self._cache = {}
-            self._say("{} bot{}, {}".format(
-                getattr(player, "bot_level", DEFAULT_LEVEL),
-                "" if personality == DEFAULT_PERSONALITY else ", " + personality,
+            self._say("{}{}".format(
+                "" if personality == DEFAULT_PERSONALITY else personality + ", ",
                 "playing it safe" if self._in_danger() else "thinking"))
 
         phase = manager.phases.get(player.attack)
@@ -1213,10 +1222,10 @@ class BotController:
 
         def compute():
             engine, player, event = self.engine, self.player, self.manager.current_event
+            tanks = min(from_c.tanks, player.oil) if active_tanks is None else active_tanks
             if event is not None and event.free_claim_allowed(engine, target):
                 chance, left, killed = 1.0, float(attackers), 0.0
             else:
-                tanks = min(from_c.tanks, player.oil) if active_tanks is None else active_tanks
                 chance, left, killed = battle(attackers, target.units, self._combat_mods(from_c, target, tanks))
             starving = self._economy()["starving"]
             troop_cost = 1 - min(1.0, starving / attackers)
@@ -1232,6 +1241,8 @@ class BotController:
                     and self._is_real(target.owner) and self.manager.conquered_enemy_this_turn:
                 ev -= self.params["extra_exposure"] * chance * self._extra_cost(
                     from_c, target, attackers, left, chance, troop_cost)
+            if not seen and chance > 0.05 and self.params["asset_attack"] and self.params["asset_hold"]:
+                ev -= self.params["asset_attack"] * chance * self._carried_loss(from_c, target, tanks)
             if depth > 1 and chance > 0.05:
                 # The survivors move in (one stays behind) and go on.
                 onward = int(left / chance) - 1
@@ -1247,6 +1258,19 @@ class BotController:
                 ev += chance * self.params["follow_discount"] * best
             return ev
         return self._cached(key, compute)
+
+    def _carried_loss(self, from_c, target, active_tanks):
+        """What the assets that go along on an attack on `target` are likely to
+        cost: they land on the conquered country, and go down with it."""
+        p = self.params
+        sea = self._links(from_c.name).get(target.name) == "sea"
+        ships = from_c.ships if sea else 0
+        planes = 1 if sea and not ships and from_c.planes else 0
+        tanks = active_tanks if p["asset_carry"] else from_c.tanks
+        price = self._asset_price(ships, tanks, planes, 0)
+        if not price:
+            return 0.0
+        return p["asset_hold"] * price * self._danger(target, p["conquest_garrison"], 0, 0)
 
     def _extra_cost(self, from_c, target, attackers, left, chance, troop_cost):
         """What taking `target` from `from_c` exposes, in troops: the dice of the
@@ -1553,6 +1577,13 @@ class BotController:
             return value * (1 + self.params["survival_weight"] * self._elimination_risk())
         return self._cached(("hold", country.name), compute)
 
+    def _asset_price(self, ships, tanks, planes, fort):
+        """What the assets on a country cost to replace, in troops: they go with it."""
+        w = self._weights()
+        wood = 15 * ships + sum(10 + 5 * k for k in range(fort))
+        steel = TANK_STEEL * tanks + 10 * planes
+        return w["wood"] * wood + w["steel"] * steel
+
     def _best_attack_ev(self, country, units, depth=2, ships=None, planes=None, tanks=None):
         """The most an attack from `country` with `units` troops on it is
         worth (0 when nothing is)."""
@@ -1567,7 +1598,12 @@ class BotController:
         """How good `units` troops on `country` are: what they can attack
         (times `attack_weight`) minus what could be lost there. `ships`,
         `planes`, `tanks` and `fort` pretend a different number is there."""
-        value = -self._hold_value(country) * self._danger(country, units, fort, tanks)
+        danger = self._danger(country, units, fort, tanks)
+        value = -self._hold_value(country) * danger
+        if self.params["asset_hold"]:
+            value -= self.params["asset_hold"] * danger * self._asset_price(
+                country.ships if ships is None else ships, country.tanks if tanks is None else tanks,
+                country.planes if planes is None else planes, country.fort_lvl if fort is None else fort)
         if units > 1 and attack_weight:
             value += attack_weight * self._best_attack_ev(country, units, depth, ships, planes, tanks)
         return value
@@ -1936,7 +1972,7 @@ class BotController:
 
     def _drop_nuke(self, name):
         self.manager.phases[3].drop_nuke(name)
-        self.manager.notices.append("{} nuked {}!".format(self.player.name, name))
+        self.manager.notices.append(t("{} nuked {}!").format(self.player.name, t(name)))
 
     # --- attack --------------------------------------------------------------
 
@@ -2017,6 +2053,8 @@ class BotController:
             attack.selected_planes = 1
             attack.active_tanks = min(attack.active_tanks,
                                       max(player.oil - 1 + attack.prepaid_planes, 0) + attack.tank_fee_paid)
+        if self.params["asset_carry"]:
+            attack.selected_tanks = min(attack.selected_tanks, attack.active_tanks)
 
     def _free_share(self, from_c):
         """How much of an attack from `from_c` is made with troops that
@@ -2207,7 +2245,8 @@ class BotController:
         self._vacated[country.name] = self.manager.turn_num
         phase.abandon(country)
         self.player.repositioned_this_turn = True
-        self.engine.log_action(self.player, " withdrew {} troops from {} to {}".format(troops, country.name, target.name))
+        self.engine.log_action(self.player, Msg(" withdrew {} troops from {} to {}",
+                                                troops, country.name, target.name))
         self._say("withdraws from {} (mouse buffer, {:+.1f})".format(country.name, gain))
         return True
 
@@ -2229,9 +2268,10 @@ class BotController:
             return True
         weight = self.params["next_turn_weight"]
         oil_cost = self._weights()["oil"]
+        move_assets = self.params["asset_move"]
 
-        def value(country, units, ships=None, planes=None):
-            return self._position_value(country, units, weight, 1, ships, planes)
+        def value(country, units, ships=None, planes=None, tanks=None):
+            return self._position_value(country, units, weight, 1, ships, planes, tanks)
 
         best_gain, best = self.params["reposition_min_gain"], None
         for origin in self._owned():
@@ -2248,25 +2288,57 @@ class BotController:
             planes = (0, 1) if origin.planes and player.oil >= 1 else (0,)
             ships = (0, 1) if origin.ships else (0,)
             for n in sorted({spare, spare // 2, min(spare, 3), 0}):
+                # The stack's tanks go along when about half of it does.
+                tk = origin.tanks if n and 2 * n >= origin.units - 1 else 0
                 for plane in planes:
                     for ship in ships:
                         if (n, plane, ship) == (0, 0, 0) or (ship and not n):
                             continue  # nothing moves / a ship needs a troop aboard
-                        loss = now - value(origin, origin.units - n, origin.ships - ship, origin.planes - plane)
+                        loss = now - (value(origin, origin.units - n, origin.ships - ship, origin.planes - plane,
+                                            origin.tanks - tk if move_assets else None))
                         for target in targets:
                             if ship and target.name not in by_sea:
                                 continue
                             if n and target.name not in land and not (ship or plane):
                                 continue  # troops can't cross the sea alone
                             gain = self._jitter(
-                                value(target, target.units + n, target.ships + ship, target.planes + plane)
+                                value(target, target.units + n, target.ships + ship, target.planes + plane,
+                                      target.tanks + tk if move_assets else None)
                                 - value(target, target.units) - loss - plane * oil_cost)
                             if gain > best_gain:
-                                best_gain, best = gain, (origin, target, n, ship, plane)
+                                best_gain, best = gain, (origin, target, n, ship, plane, tk)
+        if move_assets:
+            # Assets alone: tanks, a plane, or a ship with one troop to steer it, to
+            # wherever they are worth the most -- out of reach of the enemy, say.
+            for origin in self._owned():
+                if not (origin.ships or origin.tanks or origin.planes):
+                    continue
+                reach = sorted(self._own_reach(origin.name) - {origin.name})
+                if not reach:
+                    continue
+                by_sea = phase._sea_flood_fill(origin.name)
+                now = value(origin, origin.units, origin.ships, origin.planes, origin.tanks)
+                for ship in ((0, 1) if origin.ships and origin.units >= 2 else (0,)):
+                    for tk in ((0, origin.tanks) if origin.tanks else (0,)):
+                        for plane in ((0, 1) if origin.planes and player.oil >= 1 else (0,)):
+                            if not (ship or tk or plane):
+                                continue
+                            loss = now - value(origin, origin.units - ship, origin.ships - ship,
+                                               origin.planes - plane, origin.tanks - tk)
+                            for name in reach:
+                                if ship and name not in by_sea:
+                                    continue
+                                target = engine.countries[name]
+                                gain = self._jitter(
+                                    value(target, target.units + ship, target.ships + ship, target.planes + plane,
+                                          target.tanks + tk)
+                                    - value(target, target.units, target.ships, target.planes, target.tanks)
+                                    - loss - plane * oil_cost)
+                                if gain > best_gain:
+                                    best_gain, best = gain, (origin, target, ship, ship, plane, tk)
         if best is None:
             return False
-        origin, target, n, ship, plane = best
-        tanks = origin.tanks if n and 2 * n >= origin.units - 1 else 0
+        origin, target, n, ship, plane, tanks = best
         origin.units -= n
         target.units += n
         origin.tanks -= tanks
@@ -2278,12 +2350,14 @@ class BotController:
         player.oil -= plane
         player.repositioned_this_turn = True
         # Logged like MovementPhase._log_move does for a human's move.
-        moved = ["{} {}".format(k, word) for k, word in
+        moved = [Msg("{} {}", k, word) for k, word in
                  ((n, "troops"), (tanks, "tanks"), (ship, "ships"), (plane, "planes")) if k]
-        engine.log_action(player, " moved {} from {} to {}".format(", ".join(moved), origin.name, target.name))
+        engine.log_action(player, Msg(" moved {} from {} to {}", Join(moved), origin.name, target.name))
         extra =" with a plane" if plane else " by ship" if ship else ""
-        self._say("moves {} troops from {} to {}{}".format(n, origin.name, target.name, extra) if n
-                  else "moves a {} from {} to {}".format("plane" if plane else "ship", origin.name, target.name))
+        self._say("moves {} troops from {} to {}{}".format(n, origin.name, target.name, extra) if n > ship
+                  else "moves {} from {} to {}".format(
+                      ", ".join("{} {}".format(k, word) for k, word in
+                                ((tanks, "tanks"), (ship, "ship"), (plane, "plane")) if k), origin.name, target.name))
         return True
 
     def _best_redistribution(self, phase, kinds=("rails", "air")):

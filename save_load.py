@@ -41,6 +41,7 @@ import os
 
 import numpy as np
 
+from lang import t, Msg
 from models import Player, Kaertske, Connection
 
 SAVE_VERSION = 1
@@ -71,7 +72,7 @@ def read_save_name(path):
     at `path`. Saves from before names existed are just "Saved game"."""
     try:
         with open(path) as f:
-            return json.load(f).get("save_name") or "Saved game"
+            return json.load(f).get("save_name") or t("Saved game")
     except (OSError, ValueError):
         return None
 
@@ -121,7 +122,6 @@ def _player_to_dict(player):
         "developed_this_turn": player.developed_this_turn,
         "eliminated": player.eliminated,
         "is_bot": player.is_bot,
-        "bot_level": player.bot_level,
         "bot_personality": player.bot_personality,
         # Cards only need their type (0-3); Kaertske re-derives everything
         # else (name, sprite, layout position) from that plus engine.images.
@@ -199,7 +199,8 @@ def save_game(engine, manager, path=AUTOSAVE_PATH, event_schedule_pending=False,
             "awaiting_gap": manager.awaiting_gap,
             "event_schedule_pending": event_schedule_pending,
         },
-        "action_log": [[[text, list(color)] for text, color in line] for line in engine.action_log[-100:]],
+        "action_log": [[[text.to_json() if isinstance(text, Msg) else text, list(color)] for text, color in line]
+                       for line in engine.action_log[-100:]],
         "players": [_player_to_dict(p) for p in engine.players],
         "countries": {
             name: _country_to_dict(country, engine.default_player)
@@ -270,7 +271,6 @@ def load_game(path, engine, manager):
         player.developed_this_turn = pdata.get("developed_this_turn", False)
         player.eliminated = pdata.get("eliminated", False)
         player.is_bot = pdata.get("is_bot", False)
-        player.bot_level = pdata.get("bot_level", player.bot_level)
         player.bot_personality = pdata.get("bot_personality", player.bot_personality)
         player.cards = [Kaertske(card_type, images=engine.images) for card_type in pdata["cards"]]
         new_players.append(player)
@@ -324,7 +324,8 @@ def load_game(path, engine, manager):
 
     # --- turn / manager state ------------------------------------------
     engine.turn = data["turn"]["current_player_index"]
-    engine.action_log = [[[text, tuple(color)] for text, color in line] for line in data.get("action_log", [])]
+    engine.action_log = [[[Msg.from_json(text), tuple(color)] for text, color in line]
+                         for line in data.get("action_log", [])]
     engine.action_log_open = False
     engine.action_scroll = 0
     engine.default_game = data.get("default_game", engine.default_game)

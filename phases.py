@@ -13,6 +13,7 @@ board.py / models.py, instead of the list indices running.py used.
 
 import pygame as pg
 from fonts import game_font
+from lang import t, Msg, Join
 import sounds
 import numpy as np
 
@@ -221,7 +222,7 @@ class Phase:
         self.draw_rect((0, 0, 0), x, y, w, h, 3)
         if Phase._popup_hint_font is None:
             Phase._popup_hint_font = game_font(15)
-        hint = self._popup_hint_font.render("Click anywhere to continue", True, self.POPUP_HINT_COLOR)
+        hint = self._popup_hint_font.render(t("Click anywhere to continue"), True, self.POPUP_HINT_COLOR)
         self.view.screen.blit(hint, hint.get_rect(midbottom=(int(x + w * 0.5), int(y + h - 12))))
         # The box counts as a button under its own ones, so a click on it
         # can't reach the map behind (e.g. reselect the attacker).
@@ -266,18 +267,21 @@ class Phase:
 
     def _draw_reinforcements(self, count):
         """Troops left to deploy: the troop-card soldier with a signed
-        number over it, at the bottom centre of the screen."""
+        number over it, just left of the player panel (10 px further than
+        the cancel button) and level with its helmet row."""
         import pygame as pg
         view = self.view
+        gui = self.engine.gui
         height = 48
         if "reinforcements" not in _ASSET_ICONS:
             sprite = pg.image.load("./images/card0.png").convert_alpha()
             _ASSET_ICONS["reinforcements"] = pg.transform.smoothscale(
                 sprite, (round(sprite.get_width() * height / sprite.get_height()), height))
         sprite = _ASSET_ICONS["reinforcements"]
-        cx = view.WIDTH // 2
-        cy = view.HEIGHT - 6 - height // 2
-        view.screen.blit(sprite, (cx - sprite.get_width() // 2, cy - height // 2))
+        right = view.WIDTH - gui.width - self.BUTTON_GAP - 10
+        cx = right - sprite.get_width() // 2
+        cy = gui.player_row_center_y(view, gui.HELMET_ROW)
+        view.screen.blit(sprite, (right - sprite.get_width(), cy - height // 2))
         label = ("+" if count >= 0 else "-") + str(abs(count))
         text = self.engine.font.render(label, True, (0, 0, 0))
         outline = self.engine.font.render(label, True, (255, 255, 255))
@@ -530,25 +534,14 @@ class Phase:
         by_air = self._redistribute_kind == "air"
         # Resource selector, as on the movement screen (troops and tanks;
         # boats can't go by rail or air, and planes only move between
-        # airports).
-        resources = [("units", "spr_troops"), ("tanks", "spr_tank")]
+        # airports): each pool's sprite with its count, click one to pick it.
+        pools = [("units", "spr_troops", self.rail_pool), ("tanks", "spr_tank", self.rail_tank_pool)]
         if by_air:
-            resources.append(("planes", "spr_plane"))
-        for i, (key, sprite) in enumerate(resources):
-            x, y = (WIDTH - (len(resources) * 90 - 10)) // 2 + i * 90, 10
-            selected = self.rail_resource == key
-            self.draw_rect((100, 100, 255) if selected else (200, 200, 200), x, y, 80, 40)
-            self.draw_rect((0, 0, 0), x, y, 80, 40, 3)
-            icon = self._resource_icon(sprite)
-            view.screen.blit(icon, (x + 40 - icon.get_width() // 2, y + 20 - icon.get_height() // 2))
-            if self.clicked(x, y, x + 80, y + 40):
-                self.rail_resource = key
-
+            pools.append(("planes", "spr_plane", self.rail_plane_pool))
+        picked = self._resource_selector(pools, self.rail_resource)
+        if picked is not None:
+            self.rail_resource = picked
         pool_attr = {"units": "rail_pool", "tanks": "rail_tank_pool", "planes": "rail_plane_pool"}[self.rail_resource]
-        pools = [("spr_troops", self.rail_pool), ("spr_tank", self.rail_tank_pool)]
-        if by_air:
-            pools.append(("spr_plane", self.rail_plane_pool))
-        self._draw_pool_counters(pools, 54)
 
         # As when deploying troops: left-click a country to put one there
         # from the pool, right-click to take one out into the pool.
@@ -572,7 +565,7 @@ class Phase:
 
         if any(engine.countries[n].units == 0 and (engine.countries[n].tanks > 0 or engine.countries[n].planes > 0)
                for n in self.rail_network):
-            self.blit_hint("Tanks and planes in an emptied country are lost on Confirm")
+            self.blit_hint(t("Tanks and planes in an emptied country are lost on Confirm"))
 
         done_active = self.rail_pool == 0 and self.rail_tank_pool == 0 and self.rail_plane_pool == 0
         confirm_clicked = self.confirm_button(self.CONFIRM_X, self.ROW_Y, done_active)
@@ -585,39 +578,73 @@ class Phase:
         else:
             self._rail_extra(done_active)
 
-    def _draw_pool_counters(self, pools, y):
-        """Sprite with the pool's count on it under each resource toggle
-        (same order, centred on it); dimmed while the pool is empty."""
-        import pygame as pg
+    SELECT_GLOW = (255, 220, 60)
+    _selector_icons = {}
+
+    def _selector_icon(self, sprite):
+        """Sprite for the resource selector (cached): troops as the
+        troop-card soldier, 56 px tall; the rest 44 px square."""
+        if sprite not in self._selector_icons:
+            if sprite == "spr_troops":
+                surf = self.engine.images["spr_card0"].image
+                size = (round(surf.get_width() * 56 / surf.get_height()), 56)
+            else:
+                surf = self.engine.images[sprite].image
+                size = (44, 44)
+            self._selector_icons[sprite] = pg.transform.smoothscale(surf, size)
+        return self._selector_icons[sprite]
+
+    _glow = None
+
+    def _selector_glow(self):
+        """Soft yellow disc that marks the selected resource (cached)."""
+        if Phase._glow is None:
+            radius = 42
+            surf = pg.Surface((radius * 2, radius * 2), pg.SRCALPHA)
+            for r in range(radius, 0, -1):
+                alpha = int(255 * min(1, 1.6 * (1 - r / radius)) ** 0.9)
+                pg.draw.circle(surf, self.SELECT_GLOW + (alpha,), (radius, radius), r)
+            Phase._glow = surf
+        return Phase._glow
+
+    SELECTOR_STEP = 67  # between sprite centres
+
+    def _resource_selector(self, items, selected, y=22, disabled=()):
+        """Row of resource sprites centred at the top: a glow behind the
+        selected one, a click picks one (returned, else None). Items are
+        (key, sprite, count); a count is drawn on the sprite (dimmed while
+        0) unless it is None. Keys in `disabled` are dimmed and only give
+        the error sound when clicked. The default `y` centres the row on
+        the HUD buttons (cards button: top 20, 60 high)."""
         screen = self.view.screen
-        size = 44
-        left = (self.view.WIDTH - (len(pools) * 90 - 10)) // 2
         font = pg.font.Font(None, 30)
-        for i, (sprite, count) in enumerate(pools):
-            x = left + i * 90 + 40 - size // 2
-            surf = self.engine.hud_images[sprite].image if sprite == "spr_troops" else self.engine.images[sprite].image
-            icon = pg.transform.smoothscale(surf, (size, size))
-            if count == 0:
+        step = self.SELECTOR_STEP
+        left = (self.view.WIDTH - ((len(items) - 1) * step + 80)) // 2
+        picked = None
+        for i, (key, sprite, count) in enumerate(items):
+            cx, cy = left + i * step + 40, y + 28
+            if key == selected:
+                glow = self._selector_glow()
+                screen.blit(glow, (cx - glow.get_width() // 2, cy - glow.get_height() // 2))
+            icon = self._selector_icon(sprite)
+            if count == 0 or key in disabled:
                 icon = icon.copy()
                 icon.fill((255, 255, 255, 110), special_flags=pg.BLEND_RGBA_MULT)
-            screen.blit(icon, (x, y))
-            text = font.render(str(count), True, (255, 255, 255))
-            outline = font.render(str(count), True, (0, 0, 0))
-            tx, ty = x + (size - text.get_width()) // 2, y + (size - text.get_height()) // 2
-            for dx in (-1, 0, 1):
-                for dy in (-1, 0, 1):
-                    screen.blit(outline, (tx + dx, ty + dy))
-            screen.blit(text, (tx, ty))
-
-    _resource_icons = {}
-
-    def _resource_icon(self, sprite):
-        """Sprite for a resource selector box, scaled to fit it (cached)."""
-        import pygame as pg
-        if sprite not in self._resource_icons:
-            surf = self.engine.hud_images[sprite].image if sprite == "spr_troops" else self.engine.images[sprite].image
-            self._resource_icons[sprite] = pg.transform.smoothscale(surf, (30, 30))
-        return self._resource_icons[sprite]
+            screen.blit(icon, (cx - icon.get_width() // 2, cy - icon.get_height() // 2))
+            if count is not None:
+                text = font.render(str(count), True, (255, 255, 255))
+                outline = font.render(str(count), True, (0, 0, 0))
+                tx, ty = cx - text.get_width() // 2, cy - text.get_height() // 2
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        screen.blit(outline, (tx + dx, ty + dy))
+                screen.blit(text, (tx, ty))
+            if self.clicked(cx - step // 2, y, cx + step // 2, y + 56):
+                if key in disabled:
+                    sounds.play("error")
+                else:
+                    picked = key
+        return picked
 
     def _cancel_redistribute(self):
         """Undo every change made on the redistribute screen: troops go back
@@ -646,11 +673,11 @@ class Phase:
             for name in self.rail_network:
                 diff = getattr(countries[name], attr) - initial.get(name, 0)
                 if diff:
-                    changes.append("{}{} {}{}".format("+" if diff > 0 else "-", abs(diff),
-                                                      "" if attr == "units" else label + " ", name))
-        self.engine.log_action(self.player, " moved {}: {}".format(
-            "by air" if self._redistribute_kind == "air" else "along rails",
-            ", ".join(changes) or "nothing changed"))
+                    changes.append(Msg("{}{} {}{}", "+" if diff > 0 else "-", abs(diff),
+                                       "" if attr == "units" else label + " ", name))
+        self.engine.log_action(self.player, Msg(
+            " moved {}: {}", "by air" if self._redistribute_kind == "air" else "along rails",
+            Join(changes) if changes else "nothing changed"))
         for name in self.rail_network:
             country = self.engine.countries[name]
             if country.units == 0:
@@ -732,8 +759,9 @@ class ReinforcementPhase(Phase):
             if all(engine.countries[n].owner == player for n in CONTINENTS[continent]):
                 for _ in range(bonus):
                     player.cards.append(Kaertske(random_card_type(), images=engine.images))
-                self.manager.notices.append("You received {} {} for having {}".format(
-                    bonus, "card" if bonus == 1 else "cards", continent))
+                self.manager.notices.append(t(
+                    "You received {} card for having {}" if bonus == 1 else "You received {} cards for having {}"
+                ).format(bonus, t(continent)))
 
     def _produce(self, first_round=False):
         """The turn's income from the player's countries, their troops (and
@@ -754,8 +782,8 @@ class ReinforcementPhase(Phase):
                         # Developed last turn and they still hold it and its
                         # whole continent: no waiting for the first income.
                         continent = next(name for name, members in CONTINENTS.items() if country.name in members)
-                        manager.notices.append("Because you control {}, {} was developed instantly!".format(
-                            continent, country.name))
+                        manager.notices.append(t("Because you control {}, {} was developed instantly!").format(
+                            t(continent), t(country.name)))
                     country.dormant_owner = None
                     amounts = {
                         "food": country.food * mult,
@@ -802,7 +830,7 @@ class ReinforcementPhase(Phase):
         for country in engine.countries.values():
             if country.owner == player and country.units == 0:
                 self.abandon(country)
-        engine.log_action(player, " lost {} troops to starvation".format(self.starved))
+        engine.log_action(player, Msg(" lost {} troops to starvation", self.starved))
         self.starved = 0
         self._produce()
         self._continent_cards()
@@ -826,11 +854,11 @@ class ReinforcementPhase(Phase):
                 pg.image.load("./images/starving.png").convert_alpha(), (112, 112))
         icon = _ASSET_ICONS["starving"]
         screen.blit(icon, icon.get_rect(midtop=(cx, int(y + 22))))
-        text = self.engine.font.render("{} troops starved to death".format(self.starved), True, (0, 0, 0))
+        text = self.engine.font.render(t("{} troops starved to death").format(self.starved), True, (0, 0, 0))
         screen.blit(text, text.get_rect(midtop=(cx, int(y + 160))))
         if ReinforcementPhase._hint_font is None:
             ReinforcementPhase._hint_font = game_font(15)
-        hint = self._hint_font.render("Click anywhere to continue", True, (110, 70, 70))
+        hint = self._hint_font.render(t("Click anywhere to continue"), True, (110, 70, 70))
         screen.blit(hint, hint.get_rect(midbottom=(cx, int(y + h - 18))))
         if self.io.left_pressed and self.io.top_button is None:
             self.starve_pool = -self.starved
@@ -844,7 +872,7 @@ class ReinforcementPhase(Phase):
         player = self.player
         HEIGHT = self.view.HEIGHT
 
-        # The pool as the deploy screen's soldier ("-N", bottom centre).
+        # The pool as the deploy screen's soldier ("-N", by the helmet row).
         self._draw_reinforcements(self.starve_pool)
         active = self.starve_pool == 0
         confirm_clicked = self.confirm_button(self.CONFIRM_X, self.ROW_Y, active)
@@ -1099,7 +1127,7 @@ class AttackPhase(Phase):
         # from the country selected when the rails/airport button was hit.
         launch = self.rail_last_added if self.rail_last_added is not None else self.attack_from
         if by_air and engine.countries[launch].planes == 0:
-            self.blit_hint("Air attack needs a plane in the launch airport")
+            self.blit_hint(t("Air attack needs a plane in the launch airport"))
             return
         if self.io.left_pressed:
             self.attack_from = launch
@@ -1214,7 +1242,7 @@ class AttackPhase(Phase):
         done = self.click_anywhere_popup(panel_x, panel_y, panel_w, panel_h)
         # Oil it will cost: centred above the "click anywhere" hint.
         cost_x, cost_y = panel_x + panel_w * 0.5, panel_y + 264
-        self.blit_text("Bring along from {}:".format(self.attack_from), panel_x + 20, panel_y + 10)
+        self.blit_text(t("Bring along from {}:").format(t(self.attack_from)), panel_x + 20, panel_y + 10)
 
         rows = [
             ("selected_ships", from_c.ships, engine.images["spr_ship"]),
@@ -1227,7 +1255,7 @@ class AttackPhase(Phase):
             selected = getattr(self, attr)
             label = "{} / {}".format(selected, available)
             if attr == "selected_ships" and self.attack_via_land:
-                label += " (no boats over land)"
+                label += t(" (no boats over land)")
             self.blit_text(label, panel_x + 70, row_y + 8)
 
             minus_x = panel_x + 340
@@ -1269,7 +1297,7 @@ class AttackPhase(Phase):
             # Already claimed: can't back out, so just block continuing
             # until something is carrying the troops across again.
             if no_escort:
-                self.blit_text("Needs a ship or plane to cross the sea", panel_x + 20, panel_y + 50 + len(rows) * 52 + 8)
+                self.blit_text(t("Needs a ship or plane to cross the sea"), panel_x + 20, panel_y + 50 + len(rows) * 52 + 8)
             self._draw_oil_cost(cost_x, cost_y, max(self.selected_planes - self.prepaid_planes, 0))
             if done and no_escort:
                 sounds.play("error")
@@ -1292,7 +1320,7 @@ class AttackPhase(Phase):
         active_row_y = panel_y + 50 + len(rows) * 52
         engine.images["spr_tank"].draw(view.screen, Position(panel_x + 20, active_row_y))
         self.blit_text(
-            "Active: {} / {}".format(self.active_tanks, self.selected_tanks),
+            t("Active: {} / {}").format(self.active_tanks, self.selected_tanks),
             panel_x + 70, active_row_y + 8,
         )
 
@@ -1387,7 +1415,7 @@ class AttackPhase(Phase):
         panel_w, panel_h = 440, 180
         panel_x, panel_y = view.WIDTH * 0.5 - panel_w * 0.5, view.HEIGHT * 0.5 - panel_h * 0.5
         done = self.click_anywhere_popup(panel_x, panel_y, panel_w, panel_h)
-        self.blit_text("{}: defend {} with tanks".format(owner.name, self.defence_country),
+        self.blit_text(t("{}: defend {} with tanks").format(owner.name, t(self.defence_country)),
                        panel_x + 20, panel_y + 10)
 
         row_y = panel_y + 50
@@ -1462,8 +1490,8 @@ class AttackPhase(Phase):
             killed = len(self.attack_dice)
             attack_from = engine.countries[self.attack_from]
             attack_from.units -= killed
-            manager.notices.append("{} units have been killed by pirates".format(killed))
-            engine.log_action(self.player, "'s attack lost {} units to pirates".format(killed))
+            manager.notices.append(t("{} units have been killed by pirates").format(killed))
+            engine.log_action(self.player, Msg("'s attack lost {} units to pirates", killed))
             if attack_from.units <= 0:
                 self.abandon(attack_from)
                 self.player.subattack = 0
@@ -1672,12 +1700,11 @@ class AttackPhase(Phase):
             battle = self._battle = {"player": player, "country": country.name,
                                      "lost": lost, "killed": killed, "entry": None}
         lost, killed = battle["lost"], battle["killed"]
-        counts = "{} lost, {} defeated".format(lost, killed)
+        counts = Msg("{} lost, {} defeated", lost, killed)
         if conquered:
-            parts = [player, " took {} from ".format(country.name), defender,
-                     ": " + counts]
+            parts = [player, Msg(" took {} from ", country.name), defender, Msg(": {}", counts)]
         else:
-            parts = [player, " attacked ", defender, " in {}: ".format(country.name) + counts]
+            parts = [player, Msg(" attacked "), defender, Msg(" in {}: {}", country.name, counts)]
         if entry is None:
             engine.log_action(*parts)
             battle["entry"] = engine.action_log[-1]
@@ -1699,7 +1726,7 @@ class AttackPhase(Phase):
         if defence.owner != engine.default_player:
             manager.conquered_enemy_this_turn = True
         if log:
-            engine.log_action(player, " took {} from ".format(defence.name), previous_owner)
+            engine.log_action(player, Msg(" took {} from ", defence.name), previous_owner)
 
         # Conquest wipes out whatever the previous owner had stationed here
         # -- ships, tanks, planes, and (already handled below) the fort --
@@ -1921,7 +1948,7 @@ class MovementPhase(Phase):
         country.developed = True
         country.dormant_owner = player
         player.developed_this_turn = True
-        self.engine.log_action(player, " started developing {}".format(country.name))
+        self.engine.log_action(player, Msg(" started developing {}", country.name))
 
     def _select_develop_target(self):
         hover = self.io.hover_country
@@ -1952,7 +1979,9 @@ class MovementPhase(Phase):
         engine = self.engine
         player = self.player
         if player.repositioned_this_turn:
-            self.blit_hint("Already repositioned this turn")
+            self.blit_hint(t("Already repositioned this turn"))
+            if self.io.left_pressed and self.io.hover_country is not None:
+                sounds.play("error")
             return
         hover = self.io.hover_country
         if self.io.left_pressed and hover is not None and engine.countries[hover].owner == player:
@@ -2146,12 +2175,11 @@ class MovementPhase(Phase):
         for key, word in (("units", ""), ("ships", "ships "), ("tanks", "tanks "), ("planes", "planes ")):
             n = getattr(origin, key) - getattr(self, "initial_origin" + ("" if key == "units" else "_" + key))
             if n:
-                changes[origin.name].append("{:+d} {}{}".format(n, word, origin.name))
-                changes[target.name].append("{:+d} {}{}".format(-n, word, target.name))
+                changes[origin.name].append(Msg("{:+d} {}{}", n, word, origin.name))
+                changes[target.name].append(Msg("{:+d} {}{}", -n, word, target.name))
         if changes[origin.name]:
             source, dest = (target, origin) if origin.units > self.initial_origin else (origin, target)
-            self.engine.log_action(self.player, " moved: {}".format(
-                ", ".join(changes[source.name] + changes[dest.name])))
+            self.engine.log_action(self.player, Msg(" moved: {}", Join(changes[source.name] + changes[dest.name])))
 
     def _cancel_adjustment(self, origin, target):
         origin.units, target.units = self.initial_origin, self.initial_target
@@ -2160,6 +2188,10 @@ class MovementPhase(Phase):
         origin.planes, target.planes = self.initial_origin_planes, self.initial_target_planes
         self.player.oil += self.oil_spent_on_planes
         self.oil_spent_on_planes = 0
+        # Back to picking an origin: neither country stays highlighted.
+        self.origin_country = None
+        self.target_country = None
+        self.finished_list = set()
         self.player.subattack = 0
 
     def _adjust_units(self):
@@ -2172,30 +2204,29 @@ class MovementPhase(Phase):
         # Resource selector: which of troops/ships/tanks/planes does
         # clicking origin/target currently move?
         resources = [
-            ("units", "spr_troops"),
-            ("ships", "spr_ship"),
-            ("tanks", "spr_tank"),
-            ("planes", "spr_plane"),
+            ("units", "spr_troops", None),
+            ("ships", "spr_ship", None),
+            ("tanks", "spr_tank", None),
+            ("planes", "spr_plane", None),
         ]
-        for i, (key, sprite) in enumerate(resources):
-            x, y = (WIDTH - (len(resources) * 90 - 10)) // 2 + i * 90, 10
-            selected = self.move_resource == key
-            self.draw_rect((100, 100, 255) if selected else (200, 200, 200), x, y, 80, 40)
-            self.draw_rect((0, 0, 0), x, y, 80, 40, 3)
-            icon = self._resource_icon(sprite)
-            view.screen.blit(icon, (x + 40 - icon.get_width() // 2, y + 20 - icon.get_height() // 2))
-            if self.clicked(x, y, x + 80, y + 40):
-                self.move_resource = key
+        # Ships/tanks/planes that neither country has are greyed out.
+        absent = {key for key in ("ships", "tanks", "planes")
+                  if getattr(origin, key) + getattr(target, key) == 0}
+        if self.move_resource in absent:
+            self.move_resource = "units"
+        picked = self._resource_selector(resources, self.move_resource, disabled=absent)
+        if picked is not None:
+            self.move_resource = picked
 
         if self.move_resource == "ships" and not self.ships_via_sea:
-            self.blit_hint("No unbroken sea route -- ships can't move here")
+            self.blit_hint(t("No unbroken sea route -- ships can't move here"))
         elif self.move_resource == "units" and self.troops_require_sea and not self._has_sea_escort(target):
-            self.blit_hint("No land route -- bring a ship or plane to escort troops")
+            self.blit_hint(t("No land route -- bring a ship or plane to escort troops"))
         elif self.move_resource == "planes":
-            self.blit_hint("Planes cost 1 oil each to relocate")
+            self.blit_hint(t("Planes cost 1 oil each to relocate"))
 
         if origin.units == 0 or target.units == 0:
-            self.blit_hint("Emptied country will be abandoned on Confirm")
+            self.blit_hint(t("Emptied country will be abandoned on Confirm"))
 
         # Troops that crossed open sea need a boat or plane along for the
         # ride; without one the move can't be confirmed.
@@ -2205,10 +2236,10 @@ class MovementPhase(Phase):
             and not self._has_sea_escort(target)
         )
         if blocked and self.move_resource != "units":
-            self.blit_hint("Troops need a ship or plane to cross the sea")
+            self.blit_hint(t("Troops need a ship or plane to cross the sea"))
         elif self._ships_unmanned(target):
             blocked = True
-            self.blit_hint("A ship needs at least one troop moving with it")
+            self.blit_hint(t("A ship needs at least one troop moving with it"))
 
         confirm_clicked = self.confirm_button(self.CONFIRM_X, self.ROW_Y, not blocked)
         # Planes moved cost 1 oil each (already taken, refunded on Cancel).
@@ -2236,6 +2267,9 @@ class MovementPhase(Phase):
             self._log_move(origin, target)
             # Only one confirmed reposition is allowed per turn.
             self.player.repositioned_this_turn = True
+            self.origin_country = None
+            self.target_country = None
+            self.finished_list = set()
             self.player.subattack = 0
 
 
@@ -2321,10 +2355,10 @@ class ShopPhase(Phase):
         # (like the actual build) assumes buying the cheapest, level 1.
         fort_tiers = [self._cost({"wood": 10 + 5 * lvl})["wood"] for lvl in range(3)]
         units = [
-            (4, fx + 30, "spr_ship", player.wood >= ship_cost["wood"], [("spr_wood", "X {}".format(ship_cost["wood"]) if ship_cost["wood"] else "Free")]),
+            (4, fx + 30, "spr_ship", player.wood >= ship_cost["wood"], [("spr_wood", "X {}".format(ship_cost["wood"]) if ship_cost["wood"] else t("Free"))]),
             (5, fx + 180, "spr_plane", player.steel >= plane_cost["steel"], [("spr_steel", "X {}".format(plane_cost["steel"]))]),
             (6, fx + 330, "spr_tank", player.steel >= tank_cost["steel"], [("spr_steel", "X {}".format(tank_cost["steel"]))]),
-            (7, fx + 480, "spr_fort", player.wood >= fort_tiers[0], [("spr_wood", "/".join(str(t) for t in fort_tiers))]),
+            (7, fx + 480, "spr_fort", player.wood >= fort_tiers[0], [("spr_wood", "/".join(str(tier) for tier in fort_tiers))]),
         ]
         for sub, x, sprite, affordable, costs in units:
             if units_allowed and affordable and self.clicked(x, fy + 295, x + 130, fy + 530) \
@@ -2461,7 +2495,7 @@ class ShopPhase(Phase):
             if {a, b} == set(c.connection) and c.kind == "sea":
                 c.kind = "land"
                 self.player.wood -= cost["wood"]
-                self.engine.log_action(self.player, " built a bridge from {} to {}".format(a, b))
+                self.engine.log_action(self.player, Msg(" built a bridge from {} to {}", a, b))
                 return True
         return False
 
@@ -2508,7 +2542,7 @@ class ShopPhase(Phase):
                 c.rails = True  # draws grey (Connection.draw) and enables rail redistribution
                 self.player.wood -= cost["wood"]
                 self.player.steel -= cost["steel"]
-                self.engine.log_action(self.player, " built rails from {} to {}".format(a, b))
+                self.engine.log_action(self.player, Msg(" built rails from {} to {}", a, b))
                 return True
         return False
 
@@ -2544,7 +2578,8 @@ class ShopPhase(Phase):
         target.bombed_by = self.player
         destroyed = target.units - target.units // 2
         target.units = target.units // 2  # rounded down
-        self.engine.log_action(self.player, " nuked {}: {} casualt{}".format(name, destroyed, "y" if destroyed == 1 else "ies"))
+        self.engine.log_action(self.player, Msg(" nuked {}: {} casualty" if destroyed == 1
+                                                else " nuked {}: {} casualties", name, destroyed))
         if target.units == 0:
             # Nobody survives to hold it: a player's country is abandoned
             # on the spot (same as emptying it while redistributing), an
@@ -2575,8 +2610,9 @@ class ShopPhase(Phase):
             country.airport = True
         for resource, amount in cost.items():
             setattr(self.player, resource, getattr(self.player, resource) - amount)
-        self.engine.log_action(self.player, " placed a {} in {}".format(
-            {"ships": "ship", "planes": "plane", "tanks": "tank"}.get(attr, attr), name))
+        self.engine.log_action(self.player, Msg(
+            {"ships": " placed a ship in {}", "planes": " placed a plane in {}", "tanks": " placed a tank in {}"}[attr],
+            name))
 
     def fort_cost(self, country):
         return self._cost({"wood": 10 + 5 * country.fort_lvl})["wood"]
@@ -2595,7 +2631,7 @@ class ShopPhase(Phase):
         if country.owner == self.player and country.fort_lvl <= 2 and self.player.wood >= cost:
             self.player.wood -= cost
             country.fort_lvl += 1
-            self.engine.log_action(self.player, " built a fort in {}".format(name))
+            self.engine.log_action(self.player, Msg(" built a fort in {}", name))
             return True
         return False
 
@@ -2680,7 +2716,7 @@ class EventTargetPhase(Phase):
             # crash. Bail to a safe default instead.
             player.attack, player.subattack = 0, 0
             return
-        self.blit_hint(self.prompt)
+        self.blit_hint(t(self.prompt))
 
         valid = [c for c in engine.countries.values() if self.predicate(c)]
         for country in valid:
@@ -2736,8 +2772,8 @@ class MouseAttackPhase(Phase):
             self._begin(event)
             return
         country = self.engine.countries[self.target]
-        self.blit_hint("{}: mouse attacks {} of {} -- {} troops left".format(
-            event.name, self.target, country.owner.name, self.troops))
+        self.blit_hint(t("{}: mouse attacks {} of {} -- {} troops left").format(
+            t(event.name), t(self.target), country.owner.name, self.troops))
         country.shade = 1
         if player.subattack == 1:
             self._choose_tanks(country)
@@ -2777,7 +2813,7 @@ class MouseAttackPhase(Phase):
         panel_w, panel_h = 440, 180
         panel_x, panel_y = view.WIDTH * 0.5 - panel_w * 0.5, view.HEIGHT * 0.5 - panel_h * 0.5
         done = self.click_anywhere_popup(panel_x, panel_y, panel_w, panel_h)
-        self.blit_text("{}: defend {} with tanks".format(owner.name, country.name), panel_x + 20, panel_y + 10)
+        self.blit_text(t("{}: defend {} with tanks").format(owner.name, t(country.name)), panel_x + 20, panel_y + 10)
         row_y = panel_y + 50
         engine.images["spr_tank"].draw(view.screen, Position(panel_x + 20, row_y))
         self.blit_text("{} / {}".format(self.tank_choice, country.tanks), panel_x + 70, row_y + 8)
@@ -2821,7 +2857,7 @@ class MouseAttackPhase(Phase):
         auto_roll = owner.is_bot or len(self.defence_dice) == 1
         roll_clicked = not auto_roll and self.confirm_button(self.CONFIRM_X, self.ROW_Y)
         if not auto_roll:
-            self.blit_hint("{}: click dice to leave out, then roll".format(owner.name))
+            self.blit_hint(t("{}: click dice to leave out, then roll").format(owner.name))
         for i in range(len(self.defence_dice)):
             y = self.PICK_DICE_Y + 40 * self.defence_dice[i]
             x = self.dice_x(i, len(self.defence_dice))
@@ -2871,20 +2907,20 @@ class MouseAttackPhase(Phase):
         owner = country.owner
         if country.units <= 0:
             # Taken the same way a conquest wipes out what was there.
-            counts = ": {} lost, {} defeated".format(self.native_losses, self.owner_losses)
-            self.engine.log_action("The natives took {} from ".format(country.name), owner, counts)
+            counts = Msg(": {} lost, {} defeated", self.native_losses, self.owner_losses)
+            self.engine.log_action(Msg("The natives took {} from ", country.name), owner, counts)
             self.engine.log_wiped(country)
             country.owner = self.engine.default_player
             country.units = self.troops
             country.ships = country.tanks = country.planes = country.fort_lvl = 0
             country.landmark_owner = None
-            self.manager.notices.append([event.name, "The natives took {} from {}{}".format(
-                country.name, owner.name, counts)])
+            self.manager.notices.append([event.name, t("The natives took {} from {}{}").format(
+                t(country.name), owner.name, counts)])
         elif self.troops <= 0:
-            counts = ": {} lost, {} destroyed".format(self.owner_losses, self.native_losses)
-            self.manager.notices.append([event.name, "{} defended {} from the natives{}".format(
-                owner.name, country.name, counts)])
-            self.engine.log_action(owner, " defended {} from the natives{}".format(country.name, counts))
+            counts = Msg(": {} lost, {} destroyed", self.owner_losses, self.native_losses)
+            self.manager.notices.append([event.name, t("{} defended {} from the natives{}").format(
+                owner.name, t(country.name), counts)])
+            self.engine.log_action(owner, Msg(" defended {} from the natives{}", country.name, counts))
         else:
             self._roll()
             return
@@ -2974,6 +3010,31 @@ class TurnManager:
         for country in self.engine.countries.values():
             country.shade = 0
 
+    def acting_player(self):
+        """The player whose decision the game waits for: whoever's turn it
+        is, except a human defender picking tanks or dice (also against an
+        event's mouse attack) and an event's chooser. Their game controller
+        is the one that clicks (controls.py)."""
+        engine = self.engine
+        player = engine.players[engine.turn]
+        if self.dialog_active:
+            return player
+        if player.attack == 1 and player.subattack in (3, 8):
+            # As BotController._human_defending.
+            attack = self.phases[1]
+            if attack.defence_country is not None:
+                owner = engine.countries[attack.defence_country].owner
+                if owner is not engine.default_player and not owner.is_bot \
+                        and (player.subattack == 8 or len(attack.defence_dice) > 1):
+                    return owner
+        if player.attack == 5 and self.phases[5].chooser is not None:
+            return self.phases[5].chooser
+        if player.attack == 6 and player.subattack in (1, 3):
+            target = self.phases[6].target
+            if target is not None and engine.countries[target].owner is not engine.default_player:
+                return engine.countries[target].owner
+        return player
+
     def attack_in_progress(self):
         """Dice have been cast for an attack (rolled, being resolved, or
         choosing how many troops move in): it has to be finished before the
@@ -3005,9 +3066,21 @@ class TurnManager:
 
     def must_trade(self, player=None):
         """A player holding more than 4 cards is locked into the card menu
-        until they've traded down to 4 or fewer."""
+        until they've traded down to 4 or fewer. When the cards come from
+        eliminating someone, that waits until the player has confirmed how
+        many troops move in (bots trade straight away, as they always have)."""
         player = player or self.engine.players[self.engine.turn]
-        return not player.eliminated and len(player.cards) > self.MAX_CARDS
+        if player.eliminated or len(player.cards) <= self.MAX_CARDS:
+            return False
+        return player.is_bot or not self.moving_in(player)
+
+    def moving_in(self, player):
+        """`player` is choosing how many troops move into a country just
+        conquered or claimed (or is in a free claim's asset panel, opened
+        from that screen)."""
+        if player.attack != 1:
+            return False
+        return player.subattack == 5 or (player.subattack == 6 and self.phases[1].free_claim)
 
     def can_trade(self):
         """Cards can only be traded while deploying troops in the
@@ -3090,7 +3163,7 @@ class TurnManager:
         landmark country `dropped_on` instead: `name` gets the forgot-it
         punishment on the spot."""
         item = LANDMARKS[name]
-        self._punish_landmark(name, "the {} belongs on {}, not {}".format(item, name, dropped_on),
+        self._punish_landmark(name, t("the {} belongs on {}, not {}").format(t(item), t(name), t(dropped_on)),
                               "misplaced")
 
     def _punish_landmark(self, name, reason, verb="forgot"):
@@ -3101,25 +3174,27 @@ class TurnManager:
         country = engine.countries[name]
         self.landmarks_punished.add(name)
         if country.units <= 1:
-            engine.log_action(player, " {} the {}: {} was taken over by the mouse".format(
-                verb, LANDMARKS[name], name))
+            engine.log_action(player, Msg(
+                " forgot the {}: {} was taken over by the mouse" if verb == "forgot"
+                else " misplaced the {}: {} was taken over by the mouse", LANDMARKS[name], name))
             self.phases[0].abandon(country)
-            self.notices.append(IconNotice("{}, {}, {} was taken over by the mouse".format(
-                player.name, reason, name), LANDMARKS[name]))
+            self.notices.append(IconNotice(t("{}, {}, {} was taken over by the mouse").format(
+                player.name, reason, t(name)), LANDMARKS[name]))
         else:
             removed = country.units - 1
             country.units = 1
-            self.notices.append(IconNotice("{}, {}, {} {} removed from {}".format(
-                player.name, reason, removed, "troop was" if removed == 1 else "troops were", name),
+            self.notices.append(IconNotice(t("{}, {}, {} {} removed from {}").format(
+                player.name, reason, removed, t("troop was" if removed == 1 else "troops were"), t(name)),
                 LANDMARKS[name]))
-            engine.log_action(player, " {} the {}: lost {} {} in {}".format(
-                verb, LANDMARKS[name], removed, "troop" if removed == 1 else "troops", name))
+            engine.log_action(player, Msg(
+                " forgot the {}: lost {} {} in {}" if verb == "forgot" else " misplaced the {}: lost {} {} in {}",
+                LANDMARKS[name], removed, "troop" if removed == 1 else "troops", name))
 
     def _apply_landmark_penalties(self):
         """The turn is being passed: every China/Japan the player still
         holds without its pagoda/torii is punished."""
         for name in sorted(self.landmarks_owed):
-            self._punish_landmark(name, "you forgot the {}".format(LANDMARKS[name]))
+            self._punish_landmark(name, t("you forgot the {}").format(t(LANDMARKS[name])))
 
     def next_turn(self):
         players = self.engine.players
@@ -3232,7 +3307,7 @@ class TurnManager:
         self.event_pending_players = alive - {current_player}
         self.event_notice = event
         event.on_start(engine)
-        engine.log_action("Event: {}".format(event.name))
+        engine.log_action(Msg("Event: {}", event.name))
 
     def turns_until_next_event(self):
         """(turns, player): how many turn changes from now until the next
@@ -3349,7 +3424,8 @@ class TurnManager:
         for i, line in enumerate(lines):
             if i:
                 offset += 50
-            for j, piece in enumerate(self._wrap_text(line, font, text_w) or [""]):
+            # t(): an event's name heading its notice is translated only here.
+            for j, piece in enumerate(self._wrap_text(t(line), font, text_w) or [""]):
                 if j:
                     offset += font.get_height() + 4
                 offsets.append(offset)
@@ -3377,13 +3453,13 @@ class TurnManager:
                     sprite = self._dialog_icons[icon] = pg.transform.smoothscale(
                         pg.image.load("./images/{}.png".format(icon)).convert_alpha(), (72, 72))
                 screen.blit(sprite, (view.WIDTH * 0.5 - 36, y + 20))
-            hint = hint_font.render("click anywhere to continue", True, (90, 50, 50))
+            hint = hint_font.render(t("click anywhere to continue"), True, (90, 50, 50))
             screen.blit(hint, (view.WIDTH * 0.5 - hint.get_width() * 0.5, y + h - 20 - hint.get_height()))
             return bool(io.left_pressed)
         bx, by, bw, bh = view.WIDTH * 0.5 - 60, y + h - 60, 120, 40
         pg.draw.rect(screen, (150, 245, 150), pg.Rect(bx, by, bw, bh))
         pg.draw.rect(screen, (0, 0, 0), pg.Rect(bx, by, bw, bh), 2)
-        img = self.engine.font.render(button, True, (0, 0, 0))
+        img = self.engine.font.render(t(button), True, (0, 0, 0))
         screen.blit(img, (bx + bw * 0.5 - img.get_width() * 0.5, by + 10))
         m = io.mouse_position
         return io.button(("r", bx, by, bw, bh))
@@ -3428,7 +3504,7 @@ class TurnManager:
         desc_font = game_font(19)
         w = 520
         text_w = w - 80
-        lines = self._wrap_text(event.description, desc_font, text_w)
+        lines = self._wrap_text(t(event.description), desc_font, text_w)
 
         icon = self.engine.hud_images["spr_event"]
         iw, ih = icon.image.get_size()
@@ -3447,7 +3523,7 @@ class TurnManager:
         icon.draw(screen, Position(int(x + w * 0.5 - iw * 0.5), int(cy)))
         cy += ih + gap1
 
-        name_surf = name_font.render(event.name, True, (0, 0, 0))
+        name_surf = name_font.render(t(event.name), True, (0, 0, 0))
         screen.blit(name_surf, (x + w * 0.5 - name_surf.get_width() * 0.5, cy))
         cy += name_h + gap2
 
@@ -3457,7 +3533,7 @@ class TurnManager:
             cy += line_h
 
         # Same hint as the other click-anywhere messages (_draw_dialog).
-        hint = hint_font.render("click anywhere to continue", True, (90, 50, 50))
+        hint = hint_font.render(t("click anywhere to continue"), True, (90, 50, 50))
         screen.blit(hint, (x + w * 0.5 - hint.get_width() * 0.5, y + h - bottom_pad - hint.get_height()))
         return bool(io.left_pressed)
 
@@ -3495,7 +3571,7 @@ class TurnManager:
         alive = [p for p in self.engine.players if not p.eliminated]
         if len(alive) <= 1 and len(self.engine.players) > 1:
             self.game_over = True
-            lines = ["{} wins!".format(alive[0].name)] if alive else ["Nobody survived"]
+            lines = [t("{} wins!").format(alive[0].name)] if alive else [t("Nobody survived")]
             if self._draw_dialog(lines, "Quit", big=True):
                 pg.event.post(pg.event.Event(pg.QUIT))
             return True
@@ -3505,15 +3581,15 @@ class TurnManager:
         engine = self.engine
         players = engine.players
         player.eliminated = True
-        engine.log_action(player, " has been eliminated")
-        lines = ["{} has been eliminated".format(player.name)]
+        engine.log_action(player, Msg(" has been eliminated"))
+        lines = [t("{} has been eliminated").format(player.name)]
         victor, loot = self.elimination_loot.pop(player, (None, []))
         if victor is not None:
             if loot:
-                lines.append("{} gained:".format(victor.name))
-                lines.append(", ".join("{} {}".format(n, r) for n, r in loot))
+                lines.append(t("{} gained:").format(victor.name))
+                lines.append(", ".join("{} {}".format(n, t(r)) for n, r in loot))
             else:
-                lines.append("{} gained nothing".format(victor.name))
+                lines.append(t("{} gained nothing").format(victor.name))
         self.notices.append(lines)
 
         # Nobody left to have dropped their bombs; hand each countdown to

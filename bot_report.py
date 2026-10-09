@@ -248,6 +248,35 @@ for cz in causes:
 row("vacated: still mouse at owner's next turn", lambda t, n, G: T(t, "vac_still_mouse") / T(t, "vac_n"))
 row("vacated: taken by another player", lambda t, n, G: T(t, "vac_taken_by_player") / T(t, "vac_n"))
 
+print("\n== assets (ships, tanks, planes, forts) ==")
+for kind in ("ships", "tanks", "planes", "fort"):
+    row("%s bought per seat-game" % kind, lambda t, n, G, kind=kind: T(t, "ast_bought_" + kind) / n)
+    row("   destroyed per seat-game", lambda t, n, G, kind=kind: T(t, "ast_lost_" + kind) / n)
+    row("   destroyed / bought", lambda t, n, G, kind=kind: T(t, "ast_lost_" + kind) / T(t, "ast_bought_" + kind))
+row("assets destroyed per seat-game (all kinds)", lambda t, n, G: sum(T(t, "ast_lost_" + k) for k in ("ships", "tanks", "planes", "fort")) / n)
+row("assets bought per seat-game (all kinds)", lambda t, n, G: sum(T(t, "ast_bought_" + k) for k in ("ships", "tanks", "planes", "fort")) / n)
+for cz in sorted({k for s_ in "AB" for k in tot[s_] if k.startswith("ast_lost_cause_")}):
+    row("   by %s per seat-game" % cz[len("ast_lost_cause_"):], lambda t, n, G, cz=cz: T(t, cz) / n)
+row("repositions per own turn", lambda t, n, G: T(t, "rep_moves") / T(t, "turns"))
+row("   moves that took a ship, tank or plane (share)", lambda t, n, G: T(t, "rep_with_assets") / T(t, "rep_moves"))
+row("   moves of assets alone, <=1 troop (share)", lambda t, n, G: T(t, "rep_assets_only") / T(t, "rep_moves"))
+row("   ships moved per seat-game", lambda t, n, G: T(t, "rep_ships") / n)
+row("   tanks moved per seat-game", lambda t, n, G: T(t, "rep_tanks") / n)
+row("   planes moved per seat-game", lambda t, n, G: T(t, "rep_planes") / n)
+row("assets left at turn end per seat-turn", lambda t, n, G: T(t, "ast_end_all") / T(t, "turns"))
+for tag, label in (("cls_F", "on a frontier country"), ("cls_B", "on a buffered country"), ("cls_S", "on a sea-exposed country"),
+                   ("cls_D", "behind the frontier"), ("cls_I", "on an interior country"),
+                   ("units1", "on a 1-troop country"), ("units2p", "on a 2+ troop country")):
+    row("   %s: share of assets left" % label, lambda t, n, G, tag=tag: T(t, "ast_end_" + tag) / T(t, "ast_end_all"))
+    row("      lost before the owner's next turn", lambda t, n, G, tag=tag: T(t, "ast_end_%s_lost" % tag) / T(t, "ast_end_" + tag))
+row("assets bought this turn, still there at its end (share of assets left)", lambda t, n, G: T(t, "ast_end_young") / T(t, "ast_end_all"))
+row("   ... of those lost before the owner's next turn", lambda t, n, G: T(t, "ast_end_young_lost") / T(t, "ast_end_young"))
+row("   older assets lost before the owner's next turn", lambda t, n, G: T(t, "ast_end_old_lost") / (T(t, "ast_end_all") - T(t, "ast_end_young")))
+row("   share of the assets lost that were bought that same turn", lambda t, n, G: T(t, "ast_end_young_lost") / T(t, "ast_end_all_lost"))
+row("assets left at turn end: lost before next turn (all)", lambda t, n, G: T(t, "ast_end_all_lost") / T(t, "ast_end_all"))
+for kind in ("ships", "tanks", "planes", "fort"):
+    row("   %s left at turn end, lost before next turn" % kind, lambda t, n, G, kind=kind: T(t, "ast_end_kind_%s_lost" % kind) / T(t, "ast_end_kind_" + kind))
+
 print("\n== R5/R6 stocks ==")
 # hoard (loot value) series
 def loot_value(stock):

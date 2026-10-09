@@ -14,6 +14,7 @@ import collections
 import os
 import sys
 
+import engine as engine_module
 import phases
 from models import CardMenu
 
@@ -61,6 +62,7 @@ class Kpi:
         self.cur = {}                                              # player -> record of the own turn in progress
         self.first_ship = {}
         self.al_turn = collections.Counter()
+        self.bought_now = collections.defaultdict(collections.Counter)   # player -> {country: assets bought this turn}
 
     def side(self, p):
         return self.stats.side_of.get(p)
@@ -150,6 +152,24 @@ class Kpi:
                         me.add(P, "conq_%s_to_mouse" % prev, 1)
                     else:
                         me.add(P, "conq_%s_retaken" % prev, 1)
+            if snap:
+                for n, (ships, tanks, planes, fort) in snap.get("assets", {}).items():
+                    cls, w0, units = snap["classes"][n]
+                    held = eng.countries[n].owner is P
+                    count = ships + tanks + planes + fort
+                    for tag in ("all", "cls_" + cls, "units1" if units <= 1 else "units2p"):
+                        me.add(P, "ast_end_" + tag, count)
+                        if not held:
+                            me.add(P, "ast_end_%s_lost" % tag, count)
+                    for kind, k in (("ships", ships), ("tanks", tanks), ("planes", planes), ("fort", fort)):
+                        me.add(P, "ast_end_kind_" + kind, k)
+                        if not held:
+                            me.add(P, "ast_end_kind_%s_lost" % kind, k)
+                    young = min(count, snap.get("bought", {}).get(n, 0))
+                    me.add(P, "ast_end_young", young)
+                    if not held:
+                        me.add(P, "ast_end_young_lost", young)
+                        me.add(P, "ast_end_old_lost", count - young)
             for n, units, ntrn in me.vac.pop(P, []):
                 o = eng.countries[n].owner
                 me.add(P, "vac_n", 1)
@@ -165,7 +185,12 @@ class Kpi:
             if P.attack != 2 or P.eliminated:
                 return
             cls = me.exposure(P)
-            me.pending[P] = dict(classes=cls, conq=list(me.conq_turn.pop(P, [])))
+            assets = {}
+            for n, c in eng.countries.items():
+                if c.owner is P and (c.ships or c.tanks or c.planes or c.fort_lvl):
+                    assets[n] = (c.ships, c.tanks, c.planes, c.fort_lvl)
+            me.pending[P] = dict(classes=cls, conq=list(me.conq_turn.pop(P, [])), assets=assets,
+                                 bought=dict(me.bought_now.pop(P, {})))
             own = [c for c in eng.countries.values() if c.owner is P]
             troops = sum(c.units for c in own)
             cur = me.cur.get(P) or dict(t=manager.turn_num, idx=me.own_turn[P] - 1, spent=[0] * 6, gained=[0] * 6, loot=[0] * 6)
@@ -197,6 +222,85 @@ class Kpi:
                     me.add(P, "first_ship_turn1", 1)
                 me.add(P, "first_ship_free_cost_wood", cost.get("wood", 0))
         wrap(phases.ShopPhase, "place_unit", before=ship_before)
+
+        # --- assets: bought, destroyed (and why) ------------------------------------------------------
+        def unit_before(phase, attr, cost, name):
+            me.bought_now[phase.player][name] += 1
+            me.add(phase.player, "ast_bought_" + attr, 1)
+            for r, v in cost.items():
+                me.add(phase.player, "ast_spent_" + r, v)
+        wrap(phases.ShopPhase, "place_unit", before=unit_before)
+
+        def fort_before(phase, name):
+            c = phase.engine.countries[name]
+            if c.owner == phase.player and c.fort_lvl <= 2 and phase.player.wood >= phase.fort_cost(c):
+                me.bought_now[phase.player][name] += 1
+                me.add(phase.player, "ast_bought_fort", 1)
+                me.add(phase.player, "ast_spent_wood", phase.fort_cost(c))
+        wrap(phases.ShopPhase, "place_fort", before=fort_before)
+
+        orig_destroyed = engine_module.Engine.log_destroyed
+
+        def destroyed(eng, owner, country_name, ships=0, tanks=0, planes=0, fort=0):
+            if owner is not None and me.side(owner) is not None and (ships or tanks or planes or fort):
+                names = []
+                f = sys._getframe(1)
+                while f is not None and len(names) < 7:
+                    names.append(f.f_code.co_name)
+                    f = f.f_back
+                if "_conquer" in names:
+                    cause = "conquest"
+                elif "abandon" in names:
+                    last = max(i for i, n in enumerate(names) if n == "abandon")    # the wrapper below it is ours
+                    cause = "abandon:" + (names[last + 1] if last + 1 < len(names) else "?")
+                elif "_apply_combat_results" in names:
+                    cause = "landing"
+                else:
+                    cause = names[1] if len(names) > 1 else "?"
+                for kind, k in (("ships", ships), ("tanks", tanks), ("planes", planes), ("fort", fort)):
+                    if k:
+                        me.add(owner, "ast_lost_" + kind, k)
+                        me.add(owner, "ast_lost_cause_" + cause, k)
+                if ships or tanks or planes or fort:
+                    me.add(owner, "ast_lost_events", 1)
+            return orig_destroyed(eng, owner, country_name, ships, tanks, planes, fort)
+        engine_module.Engine.log_destroyed = destroyed
+
+        # --- the one move a turn (_reposition): what moved ---------------------------------------------------
+        import bot as bot_module
+
+        def rep_before(ctl, phase):
+            return {c.name: (c.units, c.ships, c.tanks, c.planes) for c in ctl._owned()}
+
+        def rep_after(ctl, res, st, phase):
+            if not res:
+                return
+            P = ctl.player
+            me.add(P, "rep_moves", 1)
+            moved_assets = False
+            troops = 0
+            for c in ctl._owned():
+                before = st.get(c.name)
+                if before is None:
+                    continue
+                units, ships, tanks, planes = before
+                if c.units < units:
+                    troops += units - c.units
+                if c.ships < ships:
+                    me.add(P, "rep_ships", 1)
+                    moved_assets = True
+                if c.tanks < tanks:
+                    me.add(P, "rep_tanks", tanks - c.tanks)
+                    moved_assets = True
+                if c.planes < planes:
+                    me.add(P, "rep_planes", 1)
+                    moved_assets = True
+            me.add(P, "rep_troops", troops)
+            if moved_assets:
+                me.add(P, "rep_with_assets", 1)
+                if troops <= 1:
+                    me.add(P, "rep_assets_only", 1)
+        wrap(bot_module.BotController, "_reposition", before=rep_before, after=rep_after)
 
         # --- attacks -------------------------------------------------------------------------------------
         def att_after(phase, res, st, hover, is_land, via_air=False):

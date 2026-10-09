@@ -1,7 +1,15 @@
+import os
+
+# Images and saves/ are looked up from the working directory: start in the
+# game's folder however it was launched (a shortcut, an IDE, another folder).
+# Before the imports: lang reads saves/settings.json when it's imported.
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 from engine import Engine
 from menu import run_main_menu, run_new_game_menu, run_player_names_menu, run_load_menu
 from save_load import save_game, load_game, migrate_legacy_save, AUTOSAVE_PATH
 import pygame as pg
+import controls
 import sounds
 
 # Nothing in the game changes on its own -- only in response to input --
@@ -48,20 +56,25 @@ def play(app):
     """Runs the game until it's left. Returns "menu" for Exit Game (back to
     the start menu) or "quit" when the window is closed."""
     clock = pg.time.Clock()
-    frame_count = 0
-    frame_time_total = 0.0
     frames_left = SETTLE_FRAMES
 
     sounds.start_background()
     app._owner_snapshot = None
+    pads = controls.get()
+    app.controls = pads
+    if pads.needs_pairing(app.players):
+        app.open_pairing()  # e.g. a loaded game: who has which controller?
     while True:
         if frames_left == 0:
             # Idle: sleep until the next event instead of redrawing.
             events = [pg.event.wait()] + pg.event.get()
         else:
             events = pg.event.get()
-        if events or (app.bot_turn and not app.turn_manager.game_over):
-            frames_left = SETTLE_FRAMES  # a bot plays on without any input
+        pads.handle_events(events)
+        # A bot plays on without any input, and a tilted stick moves its
+        # cursor without sending events.
+        if events or pads.busy or (app.bot_turn and not app.turn_manager.game_over):
+            frames_left = SETTLE_FRAMES
 
         wheel = []  # +1 per wheel-up notch, -1 per wheel-down
         # While a save name is being typed, keys belong to the name box (Escape
@@ -88,8 +101,17 @@ def play(app):
                 load_game(AUTOSAVE_PATH, app, app.turn_manager)
 
         frames_left -= 1
-        frame_start = pg.time.get_ticks()
         app.io_handle()
+        # The controllers that may click this frame (see controls.py): a click
+        # sound, Start for the settings menu, LB/RB for zooming.
+        if any(pad.tapped(controls.A) for pad in pads.clickers):
+            sounds.click_pressed()
+        if any(pad.tapped(controls.START) for pad in pads.clickers) and not app.turn_manager.dialog_active:
+            app.toggle_settings()
+        wheel += [step for pad in pads.clickers for step in pad.zoom_steps]
+        if not app.modal_open and pads.needs_pairing(app.players) and any(
+                pad.tapped(controls.A) and pads.player_of(pad, app.players) is None for pad in pads.pads):
+            app.open_pairing()  # a controller nobody has yet wants in
         zoom = 1.0
         for step in wheel:
             # An open action log keeps the wheel for scrolling itself.
@@ -110,15 +132,6 @@ def play(app):
 
         app.present()
         pg.display.flip()
-
-        # Frame time = work + flip, measured before tick() adds the sleep, so
-        # it shows how much of the 16.7 ms budget (60 fps) a frame really uses.
-        frame_time_total += pg.time.get_ticks() - frame_start
-        frame_count += 1
-        if frame_count == 60:
-            print("avg frame time: {:.1f} ms".format(frame_time_total / frame_count))
-            frame_count = 0
-            frame_time_total = 0.0
         clock.tick(60)
 
 

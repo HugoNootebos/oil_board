@@ -2,7 +2,9 @@ from contextlib import contextmanager
 
 import pygame as pg
 import sounds
+import controls
 from fonts import game_font
+from lang import t, Msg, Join
 import numpy as np
 from board import get_connections, get_countries
 from models import Position, Image, Player, Io, View, Gui, Shop, Button, CardMenu, LANDMARKS
@@ -163,6 +165,12 @@ class Engine:
         self.settings = {"assets": False, "sea": True, "land": True,
                          "landmarks": True, "fast_bots": False}
         self.pending_quit = False
+        # Game controllers (controls.Controls, set by runner.py; None in the
+        # headless tools) and the Controllers panel that pairs them with
+        # players (_draw_pairing).
+        self.controls = None
+        self.pairing_open = False
+        self._pairing_since = 0
         # The event info menu (event button, top right): the active event
         # and how long until the next one is drawn.
         self.event_info_open = False
@@ -182,14 +190,13 @@ class Engine:
         self.action_log_open = False
         self.action_scroll = 0  # lines back from the newest, while open
         self.players = self.get_players(mode)
-        # player_bots: which of the players (in order) the computer plays:
-        # False for a human, else the bot's level (True: the default one).
-        # Each bot gets a random personality (see bot.PERSONALITIES).
+        # player_bots: which of the players (in order) the computer plays
+        # (True) and which are human (False). Each bot gets a random
+        # personality (see bot.PERSONALITIES).
         import bot
         for player, is_bot in zip(self.players, player_bots or []):
             player.is_bot = bool(is_bot)
             if is_bot:
-                player.bot_level = is_bot if isinstance(is_bot, str) else bot.DEFAULT_LEVEL
                 player.bot_personality = random.choice(list(bot.PERSONALITIES))
         self.countries = get_countries(self.default_player)
         self.connections = get_connections()
@@ -420,13 +427,29 @@ class Engine:
         size = (int(round(width * view.scale)), int(round(height * view.scale)))
         ui = self.ui if size == (width, height) else pg.transform.smoothscale(self.ui, size)
         view.window.blit(ui, (int(view.ox), int(view.oy)))
+        if self.controls is not None and self.controls.pads:
+            self.controls.draw(view.window, view.scale, (view.ox, view.oy), self._pad_looks())
+
+    def _pad_looks(self):
+        """Each game controller's cursor: its player's colour (white while
+        unpaired) and faded when it can't click right now. The controller
+        lights up in that colour too, where it has a light."""
+        looks = {}
+        for pad in self.controls.pads:
+            player = self.controls.player_of(pad, self.players)
+            color = player.color if player is not None else controls.UNPAIRED_COLOR
+            looks[pad] = (color, pad not in self.controls.clickers)
+            pad.set_led(color)
+        return looks
 
     def log_action(self, *parts):
         """Add a line to the bottom-left box's history: strings are drawn
-        white, a Player as their name in (a light shade of) their colour."""
+        white, a Player as their name in (a light shade of) their colour.
+        A lang.Msg is kept as it is, so it's translated whenever it's drawn
+        (also after a save is loaded in the other language)."""
         self.action_log.append([
             [part.name, light_tint(part.color, self.NAME_TINT)] if isinstance(part, Player)
-            else [str(part), (255, 255, 255)]
+            else [part if isinstance(part, Msg) else str(part), (255, 255, 255)]
             for part in parts
         ])
         del self.action_log[:-self.ACTION_LOG_MAX]
@@ -438,17 +461,17 @@ class Engine:
         """Log the loss of `owner`'s assets in a country, e.g. "Player 2's
         ship was destroyed in Japan". Nothing is logged when nothing was
         lost."""
-        items = ["{} {}s".format(k, word) if k > 1 else word
-                 for k, word in ((ships, "ship"), (tanks, "tank"), (planes, "plane"))
+        items = [Msg(plural, k) if k > 1 else word
+                 for k, word, plural in ((ships, "ship", "{} ships"), (tanks, "tank", "{} tanks"),
+                                         (planes, "plane", "{} planes"))
                  if k > 0]
         if fort > 0:
             items.append("fort")
         if not items or owner is None:
             return
-        text = items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
         single = len(items) == 1 and max(ships, tanks, planes, 1) == 1
-        self.log_action(owner, "'s {} {} destroyed in {}".format(
-            text, "was" if single else "were", country_name))
+        self.log_action(owner, Msg("'s {} was destroyed in {}" if single else "'s {} were destroyed in {}",
+                                   Join(items, ", ", " and "), country_name))
 
     def log_wiped(self, country):
         """Log every asset (ships, tanks, planes, fort) in `country` that's
@@ -474,7 +497,7 @@ class Engine:
             width = min(max(self.ACTION_OPEN_W, self._action_log_width() + 26), view.WIDTH)
             height = self.ACTION_LOG_ROWS * self.ACTION_ROW_H + 12
         else:
-            pieces = [self.font.size(text)[0] for text, _ in self.action_log[-1]]
+            pieces = [self.font.size(str(text))[0] for text, _ in self.action_log[-1]]
             width = min(sum(pieces) + 22, self.ACTION_BOX_MAX_W)
             height = self.ACTION_BOX_H
         return pg.Rect(0, view.HEIGHT - height, width, height)
@@ -485,7 +508,7 @@ class Engine:
         key = (len(self.action_log), id(self.action_log[-1]))
         if getattr(self, "_action_width_key", None) != key:
             self._action_width_key = key
-            self._action_width = max(sum(self.font.size(text)[0] for text, _ in line)
+            self._action_width = max(sum(self.font.size(str(text))[0] for text, _ in line)
                                      for line in self.action_log)
         return self._action_width
 
@@ -549,7 +572,7 @@ class Engine:
 
     def _blit_action_line(self, surface, line, x, y, height, max_x):
         for text, color in line:
-            piece = self.font.render(text, True, tuple(color))
+            piece = self.font.render(str(text), True, tuple(color))
             surface.blit(piece, (x, y + (height - piece.get_height()) // 2))
             x += piece.get_width()
             if x > max_x:
@@ -623,13 +646,15 @@ class Engine:
         # Event info sits top-left too, after the cards button.
         event_button = self._event_button()
         event_button.draw(self.view, self.io)
-        if not self.turn_manager.dialog_active and not self.settings_open:
+        if not self.turn_manager.dialog_active and not self.settings_open and not self.pairing_open:
             event_button.release_button(self.toggle_event_info, self.io)
 
         if self.settings_open:
             self._draw_settings_menu()
         elif self.event_info_open:
             self._draw_event_info()
+        elif self.pairing_open:
+            self._draw_pairing()
 
     BUTTON_STEP = 68  # top-left row: settings, shop, cards, event cards (60 wide + 8 gap)
 
@@ -642,14 +667,22 @@ class Engine:
     def modal_open(self):
         """Whether some full-screen-ish overlay (an elimination/win dialog
         or the settings menu) should freeze everything else."""
-        return self.turn_manager.dialog_active or self.settings_open or self.event_info_open
+        return self.turn_manager.dialog_active or self.settings_open or self.event_info_open \
+            or self.pairing_open
 
     def toggle_event_info(self):
         self.event_info_open = not self.event_info_open
         self.io.left_pressed = 0  # the click shouldn't reach the map behind the button
 
+    def open_pairing(self):
+        self.settings_open = False
+        self.event_info_open = False
+        self.pairing_open = True
+        self._pairing_since = pg.time.get_ticks()
+
     def toggle_settings(self):
         self.event_info_open = False
+        self.pairing_open = False
         self.settings_open = not self.settings_open
         self.dragging_landmark = None
         self._close_save_as()
@@ -710,13 +743,13 @@ class Engine:
     def _draw_save_as(self, x, y, w, h, mouse):
         """Save As: pick one of the save slots, type a name for it, Save."""
         screen = self.view.screen
-        screen.blit(self.font.render("Save As", True, (0, 0, 0)), (x + 15, y + 10))
+        screen.blit(self.font.render(t("Save As"), True, (0, 0, 0)), (x + 15, y + 10))
         for i in range(SAVE_SLOT_COUNT):
             rect = pg.Rect(x + 20, y + 45 + i * 60, w - 40, 50)
             selected = self.save_as_slot == i
             pg.draw.rect(screen, (255, 255, 255) if selected else (235, 235, 235), rect)
             pg.draw.rect(screen, (0, 0, 0), rect, 3 if selected else 2)
-            screen.blit(self.font.render("Slot {}".format(i + 1), True, (90, 90, 90)), (rect.x + 8, rect.y + 3))
+            screen.blit(self.font.render(t("Slot {}").format(i + 1), True, (90, 90, 90)), (rect.x + 8, rect.y + 3))
             if selected:
                 text = self.font.render(self.save_as_name, True, (0, 0, 0))
                 screen.blit(text, (rect.x + 8, rect.y + 25))
@@ -725,7 +758,7 @@ class Engine:
                     pg.draw.line(screen, (0, 0, 0), (cx, rect.y + 27), (cx, rect.bottom - 5), 2)
             else:
                 name = self.save_as_names[i]
-                text = self.font.render(name if name else "(empty)", True, (0, 0, 0) if name else (130, 130, 130))
+                text = self.font.render(name if name else t("(empty)"), True, (0, 0, 0) if name else (130, 130, 130))
                 screen.blit(text, (rect.x + 8, rect.y + 25))
                 if self.io.left_pressed and rect.collidepoint(mouse):
                     self.save_as_slot = i
@@ -733,19 +766,19 @@ class Engine:
 
         hint_y = y + 45 + SAVE_SLOT_COUNT * 60
         if self.save_as_slot is None:
-            hint = "Click a slot to save there"
+            hint = t("Click a slot to save there")
         elif self.save_as_names[self.save_as_slot]:
-            hint = "Type a name -- overwrites this slot"
+            hint = t("Type a name -- overwrites this slot")
         else:
-            hint = "Type a name, then Save or Enter"
+            hint = t("Type a name, then Save or Enter")
         screen.blit(self.font.render(hint, True, (0, 0, 0)), (x + 20, hint_y))
 
         save_rect = pg.Rect(x + 20, y + h - 110, w - 40, 40)
-        if self._menu_button(save_rect, "Save", (150, 245, 150), mouse,
+        if self._menu_button(save_rect, t("Save"), (150, 245, 150), mouse,
                              enabled=self.save_as_slot is not None and bool(self.save_as_name.strip())):
             self._commit_save_as()
         back_rect = pg.Rect(x + 20, y + h - 60, w - 40, 40)
-        if self._menu_button(back_rect, "Back", (220, 220, 220), mouse):
+        if self._menu_button(back_rect, t("Back"), (220, 220, 220), mouse):
             self._close_save_as()
 
     def _draw_settings_menu(self):
@@ -781,17 +814,17 @@ class Engine:
             self._draw_save_as(x, y, w, h, mouse)
             return
 
-        screen.blit(self.font.render("Settings", True, (0, 0, 0)), (x + 15, y + 10))
+        screen.blit(self.font.render(t("Settings"), True, (0, 0, 0)), (x + 15, y + 10))
 
         col_w = (w - 60) // 2
         col_x = (x + 20, x + 40 + col_w)
 
         quit_rect = pg.Rect(col_x[0], y + 45, col_w, 40)
-        if self._menu_button(quit_rect, "Exit Game", (245, 150, 150), mouse):
+        if self._menu_button(quit_rect, t("Exit Game"), (245, 150, 150), mouse):
             self.pending_quit = True
 
         save_as_rect = pg.Rect(col_x[1], y + 45, col_w, 40)
-        if self._menu_button(save_as_rect, "Save As", (150, 200, 245), mouse):
+        if self._menu_button(save_as_rect, t("Save As"), (150, 200, 245), mouse):
             self.save_as_open = True
             self.save_as_slot = None
             self.save_as_names = [read_save_name(slot_path(i)) for i in range(SAVE_SLOT_COUNT)]
@@ -807,6 +840,11 @@ class Engine:
                 row = pg.Rect(col_x[c], save_as_rect.bottom + 25 + i * 46, col_w, 34)
                 if self._toggle_switch(row, text, self.settings[key], mouse):
                     self.settings[key] = not self.settings[key]
+
+        if self.controls is not None and self.controls.pads:
+            pads_rect = pg.Rect(col_x[1], save_as_rect.bottom + 25 + len(columns[1]) * 46, col_w, 40)
+            if self._menu_button(pads_rect, t("Controllers"), (150, 200, 245), mouse):
+                self.open_pairing()
 
         # China's pagoda and Japan's torii: owed by whoever holds that
         # country without one, who drags it from here onto the map. Once
@@ -843,7 +881,7 @@ class Engine:
         knob_x = track.right - 12 if on else track.x + 12
         pg.draw.circle(screen, (255, 255, 255), (knob_x, track.centery), 9)
         pg.draw.circle(screen, (0, 0, 0), (knob_x, track.centery), 9, 2)
-        label = self.font.render(text, True, (0, 0, 0))
+        label = self.font.render(t(text), True, (0, 0, 0))
         screen.blit(label, (track.right + 12, row.centery - label.get_height() // 2))
         return self.io.button(("r", row.x, row.y, row.w, row.h))
 
@@ -934,18 +972,18 @@ class Engine:
         desc_font = game_font(19)
         w = 520
         text_w = w - 80
-        name = event.name if event is not None else "No active event card"
-        lines = manager._wrap_text(event.description, desc_font, text_w) if event is not None else []
+        name = t(event.name) if event is not None else t("No active event card")
+        lines = manager._wrap_text(t(event.description), desc_font, text_w) if event is not None else []
 
         upcoming = manager.turns_until_next_event()
         if upcoming is None:
-            next_text = "No more event cards"
+            next_text = t("No more event cards")
         else:
             turns, player = upcoming
             if turns == 1:
-                next_text = "Next event card: next turn ({})".format(player.name)
+                next_text = t("Next event card: next turn ({})").format(player.name)
             else:
-                next_text = "Next event card: in {} turns ({})".format(turns, player.name)
+                next_text = t("Next event card: in {} turns ({})").format(turns, player.name)
 
         icon = self.hud_images["spr_event"]
         iw, ih = icon.image.get_size()
@@ -977,11 +1015,72 @@ class Engine:
 
         # A click anywhere closes it (the event button itself already had
         # its chance to, earlier in draw_gui), and goes no further.
-        hint = hint_font.render("click anywhere to continue", True, (90, 50, 50))
+        hint = hint_font.render(t("click anywhere to continue"), True, (90, 50, 50))
         screen.blit(hint, (x + w * 0.5 - hint.get_width() * 0.5, y + h - bottom_pad - hint.get_height()))
         if self.io.left_pressed:
             self.event_info_open = False
             self.io.left_pressed = 0
+
+    def _draw_pairing(self):
+        """The Controllers panel: a row per human player. A controller
+        clicking (A) a row becomes that player's; the mouse clicking it
+        takes the controller away again. Opens by itself when a game starts
+        with a controller nobody has yet (runner.py), and from the settings
+        menu."""
+        view = self.view
+        screen = view.screen
+        io = self.io
+        pads = self.controls
+        mouse = (io.mouse_position.x, io.mouse_position.y)
+
+        dim = pg.Surface((view.WIDTH, view.HEIGHT), pg.SRCALPHA)
+        dim.fill((0, 0, 0, 140))
+        screen.blit(dim, (0, 0))
+
+        humans = [p for p in self.players if not p.is_bot]
+        row_h, gap = 48, 10
+        w, h = 480, 85 + len(humans) * (row_h + gap) + 70
+        x, y = view.WIDTH * 0.5 - w * 0.5, view.HEIGHT * 0.5 - h * 0.5
+        pg.draw.rect(screen, self.SETTINGS_COLOR, pg.Rect(x, y, w, h))
+        pg.draw.rect(screen, (0, 0, 0), pg.Rect(x, y, w, h), 3)
+        screen.blit(self.font.render(t("Controllers"), True, (0, 0, 0)), (x + 15, y + 10))
+        screen.blit(self.font.render(t("Point at your name and press A"), True, (70, 70, 70)), (x + 15, y + 42))
+
+        # Every controller clicks here, each for itself (not only the acting
+        # player's); the mouse through Io, as everywhere.
+        clicks = [(pad, pad.pos) for pad in pads.pads if pad.tapped(controls.A)]
+        if io.left_pressed and io.source is None:
+            clicks.append((None, mouse))
+        settling = pg.time.get_ticks() - self._pairing_since < 300
+        if settling:
+            clicks = []  # the press that opened the panel doesn't pick a row too
+        for i, player in enumerate(humans):
+            rect = pg.Rect(x + 20, y + 80 + i * (row_h + gap), w - 40, row_h)
+            for who, pos in clicks:
+                if not rect.collidepoint(pos):
+                    continue
+                if who is not None:
+                    pads.bind(who, player.name)
+                elif pads.pad_of(player.name) is not None:
+                    pads.bind(pads.pad_of(player.name), None)
+            pad = pads.pad_of(player.name)
+            fill = light_tint(player.color)
+            if rect.collidepoint(mouse) or any(rect.collidepoint(p.pos) for p in pads.pads):
+                fill = tuple(min(255, c + 20) for c in fill)
+            pg.draw.rect(screen, fill, rect)
+            pg.draw.rect(screen, (0, 0, 0), rect, 2)
+            name = self.font.render(player.name, True, (0, 0, 0))
+            screen.blit(name, (rect.x + 12, rect.centery - name.get_height() // 2))
+            label = t("Controller {}").format(pad.number) if pad is not None else t("No controller")
+            text = self.font.render(label, True, (0, 0, 0) if pad is not None else (110, 110, 110))
+            screen.blit(text, (rect.right - 12 - text.get_width(), rect.centery - text.get_height() // 2))
+
+        done_rect = pg.Rect(int(x + w * 0.5 - 90), int(y + h - 58), 180, 42)
+        done = self._menu_button(done_rect, t("Done"), (150, 245, 150), mouse)
+        if (done and not settling) or any(who is not None and done_rect.collidepoint(pos) for who, pos in clicks):
+            self.pairing_open = False
+        if io.left_pressed:
+            io.left_pressed = 0  # nothing behind the panel reacts
 
     def production(self, player):
         """What `player`'s countries would yield right now: the resources
@@ -1012,7 +1111,7 @@ class Engine:
 
     def update_turn(self):
         self.hint_rows = 0  # stacked hint boxes drawn so far this frame
-        if self.settings_open or self.event_info_open:
+        if self.settings_open or self.event_info_open or self.pairing_open:
             return  # frozen: drawing already happened in draw_gui
         if not self.turn_manager.dialog_active and not self.bot_turn:
             player = self.players[self.turn]
@@ -1039,7 +1138,11 @@ class Engine:
         self.card_menu.draw(self.io, self.font)
 
     def io_handle(self):
-        self.io.update(self.view, self.countries.values())
+        if self.controls is None:
+            self.io.update(self.view, self.countries.values())
+        else:
+            source = self.controls.frame(self)
+            self.io.update(self.view, self.countries.values(), source, self.controls.fresh(source))
         shopper = self.players[self.turn]
         if shopper.attack == 3 and shopper.subattack < 8:
             # Shop menu open: the map behind it is inert (no hover panels,
@@ -1047,6 +1150,12 @@ class Engine:
             # still needs the map.
             self.io.hover_country = None
         self.view.offset = self.io.drag_map(self.view.offset)
+        if self.controls is not None:
+            # A controller's right stick moves the view the way it's tilted.
+            for pad in self.controls.clickers:
+                if pad.pan != (0.0, 0.0):
+                    self.view.offset = self.view.offset + Position(-pad.pan[0] / self.view.zoom,
+                                                                   -pad.pan[1] / self.view.zoom)
 
     def get_players(self, mode="prompt"):
         if mode == "default":

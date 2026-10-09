@@ -25,9 +25,12 @@ import sounds
 import numpy as np
 
 from board import CONTINENTS
+from lang import t
 
 
 class Event:
+    # `name` and `description` are Dutch and stay so (saves find an event by
+    # its name): they're translated where they're shown (lang.t).
     def __init__(self, name, description=""):
         self.name = name
         self.description = description
@@ -263,7 +266,7 @@ class JapanGoesCrazy(Event):
             return False
         self.troops_pending = False
         japan.units += 5
-        engine.turn_manager.notices.append([self.name, "{} took Japan: +5 troops there".format(japan.owner.name)])
+        engine.turn_manager.notices.append([self.name, t("{} took Japan: +5 troops there").format(japan.owner.name)])
         return True
 
     def save_state(self, engine):
@@ -310,8 +313,8 @@ class NativesFightBack(Event):
             self.pending.remove(name)
             self.queue.append(name)
             engine.turn_manager.notices.append([
-                self.name, "{} took {}: the natives attack it with {} troops".format(
-                    country.owner.name, name, self.TROOPS)])
+                self.name, t("{} took {}: the natives attack it with {} troops").format(
+                    country.owner.name, t(name), self.TROOPS)])
         if not self.queue or player.attack == 6:
             return False
         self.return_to = (player.attack, player.subattack if player.attack == 0 else 0)
@@ -418,14 +421,14 @@ class WrongButton(Event):
         if owner is not engine.default_player:
             current = engine.players[engine.turn]
             self._launch(engine, owner, (current.attack, current.subattack),
-                         "{} controls Noord-Korea".format(owner.name))
+                         t("{} controls {}").format(owner.name, t("Noord-Korea")))
 
     def check_pending(self, engine, player):
         owner = engine.countries["Noord-Korea"].owner
         if self.triggered or owner is engine.default_player:
             return False
         return_to = (player.attack, player.subattack if player.attack == 0 else 0)
-        self._launch(engine, owner, return_to, "{} took Noord-Korea".format(owner.name))
+        self._launch(engine, owner, return_to, t("{} took {}").format(owner.name, t("Noord-Korea")))
         return True
 
     def save_state(self, engine):
@@ -455,13 +458,13 @@ class WrongButton(Event):
         if chooser.is_bot:
             target = manager.bot.pick_country(chooser, asia, self)
             self._strike(engine, chooser, target)
-            manager.notices.append([self.name, "{}: {} drops the nuke on {}".format(why, chooser.name, target.name)])
+            manager.notices.append([self.name, t("{}: {} drops the nuke on {}").format(why, chooser.name, t(target.name))])
             return
-        manager.notices.append([self.name, "{}: pick a country in Asia for the nuke".format(why)])
+        manager.notices.append([self.name, t("{}: pick a country in Asia for the nuke").format(why)])
         manager.phases[5].start(
             predicate=lambda c: c.name in CONTINENTS["Asia"],
             on_pick=self._strike,
-            prompt="{}: kies een land in Azie voor de atoombom".format(chooser.name),
+            prompt=t("{}: kies een land in Azie voor de atoombom").format(chooser.name),
             return_to=return_to,
             chooser=chooser,
         )
@@ -541,7 +544,7 @@ class Slavery(Event):
             self.pending.remove(name)
             country.units += 1
             engine.turn_manager.notices.append([
-                self.name, "{} took {}: 1 slave added there".format(country.owner.name, name)])
+                self.name, t("{} took {}: 1 slave added there").format(country.owner.name, t(name))])
             happened = True
         return happened
 
@@ -647,7 +650,7 @@ class ChildLabor(Event):
             self.pending.remove(name)
             country.owner.steel += 5
             engine.turn_manager.notices.append([
-                self.name, "{} took {}: +5 steel".format(country.owner.name, name)])
+                self.name, t("{} took {}: +5 steel").format(country.owner.name, t(name))])
             happened = True
         return happened
 
@@ -718,12 +721,12 @@ class Ebola(Event):
                 name = next(n for n in CONTINENTS["Africa"]
                             if country_owners[n] is not engine.countries[n].owner)
                 engine.turn_manager.notices.append([
-                    self.name, "{} of {} now has the most troops in Africa: it goes to the mouse".format(
-                        name, country_owners[name].name)])
+                    self.name, t("{} of {} now has the most troops in Africa: it goes to the mouse").format(
+                        t(name), country_owners[name].name)])
                 return True
         if self.chooser is player:
             engine.turn_manager.notices.append([
-                self.name, "{}: pick which of your countries is hit by ebola".format(player.name)])
+                self.name, t("{}: pick which of your countries is hit by ebola").format(player.name)])
             return self._launch_pick(engine, player, (player.attack, player.subattack if player.attack == 0 else 0))
         return False
 
@@ -736,7 +739,7 @@ class Ebola(Event):
         engine.turn_manager.phases[5].start(
             predicate=lambda c: c.name in candidates and c.owner is player,
             on_pick=lambda engine, chooser, country: self._strike(engine, country),
-            prompt="Kies welk land door ebola getroffen wordt",
+            prompt=t("Kies welk land door ebola getroffen wordt"),
             return_to=return_to,
         )
         player.attack, player.subattack = 5, 0
@@ -804,7 +807,7 @@ class Pilgrimage(Event):
         self.pending = False
         self._apply(engine)
         engine.turn_manager.notices.append([
-            self.name, "{} took Arabië: all their troops move there, +5 troops".format(owner.name)])
+            self.name, t("{} took {}: all their troops move there, +5 troops").format(owner.name, t("Arabië"))])
         return True
 
     def on_end(self, engine):
@@ -872,7 +875,7 @@ class ClimateHoax(Event):
         engine.turn_manager.phases[5].start(
             predicate=lambda c: c.owner is player,
             on_pick=place_plane,
-            prompt="Plaats een gratis vliegtuig in een van je landen",
+            prompt=t("Plaats een gratis vliegtuig in een van je landen"),
             return_to=(player.attack, player.subattack),
         )
         player.attack, player.subattack = 5, 0
