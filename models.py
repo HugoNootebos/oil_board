@@ -761,6 +761,7 @@ class Io:
         # the topmost one under the mouse owns the click, so whatever is
         # behind it (the map, another button) doesn't get it too.
         self.buttons = []
+        self.last_buttons = []
         self.top_button = None
         # What the pointer is: None for the mouse, else a game controller's
         # cursor (controls.Pad), see `update`.
@@ -817,15 +818,25 @@ class Io:
             self.right_clicked = (self.mouse_position.x - start.x) ** 2 + (self.mouse_position.y - start.y) ** 2 <= 4 ** 2
             self._right_down_at = None
         self.previous_transformed_mouse_position = self.previous_mouse_position.screen_to_coordinates(view)
-        # Update hover_country. A country's troop circle counts as part of
-        # it (it can overhang the border, e.g. on small countries); when
-        # several circles are under the mouse, the nearest centre wins.
-        self.hover_country = None
+        self.last_buttons, self.buttons = self.buttons, []
+        self.top_button = next((b for b in reversed(self.last_buttons)
+                                if self._contains(b, self.mouse_position)), None)
+        self.hover_country = self.country_at(view, countries, self.mouse_position)
+
+    def country_at(self, view, countries, position):
+        """The name of the country at `position` (logical px), or None --
+        also when a button drawn last frame covers it. A country's troop
+        circle counts as part of it (it can overhang the border, e.g. on
+        small countries); when several circles are under it, the nearest
+        centre wins."""
+        if any(self._contains(b, position) for b in self.last_buttons):
+            return None  # the map behind a button is out of reach
         best = None
+        found = None
         for country in countries:
             cx = (country.mass_center.x + view.offset.x) * view.zoom + 0.5 * view.WIDTH
             cy = (country.mass_center.y + view.offset.y) * view.zoom + 0.5 * view.HEIGHT
-            dx, dy = self.mouse_position.x - cx, self.mouse_position.y - cy
+            dx, dy = position.x - cx, position.y - cy
             period = WORLD_WIDTH * view.zoom
             dx = (dx + 0.5 * period) % period - 0.5 * period  # the nearest copy
             d2 = dx ** 2 + dy ** 2
@@ -834,18 +845,16 @@ class Io:
             inside = max(abs(dx), abs(dy)) <= r * 0.88 if country.airport else d2 <= r ** 2
             if inside and (best is None or d2 < best):
                 best = d2
-                self.hover_country = country.name
-        if self.hover_country is None:
-            # (Not transformed_mouse_position itself: drag_map needs it
-            # unwrapped, or a drag across the seam would jump.)
-            point = Position(wrap_x(self.transformed_mouse_position.x), self.transformed_mouse_position.y)
+                found = country.name
+        if found is None:
+            # (A copy: drag_map needs transformed_mouse_position unwrapped,
+            # or a drag across the seam would jump.)
+            point = position.screen_to_coordinates(view)
+            point = Position(wrap_x(point.x), point.y)
             for country in countries:
                 if country.point_in_country(point):
-                    self.hover_country = country.name
-        last, self.buttons = self.buttons, []
-        self.top_button = next((b for b in reversed(last) if self._contains(b, self.mouse_position)), None)
-        if self.top_button is not None:
-            self.hover_country = None  # the map behind a button is out of reach
+                    found = country.name
+        return found
 
     def drag_map(self, offset):
         # Either the middle or right mouse button drags (pans) the map

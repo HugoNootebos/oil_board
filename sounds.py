@@ -4,6 +4,8 @@ Every call is safe when there is no audio device (headless runs): sounds
 just don't play. The background music is kept very soft and is never
 muted: effects play on top of it."""
 import os
+import unicodedata
+
 import pygame as pg
 
 SOUND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sounds")
@@ -60,6 +62,45 @@ def play(name):
         if sound is None:
             sound = _sounds[name] = pg.mixer.Sound(os.path.join(SOUND_DIR, name + ".mp3"))
         sound.set_volume(VOLUMES.get(name, 1.0))
+        sound.play()
+    except (pg.error, FileNotFoundError):
+        pass
+
+
+# --- country names ----------------------------------------------------
+# Spoken country names: sounds/countries/<country>.flac (accents left out
+# of the file name; matched ignoring case, accents, spaces and hyphens).
+COUNTRY_DIR = os.path.join(SOUND_DIR, "countries")
+_country_files = None
+_country_voice = None  # the name playing now, cut off by the next
+
+
+def _key(name):
+    name = unicodedata.normalize("NFKD", name).casefold()
+    return "".join(ch for ch in name if ch.isalnum())
+
+
+def play_country(name):
+    """Say the country `name` (no-op when it has no sound file)."""
+    global _country_files, _country_voice
+    if not _ready():
+        return
+    if _country_files is None:
+        try:
+            _country_files = {_key(os.path.splitext(f)[0]): os.path.join(COUNTRY_DIR, f)
+                              for f in os.listdir(COUNTRY_DIR) if f.endswith(".flac")}
+        except OSError:
+            _country_files = {}
+    path = _country_files.get(_key(name))
+    if path is None:
+        return
+    try:
+        sound = _sounds.get(path)
+        if sound is None:
+            sound = _sounds[path] = pg.mixer.Sound(path)
+        if _country_voice is not None:
+            _country_voice.stop()
+        _country_voice = sound
         sound.play()
     except (pg.error, FileNotFoundError):
         pass

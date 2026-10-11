@@ -1179,6 +1179,29 @@ class Engine:
                                                                    -pad.pan[1] / self.view.zoom)
         self.view.wrap()
 
+    def bystander_clicks(self):
+        """A player whose turn it isn't, pressing A with their controller's
+        cursor on a country, hears that country's name. Not for a click
+        the game takes (a defender's dice, an event's pick: those
+        controllers click, see controls.py), nor through the shop menu,
+        the card menu or a dialog."""
+        pads = self.controls
+        if pads is None or self.modal_open or self.card_menu.show:
+            return
+        current = self.players[self.turn]
+        if current.attack == 3 and current.subattack < 8:
+            return  # shop menu open
+        bot_acting = self.turn_manager.acting_player().is_bot  # then every paired controller clicks
+        for pad in pads.pads:
+            if not pad.tapped(controls.A) or (pad in pads.clickers and not bot_acting):
+                continue
+            player = pads.player_of(pad, self.players)
+            if player is None or player is current:
+                continue
+            name = self.io.country_at(self.view, self.countries.values(), Position(*pad.pos))
+            if name is not None:
+                sounds.play_country(name)
+
     def get_players(self, mode="prompt"):
         if mode == "default":
             self.default_game = True
