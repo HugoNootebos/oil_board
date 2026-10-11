@@ -7,7 +7,7 @@ from fonts import game_font
 from lang import t, Msg, Join
 import numpy as np
 from board import get_connections, get_countries
-from models import Position, Image, Player, Io, View, Gui, Shop, Button, CardMenu, LANDMARKS
+from models import Position, Image, Player, Io, View, Gui, Shop, Button, CardMenu, LANDMARKS, WORLD_WIDTH, WRAP_ROUTES
 from phases import TurnManager
 import random
 from random import sample
@@ -212,6 +212,14 @@ class Engine:
         self.landmark_spots = {
             name: find_spot(self.countries[name], self.countries, self.connections) for name in LANDMARKS
         }
+        # The map wraps around east-west and is drawn once per copy of the
+        # world on screen: (min x, max x) of what one copy draws, its
+        # Pacific routes (into the next copy) and troop circles included.
+        xs = [p.x for country in self.countries.values() for ring in country.polygon for p in ring]
+        for route in WRAP_ROUTES:
+            xs.append(min(self.countries[name].mass_center.x for name in route) + WORLD_WIDTH)
+        margin = 2 * Io.TROOP_CIRCLE_RADIUS / View.MIN_ZOOM
+        self._world_extent = (min(xs) - margin, max(xs) + margin)
 
         self.reinforcements = 0
         self.all_reinforcements_deployed = True
@@ -368,18 +376,27 @@ class Engine:
         clip = self._logical_clip(ss)
         surface.set_clip(clip)
         surface.fill(tuple(background_color) + (255,), clip)
-        for country in self.countries.values():
-            country.draw(view, border_color=self.colors["outlines"], draw_border=False)
+        copies = view.copies(self._world_extent)
+        for dx in copies:
+            with view.shifted(dx):
+                for country in self.countries.values():
+                    country.draw(view, border_color=self.colors["outlines"], draw_border=False)
         with self._blended(surface, self.BORDER_OPACITY):
-            for country in self.countries.values():
-                country.draw_border(view, self.BORDER_COLOR)
+            for dx in copies:
+                with view.shifted(dx):
+                    for country in self.countries.values():
+                        country.draw_border(view, self.BORDER_COLOR)
         with self._blended(surface, self.CONNECTION_OPACITY):
-            for connection in self.connections:
-                if not self.settings[connection.kind]:
-                    continue
-                connection.draw(self.countries, self.colors, view, outline_color=self.colors["outlines"])
+            for dx in copies:
+                with view.shifted(dx):
+                    for connection in self.connections:
+                        if not self.settings[connection.kind]:
+                            continue
+                        connection.draw(self.countries, self.colors, view, outline_color=self.colors["outlines"])
         if self.settings["landmarks"]:
-            self._draw_map_landmarks()
+            for dx in copies:
+                with view.shifted(dx):
+                    self._draw_map_landmarks()
         surface.set_clip(None)
         if ss != 1:
             surface = pg.transform.smoothscale(surface, (sw, sh))
@@ -408,15 +425,17 @@ class Engine:
         view.draw_ox = view.ox
         view.draw_oy = view.oy
         view.window.set_clip(self._logical_clip())
-        for country in self.countries.values():
-            country.draw_troops(self.map_font, view)
-            country.draw_assets(
-                view=view,
-                img_ship=self.map_images["spr_ship"],
-                img_plane=self.map_images["spr_plane"],
-                img_tank=self.map_images["spr_tank"],
-                show_military=self.settings["assets"],
-            )
+        for dx in view.copies(self._world_extent):
+            with view.shifted(dx):
+                for country in self.countries.values():
+                    country.draw_troops(self.map_font, view)
+                    country.draw_assets(
+                        view=view,
+                        img_ship=self.map_images["spr_ship"],
+                        img_plane=self.map_images["spr_plane"],
+                        img_tank=self.map_images["spr_tank"],
+                        show_military=self.settings["assets"],
+                    )
         view.window.set_clip(None)
 
     def present(self):
@@ -1084,7 +1103,8 @@ class Engine:
 
     def production(self, player):
         """What `player`'s countries would yield right now: the resources
-        as they'd arrive next income (food net of the troops to feed)."""
+        as they'd arrive next income (food net of the troops to feed), plus
+        "units": the troops on the board that food has to feed."""
         from phases import income_multiplier
         totals = dict.fromkeys(("food", "wood", "steel", "oil", "nuclear", "troops", "helmets"), 0)
         units = 0
@@ -1107,6 +1127,7 @@ class Engine:
                         totals[resource] += amount
                 totals["troops"] += country.troops
         totals["food"] -= units
+        totals["units"] = units
         return totals
 
     def update_turn(self):
@@ -1156,6 +1177,7 @@ class Engine:
                 if pad.pan != (0.0, 0.0):
                     self.view.offset = self.view.offset + Position(-pad.pan[0] / self.view.zoom,
                                                                    -pad.pan[1] / self.view.zoom)
+        self.view.wrap()
 
     def get_players(self, mode="prompt"):
         if mode == "default":

@@ -59,11 +59,13 @@ def image_button_shape(cx, cy, size=(IMAGE_BUTTON_W, IMAGE_BUTTON_H)):
     return ("r", int(cx) - w // 2, int(cy) - h // 2, w, h)
 
 
-def draw_image_button(engine, cx, cy, name, enabled=True, size=(IMAGE_BUTTON_W, IMAGE_BUTTON_H)):
+def draw_image_button(engine, cx, cy, name, enabled=True, size=(IMAGE_BUTTON_W, IMAGE_BUTTON_H),
+                      greyed=False):
     """Rectangular button images/<name>_button.png, `size` big and centred
     on (cx, cy) in logical UI coordinates. Returns True when it was
     clicked; a disabled one is drawn washed-out grey and never reports a
-    click."""
+    click. `greyed` draws it grey too but keeps it clickable (a toggle
+    that is on)."""
     if (name, size) not in _IMAGE_BUTTONS:
         image = pg.transform.scale(
             pg.image.load("./images/{}_button.png".format(name)).convert_alpha(), size)
@@ -78,7 +80,7 @@ def draw_image_button(engine, cx, cy, name, enabled=True, size=(IMAGE_BUTTON_W, 
         _IMAGE_BUTTONS[(name, size)] = image, hover, disabled
     image, hover, disabled = _IMAGE_BUTTONS[(name, size)]
     shape = image_button_shape(cx, cy, size)
-    if not enabled:
+    if not enabled or greyed:
         image = disabled
     elif engine.io._contains(shape, engine.io.mouse_position):
         image = hover
@@ -163,10 +165,13 @@ class Phase:
     THROWN_DEFENCE_Y = 325
     PICK_DICE_Y = 450
     PICK_TEXT_Y = 415
+    # Rows are centred on the map area left of the side panel (not the
+    # screen), so a deselected die doesn't cover the oil cost over Confirm.
+    DICE_CX = (960 - 150) // 2
 
     def dice_x(self, index, count):
         """Left edge of die `index` in a centred row of `count` 70px dice."""
-        return int(self.view.WIDTH * 0.5 - 40 * (count - 1) - 35 + 80 * index)
+        return int(self.DICE_CX - 40 * (count - 1) - 35 + 80 * index)
 
     def thrown_columns(self):
         """Number of columns for the thrown dice: attack die i is compared to
@@ -265,29 +270,36 @@ class Phase:
 
     HINT_COLOR = (245, 130, 130)
 
+    _reinforcement_font = None
+
     def _draw_reinforcements(self, count):
-        """Troops left to deploy: the troop-card soldier with a signed
-        number over it, just left of the player panel (10 px further than
-        the cancel button) and level with its helmet row."""
+        """Troops left to deploy: the troop-card soldier (96 px tall) with a
+        big signed number over it, at the left edge of the screen, its feet
+        well clear of a hint box (blit_hint) over the collapsed action log."""
         import pygame as pg
         view = self.view
-        gui = self.engine.gui
-        height = 48
+        engine = self.engine
+        height = 96
         if "reinforcements" not in _ASSET_ICONS:
             sprite = pg.image.load("./images/card0.png").convert_alpha()
             _ASSET_ICONS["reinforcements"] = pg.transform.smoothscale(
                 sprite, (round(sprite.get_width() * height / sprite.get_height()), height))
         sprite = _ASSET_ICONS["reinforcements"]
-        right = view.WIDTH - gui.width - self.BUTTON_GAP - 10
-        cx = right - sprite.get_width() // 2
-        cy = gui.player_row_center_y(view, gui.HELMET_ROW)
-        view.screen.blit(sprite, (right - sprite.get_width(), cy - height // 2))
+        if Phase._reinforcement_font is None:
+            Phase._reinforcement_font = game_font(40)
+        font = Phase._reinforcement_font
+        left = self.BUTTON_GAP + 10
+        hint_h = engine.font.get_height() + 8
+        bottom = view.HEIGHT - engine.ACTION_BOX_H - hint_h - 30
+        cx = left + sprite.get_width() // 2
+        cy = bottom - height // 2
+        view.screen.blit(sprite, (left, bottom - height))
         label = ("+" if count >= 0 else "-") + str(abs(count))
-        text = self.engine.font.render(label, True, (0, 0, 0))
-        outline = self.engine.font.render(label, True, (255, 255, 255))
+        text = font.render(label, True, (0, 0, 0))
+        outline = font.render(label, True, (255, 255, 255))
         x, y = cx - text.get_width() // 2, cy - text.get_height() // 2
-        for dx in (-2, -1, 0, 1, 2):
-            for dy in (-2, -1, 0, 1, 2):
+        for dx in range(-4, 5):
+            for dy in range(-4, 5):
                 if dx or dy:
                     view.screen.blit(outline, (x + dx, y + dy))
         view.screen.blit(text, (x, y))
@@ -1643,9 +1655,9 @@ class AttackPhase(Phase):
         defender = defence.owner
         self._log_battle(player, defender, defence, sum(attack_loss),
                          sum(not a for a in attack_loss), conquered=defence.units <= 0)
-        # A failed landing over sea: rolling 1 die and losing it, or 2 dice
-        # and losing both, sinks every asset brought along on the attack.
-        if not self.attack_via_land and len(A) in (1, 2) and n == len(A) and all(attack_loss):
+        # A failed attack, over sea or over land: rolling 1 die and losing
+        # it, or 2 dice and losing both, destroys every asset brought along.
+        if len(A) in (1, 2) and n == len(A) and all(attack_loss):
             ships, tanks, planes = self.selected_ships, self.selected_tanks, self.selected_planes
             if ships or tanks or planes:
                 attack_from.ships = max(attack_from.ships - ships, 0)
@@ -1900,11 +1912,12 @@ class MovementPhase(Phase):
 
         # Greyed out (error sound on a click) when none of the player's
         # undeveloped countries has anything to develop. While picking a
-        # country it toggles back off, as does the cancel button.
+        # country it is grey but toggles back off, as does the cancel button.
         developable = active or any(
             c.owner == player and not c.developed and any(self.develop_cost(c).values())
             for c in engine.countries.values())
-        toggled = draw_image_button(self.engine, dx, dy, "develop", enabled=developable, size=PICTURE_BUTTON_SIZE)
+        toggled = draw_image_button(self.engine, dx, dy, "develop", enabled=developable, size=PICTURE_BUTTON_SIZE,
+                                    greyed=active)
         if active:
             toggled = self.cancel_button(self.CANCEL_X, self.ROW_Y) or toggled
         if toggled:
@@ -1979,7 +1992,6 @@ class MovementPhase(Phase):
         engine = self.engine
         player = self.player
         if player.repositioned_this_turn:
-            self.blit_hint(t("Already repositioned this turn"))
             if self.io.left_pressed and self.io.hover_country is not None:
                 sounds.play("error")
             return

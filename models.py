@@ -1,5 +1,6 @@
 import math
 import zlib
+from contextlib import contextmanager
 
 import numpy as np
 import pygame as pg
@@ -521,6 +522,25 @@ class Country:
             img.draw(view.map_surface, Position(int(x + start_x + i * spacing), y))
 
 
+# The map wraps around east-west: past Japan lies the Pacific, then the
+# Americas again. The board runs from Alaska's west edge (x 16) to
+# Siberie's east edge (x 631); PACIFIC map units of open sea are added
+# between the two, so the world repeats every WORLD_WIDTH. SEAM is a
+# point in that ocean where one copy of the world ends and the next
+# begins: the board itself lies in [SEAM - WORLD_WIDTH, SEAM).
+PACIFIC = 300
+WORLD_WIDTH = (631 - 16) + PACIFIC
+SEAM = 700
+# Routes that cross the Pacific: drawn from the eastern country eastwards
+# to the western one in the next copy.
+WRAP_ROUTES = (frozenset({"Alaska", "Siberië"}), frozenset({"Japan", "Pearl Harbor"}))
+
+
+def wrap_x(x):
+    """World x brought into the board's own copy, [SEAM - WORLD_WIDTH, SEAM)."""
+    return (x - SEAM) % WORLD_WIDTH + SEAM - WORLD_WIDTH
+
+
 class Connection:
 
     def __init__(self, connection, kind, rails=False):
@@ -585,21 +605,20 @@ class Connection:
             outline_width=2,
     ):
         points = [countries[name].mass_center.to_px(view) for name in self.connection]
-        if {"Alaska", "Siberië"}.issubset(self.connection) or {"Japan", "Pearl Harbor"}.issubset(self.connection):
-            logical = [countries[name].mass_center.transform_coordinates(view) for name in self.connection]
-            swap = logical[0].x < logical[0].y
-
-            def edge(flag):
-                return int(view.WIDTH * flag * view.draw_scale + view.draw_ox)
-
-            points = [points[0], (edge(not swap), points[0][1]), points[1], (edge(swap), points[1][1])]
+        if frozenset(self.connection) in WRAP_ROUTES:
+            # Across the Pacific: from the eastern country to the western
+            # one in the next copy of the world (the copy to the west draws
+            # the line coming into this copy's western country).
+            west, east = sorted(self.connection, key=lambda name: countries[name].mass_center.x)
+            center = countries[west].mass_center
+            points = [countries[east].mass_center.to_px(view),
+                      Position(center.x + WORLD_WIDTH, center.y).to_px(view)]
         # A connection with rails built on it is drawn grey regardless of
         # whether it's a land or sea link.
         line_color = connection_colors["rails"] if self.rails else connection_colors[self.kind]
-        # Each piece is a polyline: the plain straight line, the two halves
-        # of a route wrapping around the map edge, or a waypoint curve.
+        # Each piece is a polyline: the plain straight line or a waypoint curve.
         path = self._path(countries, view)
-        pieces = [path] if path is not None else [list(pair) for pair in zip(points[0::2], points[1::2])]
+        pieces = [path] if path is not None else [points]
         if self.kind == "sea" and not self.rails:
             # Sea routes: evenly spaced dots, no outline.
             for piece in pieces:
@@ -807,6 +826,8 @@ class Io:
             cx = (country.mass_center.x + view.offset.x) * view.zoom + 0.5 * view.WIDTH
             cy = (country.mass_center.y + view.offset.y) * view.zoom + 0.5 * view.HEIGHT
             dx, dy = self.mouse_position.x - cx, self.mouse_position.y - cy
+            period = WORLD_WIDTH * view.zoom
+            dx = (dx + 0.5 * period) % period - 0.5 * period  # the nearest copy
             d2 = dx ** 2 + dy ** 2
             r = self.TROOP_CIRCLE_RADIUS
             # Airports draw a square (see Country.draw_troops) instead.
@@ -815,8 +836,11 @@ class Io:
                 best = d2
                 self.hover_country = country.name
         if self.hover_country is None:
+            # (Not transformed_mouse_position itself: drag_map needs it
+            # unwrapped, or a drag across the seam would jump.)
+            point = Position(wrap_x(self.transformed_mouse_position.x), self.transformed_mouse_position.y)
             for country in countries:
-                if country.point_in_country(self.transformed_mouse_position):
+                if country.point_in_country(point):
                     self.hover_country = country.name
         last, self.buttons = self.buttons, []
         self.top_button = next((b for b in reversed(last) if self._contains(b, self.mouse_position)), None)
@@ -867,6 +891,34 @@ class View:
             (screen_pos.x - 0.5 * self.WIDTH) / self.zoom - world_before.x,
             (screen_pos.y - 0.5 * self.HEIGHT) / self.zoom - world_before.y,
         )
+        self.wrap()
+
+    def wrap(self):
+        """Keep the view's centre in the board's own copy of the world (the
+        picture is the same in every copy; only the numbers stay small)."""
+        center = -self.offset.x
+        if not SEAM - WORLD_WIDTH <= center < SEAM:
+            self.offset = Position(-wrap_x(center), self.offset.y)
+
+    @contextmanager
+    def shifted(self, dx):
+        """Draw with the world moved dx map units east (another copy)."""
+        offset = self.offset
+        self.offset = Position(offset.x + dx, offset.y)
+        try:
+            yield
+        finally:
+            self.offset = offset
+
+    def copies(self, extent):
+        """Shifts (multiples of WORLD_WIDTH) of the copies of the world on
+        screen; `extent` is (min x, max x) of what one copy draws."""
+        left = -0.5 * self.WIDTH / self.zoom - self.offset.x
+        right = 0.5 * self.WIDTH / self.zoom - self.offset.x
+        first = math.floor((left - extent[1]) / WORLD_WIDTH)
+        last = math.ceil((right - extent[0]) / WORLD_WIDTH)
+        return [k * WORLD_WIDTH for k in range(first, last + 1)
+                if extent[0] + k * WORLD_WIDTH < right and extent[1] + k * WORLD_WIDTH > left]
 
 
 class Button:
@@ -1165,11 +1217,22 @@ class Gui:
             pos = Position(x0 + self.PLAYER_TEXT_X, rows_top + index * self.PLAYER_ROW_H)
             iw, ih = image.image.get_size()
             image.draw(view.screen, pos + Position((40 - iw) // 2 - self.PLAYER_TEXT_X + 8, (40 - ih) // 2))
-            text = font.render("{}".format(amount), True, self.outline_color)
+            color = self.outline_color
+            if index == 0 and production is not None and production["units"] > amount:
+                color = (200, 0, 0)  # more troops than food in stock: some will starve
+            text = font.render("{}".format(amount), True, color)
             text_pos = pos + Position(0, (40 - text.get_height()) // 2)
             # Amounts are centred on one line so 1- and 2-digit ones line up.
             view.screen.blit(text, (x0 + self.PLAYER_AMOUNT_CX - text.get_width() // 2, text_pos.y))
-            if production is not None:
+            if production is not None and index == 0:
+                # Food: the troops to feed (top) and the harvest (bottom).
+                right = x0 + self.width - 10
+                upper = self.small_font.render("(-{})".format(production["units"]), True, (170, 0, 0))
+                lower = self.small_font.render("(+{})".format(production["food"] + production["units"]),
+                                               True, (0, 120, 0))
+                view.screen.blit(upper, (right - upper.get_width(), pos.y + 3))
+                view.screen.blit(lower, (right - lower.get_width(), pos.y + 20))
+            elif production is not None:
                 if index < 5:
                     gain = production[resource_names[index]]
                 else:  # helmets: the reinforcements they bring each turn
@@ -1290,6 +1353,7 @@ class CardMenu:
         self._last_hovered = None
         self.engine = None  # set by Engine; needed for sprites and the turn manager
         self.trade_mode = False
+        self.trade_hidden = False  # reward panel hidden by the eye button
         self.trade_cards = []
         self.trade_base = 0
         self.organize_cards()
@@ -1351,11 +1415,23 @@ class CardMenu:
         _, x, y, w, h = image_button_shape(Phase.CONFIRM_X, Phase.ROW_Y)
         return pg.Rect(x, y, w, h)
 
-    def _option_rect(self, index):
-        return pg.Rect(self.view.WIDTH * 0.5 - 110, 60 + index * 58, 220, 50)
+    # The reward panel: a title over the six options.
+    REWARD_TOP = 120
+    REWARD_H = 40 + 5 * 58 + 50 + 20
 
-    def _back_rect(self):
-        return pg.Rect(self.view.WIDTH * 0.5 - 60, 60 + 6 * 58 + 6, 120, 40)
+    def _option_rect(self, index):
+        return pg.Rect(self.view.WIDTH * 0.5 - 110, self.REWARD_TOP + 40 + index * 58, 220, 50)
+
+    def _eye_rect(self):
+        """The eye button (hides/shows the reward panel), in Confirm's spot."""
+        from phases import Phase, image_button_shape
+        _, x, y, w, h = image_button_shape(Phase.CONFIRM_X, Phase.ROW_Y)
+        return pg.Rect(x, y, w, h)
+
+    def _cancel_rect(self):
+        from phases import Phase, image_button_shape
+        _, x, y, w, h = image_button_shape(Phase.CANCEL_X, Phase.ROW_Y)
+        return pg.Rect(x, y, w, h)
 
     def _panel_rect(self):
         cards = self.player.cards
@@ -1381,13 +1457,17 @@ class CardMenu:
         pos = (io.mouse_position.x, io.mouse_position.y)
         if self.trade_mode:
             if io.left_pressed:
-                for index, (_, reward, mult) in enumerate(self.TRADE_OPTIONS):
-                    if self._option_rect(index).collidepoint(pos):
-                        self._execute_trade(reward, int(round(self.trade_base * mult)))
-                        break
+                if self._eye_rect().collidepoint(pos):
+                    self.trade_hidden = not self.trade_hidden
+                elif self._cancel_rect().collidepoint(pos):
+                    self.trade_mode = False
+                elif self.trade_hidden:
+                    sounds.play("error")  # the board is only to look at
                 else:
-                    if self._back_rect().collidepoint(pos):
-                        self.trade_mode = False
+                    for index, (_, reward, mult) in enumerate(self.TRADE_OPTIONS):
+                        if self._option_rect(index).collidepoint(pos):
+                            self._execute_trade(reward, int(round(self.trade_base * mult)))
+                            break
             io.left_pressed = 0
             return
         if not self.show:
@@ -1409,6 +1489,7 @@ class CardMenu:
             io.left_pressed = 0
             if self.can_trade_now():
                 self.trade_mode = True
+                self.trade_hidden = False
                 self.trade_base = value
                 self.trade_cards = [card for card in self.player.cards if card.use]
             else:
@@ -1433,11 +1514,16 @@ class CardMenu:
     def draw(self, io, font):
         screen = self.view.screen
         if self.trade_mode:
-            pg.draw.rect(screen, (235, 235, 245), pg.Rect(self.view.WIDTH * 0.5 - 130, 20, 260, 6 * 58 + 82))
-            pg.draw.rect(screen, (0, 0, 0), pg.Rect(self.view.WIDTH * 0.5 - 130, 20, 260, 6 * 58 + 82), 3)
-            screen.blit(font.render(t("Trade cards for:"), True, (0, 0, 0)), (self.view.WIDTH * 0.5 - 60, 30))
-            images = self.engine.hud_images
             mouse = (io.mouse_position.x, io.mouse_position.y)
+            self._draw_trade_buttons(mouse)
+            if self.trade_hidden:
+                return
+            panel = pg.Rect(self.view.WIDTH * 0.5 - 130, self.REWARD_TOP, 260, self.REWARD_H)
+            pg.draw.rect(screen, (235, 235, 245), panel)
+            pg.draw.rect(screen, (0, 0, 0), panel, 3)
+            screen.blit(font.render(t("Trade cards for:"), True, (0, 0, 0)),
+                        (self.view.WIDTH * 0.5 - 60, self.REWARD_TOP + 10))
+            images = self.engine.hud_images
             for index, (sprite, _, mult) in enumerate(self.TRADE_OPTIONS):
                 rect = self._option_rect(index)
                 hovered = rect.collidepoint(mouse)
@@ -1448,11 +1534,6 @@ class CardMenu:
                 image.draw(screen, Position(rect.x + 12 + (40 - iw) // 2, rect.y + 5 + (40 - ih) // 2))
                 amount = int(round(self.trade_base * mult))
                 screen.blit(font.render("X {}".format(amount), True, (0, 0, 0)), (rect.x + 75, rect.y + 13))
-            back = self._back_rect()
-            pg.draw.rect(screen, (245, 150, 150), back)
-            pg.draw.rect(screen, (0, 0, 0), back, 2)
-            label = font.render(t("Back"), True, (0, 0, 0))
-            screen.blit(label, label.get_rect(center=back.center))
             return
         if not self.show:
             return
@@ -1487,6 +1568,20 @@ class CardMenu:
             if not allowed:
                 self.engine.turn_manager.phases[0].blit_hint(
                     t("Cards can only be traded in the recruitment phase"))
+
+    def _draw_trade_buttons(self, mouse):
+        """Eye (hide/show the rewards) and Cancel (no trade) under the
+        reward panel; their clicks are handled in handle_input."""
+        from phases import Phase, draw_cancel_button
+        if not hasattr(self, "_eye_images"):
+            eye = pg.image.load("./images/eye.png").convert_alpha()
+            eye = pg.transform.scale(eye, self._eye_rect().size)
+            hover = eye.copy()
+            hover.fill((25, 25, 25), special_flags=pg.BLEND_RGB_ADD)
+            self._eye_images = eye, hover
+        rect = self._eye_rect()
+        self.view.screen.blit(self._eye_images[rect.collidepoint(mouse)], rect.topleft)
+        draw_cancel_button(self.engine, Phase.CANCEL_X, Phase.ROW_Y)
 
     def use_cards_automatic(self):
         possible_equal_sets, possible_different_set = self.check_set(self.player.cards)

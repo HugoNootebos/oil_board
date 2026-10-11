@@ -7,6 +7,7 @@ since none of those ever move.
 
 import numpy as np
 from matplotlib.path import Path
+from models import WORLD_WIDTH, WRAP_ROUTES
 
 # Obstacle sizes in map units, from their on-screen size at the default
 # zoom (the circle, icons and lines keep a fixed screen size).
@@ -37,8 +38,8 @@ def _segment_distances(px, py, a, b):
 
 def _connection_segments(country, countries, connections):
     """The connection lines as drawn through `country`, as map segments.
-    The two links that wrap around the map edge are drawn as horizontal
-    lines to the edge instead (see Connection.draw)."""
+    The links across the Pacific run to the other country's next copy
+    of the world (see Connection.draw)."""
     center = (country.mass_center.x, country.mass_center.y)
     segments = []
     for connection in connections:
@@ -46,12 +47,11 @@ def _connection_segments(country, countries, connections):
             continue
         other = next(n for n in connection.connection if n != country.name)
         other_center = (countries[other].mass_center.x, countries[other].mass_center.y)
-        wraps = {"Alaska", "Siberië"}.issubset(connection.connection) or \
-            {"Japan", "Pearl Harbor"}.issubset(connection.connection)
-        if wraps:
-            # The eastern one runs off the right edge, the western one the left.
-            far_x = center[0] + (2000 if center[0] > other_center[0] else -2000)
-            segments.append((center, (far_x, center[1])))
+        if frozenset(connection.connection) in WRAP_ROUTES:
+            # Across the Pacific (see Connection.draw): the eastern one runs
+            # east to the western one in the next copy of the world.
+            shift = WORLD_WIDTH if center[0] > other_center[0] else -WORLD_WIDTH
+            segments.append((center, (other_center[0] + shift, other_center[1])))
         else:
             segments.append((center, other_center))
     return segments
