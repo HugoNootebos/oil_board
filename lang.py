@@ -17,7 +17,8 @@ EN (Dutch source).
 import json
 import os
 
-SETTINGS_PATH = os.path.join("saves", "settings.json")
+# Next to the saves (save_load.SAVE_DIR), so the app keeps it on the device too.
+SETTINGS_PATH = os.path.join(os.environ.get("OIL_SAVES_DIR") or "saves", "settings.json")
 LANGUAGES = ("nl", "en")
 DEFAULT_LANGUAGE = "nl"
 
@@ -129,6 +130,19 @@ NL = {
     "Start Game": "Start spel",
     "Player {}": "Speler {}",
 
+    # The app's Update button in the main menu (updater.py)
+    "Update": "Bijwerken",
+    "Checking...": "Controleren...",
+    "Downloading {}%": "Downloaden {}%",
+    "Installing libraries...": "Bibliotheken installeren...",
+    "Restarting...": "Herstarten...",
+    "Install {}": "Installeer {}",
+    "Up to date": "Up-to-date",
+    "Version: {}": "Versie: {}",
+    "No internet connection": "Geen internetverbinding",
+    "Update failed, try again later": "Bijwerken mislukt, probeer het later opnieuw",
+    "The new version can't be installed": "De nieuwe versie kan niet worden geïnstalleerd",
+
     # Game controllers (controls.py): the names screen and the Controllers panel
     "Controllers": "Controllers",
     "Controller {}": "Controller {}",
@@ -205,6 +219,8 @@ NL = {
     "You received {} cards for having {}": "Je kreeg {} kaarten voor het bezitten van {}",
     "Because you control {}, {} was developed instantly!": "Omdat je {} beheerst, is {} meteen ontwikkeld!",
     " lost {} troops to starvation": " verloor {} troepen door honger",
+    " lost {} troop in {} due to ebola": " verloor {} troep in {} door ebola",
+    " lost {} troops in {} due to ebola": " verloor {} troepen in {} door ebola",
     "{} troops starved to death": "{} troepen zijn verhongerd",
 
     # Attack
@@ -229,7 +245,6 @@ NL = {
 
     # Movement and developing
     " started developing {}": " begon {} te ontwikkelen",
-    "Already repositioned this turn": "Deze beurt al verplaatst",
     " moved: {}": " verplaatste: {}",
     "No unbroken sea route -- ships can't move here": "Geen doorlopende zeeroute -- schepen kunnen hier niet heen",
     "No land route -- bring a ship or plane to escort troops":

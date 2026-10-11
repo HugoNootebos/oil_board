@@ -25,7 +25,7 @@ import sounds
 import numpy as np
 
 from board import CONTINENTS
-from lang import t
+from lang import t, Msg
 
 
 class Event:
@@ -765,6 +765,10 @@ class Ebola(Event):
         # Reuses Phase.abandon (any Phase instance will do -- it only
         # touches engine state) rather than duplicating the same
         # "hand back to Mouse" reset here.
+        if country.owner is not engine.default_player:
+            engine.log_action(country.owner, Msg(
+                " lost {} troop in {} due to ebola" if country.units == 1
+                else " lost {} troops in {} due to ebola", country.units, country.name))
         engine.turn_manager.phases[0].abandon(country)
 
 

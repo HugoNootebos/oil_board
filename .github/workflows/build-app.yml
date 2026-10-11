@@ -1,0 +1,62 @@
+# Builds the OIL app for Mac and Windows (packaging/build.py) and puts it in a
+# GitHub Release. Start it on GitHub: Actions > "Build app" > Run workflow.
+#
+# Only needed to make the app, and again only to change the Python inside it
+# or packaging/bootstrap.py: new versions of the game reach players through
+# the Update button in the main menu.
+name: Build app
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install certifi
+      - run: python packaging/build.py mac-arm64 mac-x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: dist/*.zip
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install certifi pillow
+      - run: python packaging/build.py windows
+      - run: choco install innosetup --no-progress -y
+      - shell: pwsh
+        run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" packaging\oil_installer.iss'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/OIL-Setup.exe
+
+  release:
+    needs: [mac, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "app-${{ github.run_number }}" dist/*
+          --target "${{ github.sha }}"
+          --title "OIL app (build ${{ github.run_number }})"
+          --notes-file packaging/release_notes.md

@@ -1,0 +1,9 @@
+# Never on GitHub: each device's own saves and settings, and generated or
+# local-only files. updater.py skips these folders in an update as well.
+saves/
+__pycache__/
+.DS_Store
+.backups/
+build/
+dist/
+bot_research/

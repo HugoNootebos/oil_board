@@ -201,6 +201,11 @@ BASE = {
     # country they came from. 0: off.
     "asset_attack": 1.0,
     "asset_carry": 1,
+    # A roll of 1 die that loses, or of 2 dice that both lose, destroys every
+    # asset the attack brought along (over land too). asset_wipe: 1 weighs that
+    # before each such roll (x asset_hold): the tanks stay home when they aren't
+    # worth the risk, and the attack is called off when it no longer pays. 0: off.
+    "asset_wipe": 1,
     # How much its choices are off, at random (0: never); only for A/B tests'
     # noise-matched controls.
     "noise": 0.0,
@@ -1993,6 +1998,9 @@ class BotController:
             target = self.engine.countries[attack.defence_country]
             chance = self._win_probability(from_c, target, active_tanks=attack.active_tanks)
             ev = self._attack_ev(from_c, target, from_c.units - 1, attack.active_tanks)
+            if self.params["asset_wipe"] and self.params["asset_hold"]:
+                ev = self._wipe_check(attack, from_c, target, ev)
+                chance = self._win_probability(from_c, target, active_tanks=attack.active_tanks)
             if chance < self.params["retreat_p"] * (1 - self._free_share(from_c)) or ev < 0:
                 self._say("calls off the attack on " + target.name)
                 self._failed.add((from_c.name, target.name))
@@ -2055,6 +2063,34 @@ class BotController:
                                       max(player.oil - 1 + attack.prepaid_planes, 0) + attack.tank_fee_paid)
         if self.params["asset_carry"]:
             attack.selected_tanks = min(attack.selected_tanks, attack.active_tanks)
+
+    def _wipe_chance(self, attack, from_c, target, active_tanks):
+        """The chance this roll loses every attack die, which destroys the
+        assets brought along: only a roll of 1 or 2 dice against at least as
+        many defence dice can."""
+        na = int((attack.attack_dice == 0).sum())
+        nd = len(attack.defence_dice)
+        if na not in (1, 2) or nd < na:
+            return 0.0
+        mods = self._combat_mods(from_c, target, active_tanks)
+        return sum(p for al, _, p in _round_outcomes(na, nd, *mods) if al == na)
+
+    def _wipe_check(self, attack, from_c, target, ev):
+        """Before a roll that can lose every die: take what the assets brought
+        along would cost off the attack's value, and leave the tanks behind
+        when the attack is worth more without them. Returns the value."""
+        def risk(tanks):
+            price = self._asset_price(attack.selected_ships, tanks, attack.selected_planes, 0)
+            return self.params["asset_hold"] * price * self._wipe_chance(attack, from_c, target, min(tanks, attack.active_tanks))
+        with_tanks = ev - risk(attack.selected_tanks)
+        if not attack.selected_tanks:
+            return with_tanks
+        without = self._attack_ev(from_c, target, from_c.units - 1, 0) - risk(0)
+        if without > with_tanks:
+            self._say("leaves the tanks behind on the attack on " + target.name)
+            attack.selected_tanks = attack.active_tanks = 0
+            return without
+        return with_tanks
 
     def _free_share(self, from_c):
         """How much of an attack from `from_c` is made with troops that

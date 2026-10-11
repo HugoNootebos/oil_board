@@ -47,8 +47,10 @@ from models import Player, Kaertske, Connection
 SAVE_VERSION = 1
 
 # Save files: one autosave (written at the start of every turn) plus four
-# manual slots the player names themselves via Settings > Save As.
-SAVE_DIR = "saves"
+# manual slots the player names themselves via Settings > Save As. The app
+# (packaging/bootstrap.py) keeps them in the device's own data folder, outside
+# the game files an update replaces; run from this folder they're in saves/.
+SAVE_DIR = os.environ.get("OIL_SAVES_DIR") or "saves"
 AUTOSAVE_PATH = os.path.join(SAVE_DIR, "autosave.json")
 SAVE_SLOT_COUNT = 4
 LEGACY_SAVE_PATH = "savegame.json"  # the single save file used before slots

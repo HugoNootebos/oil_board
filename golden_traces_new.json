@@ -2,39 +2,39 @@
  "source": "bot.py",
  "traces": {
   "3p-seed1": {
-   "md5": "5a6220109b114cd76f60aaabc1ef61f4",
-   "records": 268,
-   "turns": 100,
+   "md5": "ba9cf988e8c80ce23e587b78db9b3e7e",
+   "records": 279,
+   "turns": 101,
    "winner": "A"
   },
   "3p-seed2": {
-   "md5": "c8dcbe7a0518299fabc3a55bd1305782",
-   "records": 142,
-   "turns": 54,
+   "md5": "75bb1e064476b99fe7e505a9df8028d1",
+   "records": 186,
+   "turns": 65,
    "winner": "A"
   },
   "3p-seed3": {
-   "md5": "07aa71c9f1456a6de846cd8d3fe794c1",
-   "records": 70,
-   "turns": 27,
+   "md5": "fb4b5a6828b11f358283ab035e1d5101",
+   "records": 142,
+   "turns": 61,
    "winner": "A"
   },
   "4p-seed1": {
-   "md5": "ebbc61bd3ec03ba274c9275673054541",
-   "records": 127,
-   "turns": 59,
+   "md5": "ac7c4e8e62a347090ab4427d9e4e4142",
+   "records": 316,
+   "turns": 137,
    "winner": "A"
   },
   "4p-seed2": {
-   "md5": "f0d65d2da0ad25069936a54157c4d580",
-   "records": 271,
-   "turns": 109,
+   "md5": "4b8f0bd0d4b64ef8813b4a53f165c8d5",
+   "records": 357,
+   "turns": 157,
    "winner": "A"
   },
   "4p-seed3": {
-   "md5": "c44461dbc7fa34fda1ae2efe57abe4e4",
-   "records": 166,
-   "turns": 87,
+   "md5": "ca5c257a39d3f06755415ecac7c14d94",
+   "records": 130,
+   "turns": 63,
    "winner": "A"
   },
   "5p-seed1": {
@@ -44,33 +44,33 @@
    "winner": "A"
   },
   "5p-seed2": {
-   "md5": "553537d0675775940cbccc737b0e2244",
-   "records": 223,
-   "turns": 106,
+   "md5": "57ea73b6ff9e4b791e80dcf025bb53f4",
+   "records": 349,
+   "turns": 176,
    "winner": "A"
   },
   "5p-seed3": {
-   "md5": "9ea86368ab29e3319cfad9513edcd5bd",
-   "records": 868,
-   "turns": 469,
+   "md5": "3328053c8ce0f91103aa02bd86bc0566",
+   "records": 265,
+   "turns": 134,
    "winner": "A"
   },
   "6p-seed1": {
-   "md5": "ea0e31ff4a61f9e4034bbe5cca778890",
-   "records": 415,
-   "turns": 262,
+   "md5": "daacc71461e1fb71d4909488c72a3e56",
+   "records": 421,
+   "turns": 215,
    "winner": "A"
   },
   "6p-seed2": {
-   "md5": "6362e5cc0f5917724686106e15f3047d",
-   "records": 280,
-   "turns": 205,
+   "md5": "8c0c86d7aa2d559e652fe2074ca92583",
+   "records": 241,
+   "turns": 136,
    "winner": "A"
   },
   "6p-seed3": {
-   "md5": "dfbd9cceeed5556f3fe41a97c86e901f",
-   "records": 271,
-   "turns": 143,
+   "md5": "8eead3007e7810b027476a268738c092",
+   "records": 691,
+   "turns": 397,
    "winner": "A"
   }
  },

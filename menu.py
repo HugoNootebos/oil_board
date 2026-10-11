@@ -11,6 +11,7 @@ import pygame as pg
 import controls
 import sounds
 import lang
+import updater
 from fonts import game_font
 from lang import t
 from player_colors import COUNT_MODE_COLORS, light_tint
@@ -26,6 +27,9 @@ MENU_SCALE = 0.75
 FLAG_IMAGES = {"nl": "./images/nl_flag.png", "en": "./images/uk_flag.png"}
 FLAG_SIZE = (52, 36)
 
+# Window and taskbar icon (the app's own icon is packaging/icon.png).
+ICON_IMAGE = "./images/icon.png"
+
 
 def _open_window(width, height):
     """Open the (smaller) menu window; returns the full-size canvas to draw on.
@@ -34,6 +38,8 @@ def _open_window(width, height):
     size = (round(width * MENU_SCALE), round(height * MENU_SCALE))
     current = pg.display.get_surface()
     resized = current is None or current.get_size() != size
+    if current is None and os.path.isfile(ICON_IMAGE):
+        pg.display.set_icon(pg.image.load(ICON_IMAGE))  # before the window opens
     pg.display.set_mode(size)
     if resized:
         window = pg.Window.from_display_module()
@@ -87,10 +93,18 @@ def run_main_menu(width=960, height=640):
     hint_font = game_font(18)
 
     has_save = any(os.path.isfile(path) for _, path, _ in _save_entries())
+    # The app has an Update button (updater.py); a copy run from the game's
+    # own folder doesn't.
+    app = updater.managed()
+    if app:
+        updater.mark_started()
+        updater.state.start_check()
+    update_font = game_font(26)
 
     button_w, button_h = 300, 70
     new_game_rect = pg.Rect(width // 2 - button_w // 2, height // 2 - 120, button_w, button_h)
     continue_rect = pg.Rect(width // 2 - button_w // 2, height // 2 - 10, button_w, button_h)
+    update_rect = pg.Rect(width // 2 - button_w // 2, height // 2 + 95, button_w, 56)
     quit_rect = pg.Rect(width // 2 - button_w // 2, height // 2 + 180, button_w, button_h)
     flags = {
         key: pg.transform.smoothscale(pg.image.load(path).convert_alpha(), FLAG_SIZE)
@@ -106,6 +120,10 @@ def run_main_menu(width=960, height=640):
                 lang.set_language("en" if lang.language == "nl" else "nl")
                 pg.display.set_caption(t("Main Menu"))
                 sounds.play("click")
+                continue
+            if app and update_rect.collidepoint(click):
+                sounds.play("error" if updater.state.busy else "click")
+                updater.state.start_update()
                 continue
             sounds.play("error" if not has_save and continue_rect.collidepoint(click) else "click")
             if new_game_rect.collidepoint(click):
@@ -137,12 +155,56 @@ def run_main_menu(width=960, height=640):
             screen, button_font, quit_rect, t("Quit"),
             (240, 100, 100), hovered=quit_rect.collidepoint(mouse_pos),
         )
+        if app:
+            label, color, clickable = _update_look(updater.state)
+            _draw_button(screen, update_font, update_rect, label, color,
+                         hovered=clickable and update_rect.collidepoint(mouse_pos))
+            note = UPDATE_NOTES.get(updater.state.status)
+            if note:
+                hint = hint_font.render(t(note), True, (240, 180, 120))
+                screen.blit(hint, (width // 2 - hint.get_width() // 2, update_rect.bottom + 4))
+            version = updater.installed()["title"]
+            if version:
+                text = hint_font.render(t("Version: {}").format(version), True, (150, 150, 160))
+                screen.blit(text, (16, height - text.get_height() - 12))
         screen.blit(flags[lang.language], flag_rect)
         edge = (255, 255, 255) if flag_rect.collidepoint(mouse_pos) else (90, 90, 100)
         pg.draw.rect(screen, edge, flag_rect.inflate(4, 4), 2)
 
         _present(screen)
+        if app and updater.state.status == "ready":
+            pg.quit()
+            updater.restart()  # the app puts the update in place as it starts
         clock.tick(60)
+
+
+# Shown under the Update button when it didn't work out.
+UPDATE_NOTES = {
+    "offline": "No internet connection",
+    "failed": "Update failed, try again later",
+    "refused": "The new version can't be installed",
+}
+
+
+def _update_look(update):
+    """(label, colour, clickable) of the main menu's Update button for the
+    updater's state (updater.UpdateState)."""
+    grey, plain = (170, 170, 170), (200, 200, 225)
+    if update.status == "checking":
+        return t("Checking..."), grey, False
+    if update.status == "downloading":
+        return t("Downloading {}%").format(int(update.progress * 100)), grey, False
+    if update.status == "installing":
+        return t("Installing libraries..."), grey, False
+    if update.status == "ready":
+        return t("Restarting..."), grey, False
+    if update.status == "available":
+        title = update.latest["title"]
+        title = title if len(title) <= 18 else title[:17] + "..."
+        return t("Install {}").format(title), (245, 220, 120), True
+    if update.status == "current":
+        return t("Up to date"), plain, True
+    return t("Update"), plain, True
 
 
 def run_load_menu(width=960, height=640):

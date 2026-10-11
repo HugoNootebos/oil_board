@@ -18,9 +18,11 @@ The user writes in English and Dutch; answer in the language they use.
 python3 runner.py
 ```
 
-Requirements: `pygame-ce>=2.5`, `numpy>=1.19.3`, `matplotlib>=3.3.3`
+Requirements: `pygame-ce>=2.5`, `numpy>=1.19.3`, `matplotlib>=3.3.3`,
+`certifi` (for the app's updater)
 (this Mac: Python 3.9 with numpy 1.19.3; the game also runs on a current
-Python with numpy 2). The only automated checks are `event_checks.py` (events),
+Python with numpy 2). Players use the app instead (OIL.app / the Windows
+installer, see "App & updates" below). The only automated checks are `event_checks.py` (events),
 `bot_checks.py` (bot decisions on small boards), `bot_selfplay.py` (bots
 against each other) and `bot_golden.py` (did a change leave the bots' play
 exactly as it was).
@@ -65,7 +67,10 @@ the Python 3.9 that made them. numpy 2 is fine.
 | `bot_research/` | Reports and prototype scripts of the research behind the bot retraining (reports in `bot_research/reports/`; `backup_before_wp0/` holds the files as they were before it started; `compare_assets.py` puts several A/B result files side by side). Not used by the game. |
 | `event_sandbox.py` | Interactive test board for events: `python3 event_sandbox.py`. Fixed 4-player board, events only when picked (F2), shows what each start/end changed; keys for editing the board (see its docstring / F1). Saves go to temp files. |
 | `event_checks.py` | Headless PASS/FAIL checks per event through the real game code: `python3 event_checks.py [filter]`. Add a test there when adding an event. |
-| `save_load.py` | JSON save/load, save paths (`saves/autosave.json`, `saves/slot1-4.json`), legacy `savegame.json` migration. |
+| `save_load.py` | JSON save/load, save paths (`saves/autosave.json`, `saves/slot1-4.json`; in the app `OIL_SAVES_DIR`), legacy `savegame.json` migration. |
+| `updater.py` | The app's Update button (main menu): checks GitHub Master, downloads only the changed files into `game.new/` (pip-installs `libs.new/` when `requirements.txt` changed), marks it ready, restarts. Only active in the app (`managed()`). |
+| `packaging/` | The app: `bootstrap.py` (the one fixed piece inside the app: puts an update in place, rolls back one that never reached the menu, starts `runner.py`), `build.py` (builds OIL.app / the Windows folder with python-build-standalone 3.12), `oil_installer.iss` (Windows installer), `make_icon.py` + `icon.png` (app icon; `images/icon.png` is the window icon), `release_notes.md`. |
+| `.github/workflows/build-app.yml` | Builds the Mac zips and `OIL-Setup.exe` into a GitHub Release (Actions › Build app › Run workflow). |
 | `player_colors.py` | Fixed player colours for N-player games, `light_tint`, `name_text_color` (black text on yellow). |
 | `map_polygons.py` | Country outline data. |
 | `outline_smoothing.py`, `landmark_placement.py` | Smoothed country outlines; where pagoda/torii landmark sprites go. |
@@ -103,6 +108,9 @@ menu and move phase once dice are cast.
 - By default one troop stays behind when attacking; with only one defence
   die the defender rolls automatically; move-in is automatic when there's no choice.
 - Crossing water needs a ship or plane escort; a moved ship needs at least one troop with it.
+- A failed attack roll destroys every asset brought along (ships, tanks,
+  planes): rolling 1 die and losing it, or 2 dice and losing both. Over sea
+  and (since 9 Oct 2026) over land, bridges and rails alike; 3 dice never do.
 - Food caps armies: at the start of a turn every troop beyond the food *in
   stock* starves (that turn's harvest only comes in after), so an army
   can't outgrow its food income for long. When troops starve, the turn's production (and
@@ -151,6 +159,14 @@ they're made. Bots' `_say` status lines aren't shown and aren't translated.
   in `Engine._render_layer`: a fast 1× version while panning/zooming, then a
   smooth 2× supersampled one. Changes to what it draws must be reflected in
   `Engine._map_keys()` or the cache won't refresh.
+- The map wraps around east-west: `PACIFIC` (300) map units of sea lie
+  between Siberië/Japan and the Americas, and the world repeats every
+  `WORLD_WIDTH` (models.py). The map layer and troop markers are drawn once
+  per copy on screen (`View.copies` / `View.shifted`, extent
+  `Engine._world_extent`); `WRAP_ROUTES` (Alaska–Siberië, Japan–Pearl
+  Harbor) are drawn east into the next copy; `Io.update` hit-tests every
+  copy (`wrap_x`); `View.wrap` keeps `offset.x` within one copy. Pearl Harbor
+  is moved out into the Pacific in `get_countries`.
 - See-through drawing uses `Engine._blended(surface, opacity)` (snapshot then
   blend back), not a transparent layer — that leaves artifacts on
   antialiased edges. Borders: grey 80%. Connections: 70%.
@@ -181,6 +197,26 @@ saves still work). A save always resumes at `subattack = 0` of its phase;
 in the reinforcement phase `TurnManager.turn_started` keeps that from
 running the turn start (feeding, income, reinforcements) a second time.
 Players' `is_bot` and `bot_personality` are saved.
+
+## App & updates
+
+Players run OIL as an app: `OIL.app` (Mac) or the Windows installer, built by
+`packaging/build.py` (locally, or by the GitHub workflow into a Release). The
+app is a Python 3.12 (python-build-standalone, with pip) plus
+`packaging/bootstrap.py`; it keeps everything in the device's data folder
+(`~/Library/Application Support/OIL`, `%LOCALAPPDATA%\OIL`): `game/` (the
+game files), `libs/` (libraries an update installed; until then the app's
+own), `saves/` (saves + settings.json, which no update touches),
+`crash.log`, `update.log`. The Update button (`updater.py`) brings in whatever
+is on GitHub's `Master`: code, images, sounds and new libraries alike, so the
+app itself only needs rebuilding to change Python or `bootstrap.py`
+(keep that file small and backwards compatible). An update skips `saves/`,
+`__pycache__/` and the dev-only folders (`updater.SKIP_DIRS`), and is refused
+if it lacks `runner.py` or `updater.py` (it couldn't update itself again).
+The game must keep running on the app's Python 3.12 as well as this Mac's 3.9.
+Publishing a version = committing and pushing to `Master`.
+Test the update flow without building: `OIL_DATA_DIR=<scratch folder>
+python3 packaging/bootstrap.py` (this folder plays the app's bundled game).
 
 ## Game controllers
 
@@ -224,9 +260,11 @@ that signature).
 - Verify logic changes with small headless scripts (stub out menus/events as
   needed); say clearly when something was only compiled or rendered, not
   played in the real window.
-- The project folder is not tracked in git (the repo root is the parent
-  folder), so there's no history to fall back on — be careful with
-  destructive edits.
+- Since 11 Oct 2026 this folder is a git working copy of
+  `github.com/HugoNootebos/oil_board` (branch `Master`, which players' Update
+  button installs). History only covers what has been committed, so still be
+  careful with destructive edits. Commit or push only when the user asks:
+  a push to Master is a release to every player.
 
 ## Bots
 
@@ -303,6 +341,10 @@ the losses by conquest fall by a quarter and the share of assets lost between
 turns from 10.9% to 6.8%, but 150 pairs show no gain (placement +0.007 +-0.034,
 win -4.7 +-9.8 points), and even refunding every lost asset (the oracle) is
 worth it only because it makes assets free (the bot then buys 2.3x as many).
+`asset_wipe` 1 (`_wipe_check`): before a roll of 1 or 2 dice, which destroys
+the assets brought along if every die loses, the bot takes that risk off the
+attack's value, leaves the tanks home when the attack is worth more without
+them, and calls it off when it no longer pays.
 `endgame_*` (`_endgame`) makes the leader
 spend its stock once at most 2 players are left or it holds 70% of the
 strength: leftover wood/steel/nuclear falls by half; oil and food can't be
@@ -327,5 +369,6 @@ reproducible, so two identical bots play identical pairs.
 Anything that should leave play unchanged must keep `python3 bot_golden.py`
 green (the new tunables off: `--tweak exposure=0 --tweak retention=0 --tweak
 strike=0 --tweak finish_max=0 --tweak endgame_alive=0 --tweak endgame_lead=1.1
---tweak asset_hold=0 --tweak asset_move=0 --tweak asset_attack=0 --tweak asset_carry=0`
+--tweak asset_hold=0 --tweak asset_move=0 --tweak asset_attack=0 --tweak asset_carry=0
+--tweak asset_wipe=0`
 reproduces the traces of `old_bot.py`).

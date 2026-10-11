@@ -22,6 +22,7 @@ import numpy as np  # noqa: E402
 
 from board import CONTINENTS, get_connections, get_countries  # noqa: E402
 from engine import Engine  # noqa: E402
+import lang  # noqa: E402
 from events import EVENTS  # noqa: E402
 from models import Player  # noqa: E402
 from phases import TurnManager  # noqa: E402
@@ -544,6 +545,8 @@ def _(ev):
     check("most troops in Africa goes to mouse", bc.owner is app.default_player and bc.tanks == 0)
     check("... with its starting garrison", bc.units == app.initial_country_units["Belgisch Congo"])
     check("the other stays", country("Nigeria").owner is c)
+    line = "".join(str(part) for part, _ in app.action_log[-2])
+    check("logged as the owner's loss", line == b.name + " lost 6 troops in " + lang.t("Belgisch Congo") + " due to ebola", line)
     finish()
 
     a, b, c = reset()

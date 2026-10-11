@@ -467,6 +467,62 @@ def test_assets_in_attacks():
           p["asset_hold"] > 0 and p["asset_move"] == 1 and p["asset_attack"] > 0 and p["asset_carry"] == 1)
 
 
+def test_asset_wipe():
+    # A roll of 1 die that loses destroys what the attack brought along, over land too.
+    import numpy as np
+    land = links("land")
+    x = sorted(land)[0]
+    y = sorted(land[x])[0]
+    other = next(n for n in ("Argentinië", "Peru", "Chili") if n not in (x, y))
+    bot.LEVELS["check_no_wipe"] = dict(bot.LEVELS["hard"], asset_wipe=0)
+
+    ctl, (a, b, c) = reset("hard")
+    own(a, x, 2, tanks=2)
+    own(b, y, 3)
+    own(c, other, 4)
+    attack = app.turn_manager.phases[1]
+    a.attack, a.subattack = 1, 0
+    attack.attack_from = x
+    attack._start_attack(y, True)
+    attack.attack_dice, attack.defence_dice = np.array([1.0]), np.array([6.0, 5.0])
+    attack._apply_combat_results()
+    check("rule: 1 die lost over land destroys the 2 tanks brought along ({} left)".format(app.countries[x].tanks),
+          app.countries[x].tanks == 0)
+
+    ctl, (a, b, c) = reset("hard")
+    own(a, x, 5, tanks=2)
+    own(b, y, 3)
+    own(c, other, 4)
+    attack = app.turn_manager.phases[1]
+    a.attack, a.subattack = 1, 0
+    attack.attack_from = x
+    attack._start_attack(y, True)
+    attack.attack_dice, attack.defence_dice = np.array([1.0, 1.0, 1.0]), np.array([6.0, 5.0])
+    attack._apply_combat_results()
+    check("rule: 3 dice never destroy the tanks ({} left)".format(app.countries[x].tanks),
+          app.countries[x].tanks == 2)
+
+    # The bot: 2 troops (1 die) and 3 tanks without oil (they don't fight) against
+    # 1 troop -- the tanks are only a risk, so they stay home.
+    for level, expect_left in (("hard", True), ("check_no_wipe", False)):
+        ctl, (a, b, c) = reset(level, oil=0)
+        own(a, x, 2, tanks=3)
+        own(b, y, 1)
+        own(c, other, 4)
+        attack = app.turn_manager.phases[1]
+        a.attack, a.subattack = 1, 0
+        attack.attack_from = x
+        attack._start_attack(y, True)
+        ctl._cache = {}
+        ctl._attack()
+        if expect_left:
+            check("bot rolling 1 die leaves the 3 idle tanks behind (brings {})".format(attack.selected_tanks),
+                  attack.selected_tanks == 0 and a.subattack != 2)
+        else:
+            check("asset_wipe off: the tanks go along ({})".format(attack.selected_tanks),
+                  attack.selected_tanks == 3)
+
+
 # --- running them ------------------------------------------------------------------
 
 def main():

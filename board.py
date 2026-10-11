@@ -600,6 +600,10 @@ def get_countries(default_player):
     sri_lanka.translate(0, max(ys) - min(ys))
     # The enlarged Cuba moves south, leaving a strait below Florida's tip.
     countries["Cuba"].translate(0, 9)
+    # Pearl Harbor lies out in the Pacific (which the map wraps across,
+    # see models.PACIFIC), about where Hawaii is: 60% of the way from
+    # Japan to Los Angeles.
+    countries["Pearl Harbor"].translate(-125, 0)
     # Round off the (drawn) outlines, all countries at once so shared
     # borders bend identically on both sides.
     from outline_smoothing import smooth_outlines
