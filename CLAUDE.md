@@ -24,8 +24,8 @@ Requirements: `pygame-ce>=2.5`, `numpy>=1.19.3`, `matplotlib>=3.3.3`,
 Python with numpy 2). Players use the app instead (OIL.app / the Windows
 installer, see "App & updates" below). The only automated checks are `event_checks.py` (events),
 `bot_checks.py` (bot decisions on small boards), `bot_selfplay.py` (bots
-against each other) and `bot_golden.py` (did a change leave the bots' play
-exactly as it was).
+against each other), `bot_golden.py` (did a change leave the bots' play
+exactly as it was) and `online_checks.py` (online play).
 
 **Windows:** the game runs as is: pygame-ce/SDL handles the window, sound
 and controllers. Install Python from python.org, then in the game
@@ -48,7 +48,13 @@ the Python 3.9 that made them. numpy 2 is fine.
 | File | What's in it |
 |---|---|
 | `runner.py` | Entry point: start menus → `play(app)` loop. "Exit Game" returns to the start menu; closing the window quits. F5/F9 quicksave/quickload (autosave file), Esc toggles fullscreen. |
-| `menu.py` | Start menu (with the language flag), new-game menu, player-name entry (with controller pairing), Continue/load screen (autosave + 4 named slots). Each is its own small pygame loop. |
+| `menu.py` | Start menu (with the language flag; Local Game / Online Game), new-game menu, player-name entry (with controller pairing), Continue/load screen (autosave + 4 named slots). Each is its own small pygame loop. |
+| `lobby.py` | Online Game's screens: Host (a new or saved game, then its lobby of seats) and Join (the games on every relay found, a game's lobby, then the viewer), plus a message screen. See Online play below. |
+| `online.py` | The host's side of an online game: `HostSession` (seats, joined devices, who may click, cursors, sounds), `RemotePointer` (a joined device's mouse or controller, taken like a `controls.Pad`), `FrameStream` (the screen as JPEG tiles). |
+| `viewer.py` | A joined device's side of an online game: shows the host's screen, sends its mouse and controllers, plays the host's sounds; its own Esc menu (leave, fullscreen). |
+| `net.py` | Online plumbing (standard library only): `Connection` to a relay (send/receive threads), `RoomBrowser` (relays on this computer, the LAN and the main server, told apart by id), `find_main_relay`, `PROTOCOL`, `DEFAULT_SERVER`, `device_id`. |
+| `relay.py` | The relay server: rooms, routing, LAN beacons. `python3 relay.py` on the home computer; `start_embedded` runs one inside a host's game for a LAN game. Standard library only and self-contained. |
+| `online_checks.py` | Headless PASS/FAIL checks of online play (relay, discovery, stream, seats, who clicks, a whole game through a local relay): `python3 online_checks.py [filter]`. |
 | `controls.py` | Game controllers, one per player, each with its own cursor (`Pad`). `Controls` (one, `controls.get()`) reads them, pairs them with players, decides which may click (`frame`) and draws the cursors. See Game controllers below. |
 | `lang.py` | Dutch/English: `t(text)`, `Msg`/`Join` (log text translated when drawn), the current `language`, `set_language` (saved in `saves/settings.json`), the `NL` (English source → Dutch) and `EN` (Dutch source → English) tables. |
 | `engine.py` | `Engine`: window/view, cached map layer rendering, troop markers, HUD buttons, settings menu (Exit Game, Save As, display toggles), fonts/images, player setup. |
@@ -69,6 +75,7 @@ the Python 3.9 that made them. numpy 2 is fine.
 | `event_checks.py` | Headless PASS/FAIL checks per event through the real game code: `python3 event_checks.py [filter]`. Add a test there when adding an event. |
 | `save_load.py` | JSON save/load, save paths (`saves/autosave.json`, `saves/slot1-4.json`; in the app `OIL_SAVES_DIR`), legacy `savegame.json` migration. |
 | `updater.py` | The app's Update button (main menu): checks GitHub Master, downloads only the changed files into `game.new/` (pip-installs `libs.new/` when `requirements.txt` changed), marks it ready, restarts. Only active in the app (`managed()`). |
+| `packaging/relay/` | The home relay: `install.sh` (a LaunchAgent; optionally DuckDNS), `nl.oil.relay.plist`, `README.md` (router port, dynamic DNS, `net.DEFAULT_SERVER`). |
 | `packaging/` | The app: `bootstrap.py` (the one fixed piece inside the app: puts an update in place, rolls back one that never reached the menu, starts `runner.py`), `build.py` (builds OIL.app / the Windows folder with python-build-standalone 3.12), `oil_installer.iss` (Windows installer), `make_icon.py` + `icon.png` (app icon; `images/icon.png` is the window icon), `release_notes.md`. |
 | `.github/workflows/build-app.yml` | Builds the Mac zips and `OIL-Setup.exe` into a GitHub Release (Actions › Build app › Run workflow). |
 | `player_colors.py` | Fixed player colours for N-player games, `light_tint`, `name_text_color` (black text on yellow). |
@@ -230,7 +237,8 @@ for the mouse), so phases can't tell the difference; `Io` follows whichever
 of the mouse and the clicking controllers was used last. Only the acting
 player's controller clicks (`TurnManager.acting_player`: the current
 player, a human defender picking tanks/dice, an event's `chooser`, the
-owner of a country the mouse attacks); the other cursors are drawn faded.
+owner of a country the mouse attacks; online, that's also how a joined
+device gets the click); the other cursors are drawn faded.
 On a bot's turn every paired controller clicks. The mouse always works.
 A player whose turn it isn't pressing A on a country hears its name
 (`Engine.bystander_clicks`, `sounds.play_country`: `sounds/countries/<country>.flac`,
@@ -269,6 +277,55 @@ that signature).
   button installs). History only covers what has been committed, so still be
   careful with destructive edits. Commit or push only when the user asks:
   a push to Master is a release to every player.
+
+## Online play
+
+Online Game › Host / Join (`lobby.py`). The host's computer plays the game
+exactly as a local one (`runner.play`); a device that joined only shows a
+picture of the host's screen and sends its input back (`viewer.py`). So
+whatever works locally works online, and a joined device's game version
+only has to have the same `net.PROTOCOL`. (Running the game on every device
+in lockstep was rejected: bots iterate over sets of names, whose order
+differs per process and Python version, and timers use `pg.time.get_ticks()`.)
+
+- **Relays** (`relay.py`): everyone connects out to one; it lists the rooms
+  and passes messages between a room's host and its members without reading
+  them. The main relay runs on a computer at home
+  (`packaging/relay/README.md`) at `net.DEFAULT_SERVER` (overridden by
+  `OIL_SERVER` or `"online_server"` in settings.json). A host that can't
+  reach it runs a LAN relay inside its own game. Relays announce themselves
+  by UDP broadcast (port 47801); one found several ways (its id) is used the
+  nearest way: this computer, the LAN, the internet.
+- **Seats** (`online.Seat`, kept by the host): "host" (this computer),
+  "bot", "remote" (a joined device) or "open". A device that drops out
+  leaves its seats open (the host's mouse plays them) and gets them back
+  when it joins again with the same `net.device_id()` (settings.json).
+  Anyone can join a running game to take a free seat, or to watch.
+- **Who clicks:** a joined device's mouse and controllers are
+  `online.RemotePointer`s, which `Controls.frame` takes like controllers:
+  they click when `acting_player()` is one of their players (on a bot's
+  turn: everyone's), and then the host's own mouse doesn't
+  (`Controls.mouse_ok`, `HostSession.mouse_allowed`) -- except for a device
+  that dropped out, and once the game is won. Exit Game, Save As and
+  Controllers are greyed out in the settings menu for a remote pointer, and
+  online the game-over Quit takes the host back to the menu.
+- **The picture:** `Engine.present` gives the game's area (before the
+  cursors) to `FrameStream` (1200x800, at most 20 a second); each device gets
+  JPEG pieces of the 80 px tiles changed since the frame it has, at most 2
+  updates unacknowledged, so a slow connection gets fewer, bigger updates.
+  While the map pans or zooms (more than 40% changes) the picture goes at
+  half size, at most 10 a second, and sharp again once it stands still:
+  about 0.3-0.45 MB/s per device while panning, nothing while still.
+  Cursors (at most 30 a second) and sounds (`sounds.listener`) go as
+  messages; each device draws the others' cursors itself.
+- **The idle loop:** network threads post `online.NET_EVENT` to wake
+  `pg.event.wait()`; a device's input draws `SETTLE_FRAMES`, its "got it"
+  just one frame (which sends what's next).
+- Joined devices see the host's language and the host's one view (whoever
+  may click can pan or zoom, as at one table).
+- Raise `net.PROTOCOL` whenever the messages between a host and its devices
+  change, and `relay.RELAY_PROTOCOL` when the relay's do (then the home relay
+  needs `packaging/relay/install.sh` again).
 
 ## Bots
 

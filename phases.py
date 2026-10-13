@@ -3585,7 +3585,12 @@ class TurnManager:
             self.game_over = True
             lines = [t("{} wins!").format(alive[0].name)] if alive else [t("Nobody survived")]
             if self._draw_dialog(lines, "Quit", big=True):
-                pg.event.post(pg.event.Event(pg.QUIT))
+                if getattr(self.engine, "online", None) is not None:
+                    # Online, the player who clicks may be on another device:
+                    # back to the host's menu (the game ends for everyone).
+                    self.engine.pending_quit = True
+                else:
+                    pg.event.post(pg.event.Event(pg.QUIT))
             return True
         return False
 

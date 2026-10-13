@@ -6,10 +6,13 @@ import os
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 from engine import Engine
-from menu import run_main_menu, run_new_game_menu, run_player_names_menu, run_load_menu
+from menu import (run_main_menu, run_local_menu, run_online_menu, run_new_game_menu,
+                  run_player_names_menu, run_load_menu)
 from save_load import save_game, load_game, migrate_legacy_save, AUTOSAVE_PATH
 import pygame as pg
 import controls
+import lobby
+import online
 import sounds
 
 # Nothing in the game changes on its own -- only in response to input --
@@ -22,39 +25,72 @@ SETTLE_FRAMES = 5
 
 
 def choose_game():
-    """The start menus: returns a new or loaded game (an Engine)."""
-    load_path = None
+    """The start menus: returns a new or loaded game (an Engine). Back goes
+    one menu up."""
     while True:
-        choice = run_main_menu()
-        if choice == "new":
-            break
-        load_path = run_load_menu()
-        if load_path is not None:
-            break  # otherwise Back: show the main menu again
+        if run_main_menu() == "online":
+            app = choose_online()
+            if app is not None:
+                return app
+            continue
+        while True:
+            choice = run_local_menu()
+            if choice is None:
+                break  # Back: show the main menu again
+            if choice == "new":
+                return new_game()
+            load_path = run_load_menu()
+            if load_path is not None:
+                # Continue loads onto a freshly built default-mode game, since
+                # load_game expects an already-constructed engine to apply onto.
+                app = Engine(mode="default")
+                load_game(load_path, app, app.turn_manager)
+                return app
+            # otherwise Back: show the local game menu again
 
-    if choice == "new":
-        # "de Neven" is the named default trio; a number is a plain game with
-        # that many players, named on the screen that follows.
-        new_game_choice = run_new_game_menu()
-        if new_game_choice == "default":
-            return Engine(mode="default")
-        player_names = run_player_names_menu(new_game_choice)
-        # The first autosave happens once the first player ends their turn
-        # (see TurnManager.next_turn); autosaves always go to AUTOSAVE_PATH.
-        player_names, player_bots = player_names
-        return Engine(mode="count", player_count=new_game_choice, player_names=player_names,
-                      player_bots=player_bots)
 
-    # Continue loads onto a freshly built default-mode game, since
-    # load_game expects an already-constructed engine to apply onto.
-    app = Engine(mode="default")
-    load_game(load_path, app, app.turn_manager)
-    return app
+def choose_online():
+    """Online Game: Host returns the hosted game (an Engine with its
+    online.HostSession) once it starts; a joined game is played right
+    there (lobby.join_game). None for Back."""
+    while True:
+        choice = run_online_menu()
+        if choice is None:
+            return None
+        if choice == "host":
+            app = lobby.host_game()
+            if app is not None:
+                return app
+        else:
+            lobby.join_game()
+
+
+def new_game():
+    """"de Neven" is the named default trio; a number is a plain game with
+    that many players, named on the screen that follows."""
+    new_game_choice = run_new_game_menu()
+    if new_game_choice == "default":
+        return Engine(mode="default")
+    player_names = run_player_names_menu(new_game_choice)
+    # The first autosave happens once the first player ends their turn
+    # (see TurnManager.next_turn); autosaves always go to AUTOSAVE_PATH.
+    player_names, player_bots = player_names
+    return Engine(mode="count", player_count=new_game_choice, player_names=player_names,
+                  player_bots=player_bots)
 
 
 def play(app):
     """Runs the game until it's left. Returns "menu" for Exit Game (back to
-    the start menu) or "quit" when the window is closed."""
+    the start menu) or "quit" when the window is closed. An online game
+    (app.online, see online.py) ends for the devices that joined it too."""
+    try:
+        return _play(app)
+    finally:
+        if app.online is not None:
+            app.online.close("ended")
+
+
+def _play(app):
     clock = pg.time.Clock()
     frames_left = SETTLE_FRAMES
 
@@ -62,21 +98,29 @@ def play(app):
     app._owner_snapshot = None
     pads = controls.get()
     app.controls = pads
-    if pads.needs_pairing(app.players):
+    if pads.needs_pairing(app.local_players()):
         app.open_pairing()  # e.g. a loaded game: who has which controller?
     while True:
         if frames_left == 0:
-            # Idle: sleep until the next event instead of redrawing.
-            events = [pg.event.wait()] + pg.event.get()
+            # Idle: sleep until the next event instead of redrawing. In an
+            # online game a device's input or its "got it" wakes it too
+            # (online.NET_EVENT).
+            event = pg.event.wait()
+            events = ([event] if event.type != pg.NOEVENT else []) + pg.event.get()
         else:
             events = pg.event.get()
         pads.handle_events(events)
+        session = app.online
+        remote_input = session.update() if session is not None else False
         # A bot plays on without any input, and a tilted stick moves its
-        # cursor without sending events.
-        if events or pads.busy or (app.bot_turn and not app.turn_manager.game_over):
+        # cursor without sending events. Only a device's "got it" draws just
+        # the one frame (that sends it what's next).
+        if any(e.type != online.NET_EVENT for e in events) or remote_input or pads.busy \
+                or (app.bot_turn and not app.turn_manager.game_over):
             frames_left = SETTLE_FRAMES
 
         wheel = []  # +1 per wheel-up notch, -1 per wheel-down
+        mouse_clicked = False
         # While a save name is being typed, keys belong to the name box (Escape
         # there backs out of it rather than toggling fullscreen).
         typing = app.typing_save_name
@@ -85,7 +129,7 @@ def play(app):
             if event.type == pg.QUIT:
                 return "quit"
             if event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
-                sounds.click_pressed()
+                mouse_clicked = True
             if event.type == pg.MOUSEBUTTONDOWN and event.button == 5:
                 wheel.append(-1)
             if event.type == pg.MOUSEBUTTONDOWN and event.button == 4:
@@ -100,8 +144,14 @@ def play(app):
             if event.type == pg.KEYDOWN and event.key == pg.K_F9:
                 load_game(AUTOSAVE_PATH, app, app.turn_manager)
 
-        frames_left -= 1
+        frames_left = max(0, frames_left - 1)
         app.io_handle()
+        if not pads.mouse_ok:
+            # Online, while a player on another device decides: the mouse
+            # here neither clicks nor zooms.
+            mouse_clicked, wheel = False, []
+        if mouse_clicked:
+            sounds.click_pressed()
         # The controllers that may click this frame (see controls.py): a click
         # sound, Start for the settings menu, LB/RB for zooming.
         if any(pad.tapped(controls.A) for pad in pads.clickers):
@@ -110,8 +160,8 @@ def play(app):
             app.toggle_settings()
         wheel += [step for pad in pads.clickers for step in pad.zoom_steps]
         app.bystander_clicks()  # the other players' controllers say a country's name
-        if not app.modal_open and pads.needs_pairing(app.players) and any(
-                pad.tapped(controls.A) and pads.player_of(pad, app.players) is None for pad in pads.pads):
+        if not app.modal_open and pads.needs_pairing(app.local_players()) and any(
+                pad.tapped(controls.A) and pads.player_of(pad, app.local_players()) is None for pad in pads.pads):
             app.open_pairing()  # a controller nobody has yet wants in
         zoom = 1.0
         for step in wheel:
@@ -133,6 +183,10 @@ def play(app):
 
         app.present()
         pg.display.flip()
+        if app.online is not None:
+            app.online.pump()
+            if app.online.busy:
+                frames_left = max(frames_left, 1)  # a picture or cursors still owed to the devices
         clock.tick(60)
 
 

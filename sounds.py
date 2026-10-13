@@ -14,6 +14,10 @@ BACKGROUND_VOLUME = 0.18
 
 _sounds = {}
 _ok = None
+# Called with ("sound", name) / ("country", name) for every sound played:
+# an online game's host passes them on to the devices that joined
+# (online.HostSession), so everyone hears the same.
+listener = None
 _last_mouse_ms = -10000
 _click_pending = False  # a click this frame, sounded by frame_end unless it was invalid
 _error_played = False
@@ -53,6 +57,8 @@ def play(name):
     global _last_mouse_ms, _error_played
     if name == "error":
         _error_played = True
+    if listener is not None:
+        listener("sound", name)
     if not _ready():
         return
     if name == "mouse":
@@ -83,6 +89,8 @@ def _key(name):
 def play_country(name):
     """Say the country `name` (no-op when it has no sound file)."""
     global _country_files, _country_voice
+    if listener is not None:
+        listener("country", name)
     if not _ready():
         return
     if _country_files is None:

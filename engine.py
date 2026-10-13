@@ -17,12 +17,26 @@ from save_load import AUTOSAVE_PATH, SAVE_SLOT_COUNT, slot_path, read_save_name,
 # Curated starting-country pools, keyed by player count: one is dealt to
 # each player at random, regardless of whether the game is "de Neven" or a
 # plain N-player game. A count with no pool here samples the whole map.
+# "De 3 Neven": the named default game's players (mode="default").
+DEFAULT_PLAYERS = [("Hugo", (60, 110, 230)), ("Joeri", (40, 160, 70)), ("Tètè", (210, 40, 40))]
+
 STARTING_COUNTRY_POOLS = {
     3: ["Sri Lanka", "Pearl Harbor", "Viking"],
     4: ["Zuid-Afrika", "Siberië", "New York", "Ottomaanse Rijk"],
     5: ["Noord-Korea", "Madagaskar", "Ottomaanse Rijk", "Pearl Harbor", "New York"],
     6: ["Gold Coast", "Arabië", "Venezuela", "Canada", "Nigeria", "Siberië"],
 }
+
+
+def open_window(logical_size, fullscreen):
+    """The game's window: fullscreen, or as big as fits the screen (at most
+    1.25x the logical size). Also a joined online game's (viewer.py)."""
+    width, height = logical_size
+    if fullscreen:
+        return pg.display.set_mode((0, 0), pg.FULLSCREEN)
+    desktop_w, desktop_h = pg.display.get_desktop_sizes()[0]
+    factor = min(1.25, desktop_w * 0.9 / width, desktop_h * 0.85 / height)
+    return pg.display.set_mode((int(width * factor), int(height * factor)))
 
 
 class Engine:
@@ -170,6 +184,10 @@ class Engine:
         # players (_draw_pairing).
         self.controls = None
         self.pairing_open = False
+        # An online game's host side (online.HostSession, set when the game
+        # starts from the online lobby; None in a local game): the devices
+        # that joined, their pointers, and the picture they get.
+        self.online = None
         self._pairing_since = 0
         # The event info menu (event button, top right): the active event
         # and how long until the next one is drawn.
@@ -252,12 +270,7 @@ class Engine:
     # --- display / map rendering ----------------------------------------
 
     def _set_display(self):
-        width, height = self.logical_size
-        if self.fullscreen:
-            return pg.display.set_mode((0, 0), pg.FULLSCREEN)
-        desktop_w, desktop_h = pg.display.get_desktop_sizes()[0]
-        factor = min(1.25, desktop_w * 0.9 / width, desktop_h * 0.85 / height)
-        return pg.display.set_mode((int(width * factor), int(height * factor)))
+        return open_window(self.logical_size, self.fullscreen)
 
     def _layout(self):
         """Fit the logical area into the window (letterboxed, aspect kept)
@@ -446,8 +459,14 @@ class Engine:
         size = (int(round(width * view.scale)), int(round(height * view.scale)))
         ui = self.ui if size == (width, height) else pg.transform.smoothscale(self.ui, size)
         view.window.blit(ui, (int(view.ox), int(view.oy)))
+        if self.online is not None:
+            # What the devices that joined see: before any cursor (they draw
+            # everyone's cursors themselves).
+            self.online.capture(view.window, self._logical_clip())
         if self.controls is not None and self.controls.pads:
             self.controls.draw(view.window, view.scale, (view.ox, view.oy), self._pad_looks())
+        if self.online is not None:
+            self.online.draw_cursors(view.window, view.scale, (view.ox, view.oy))
 
     def _pad_looks(self):
         """Each game controller's cursor: its player's colour (white while
@@ -689,6 +708,11 @@ class Engine:
         return self.turn_manager.dialog_active or self.settings_open or self.event_info_open \
             or self.pairing_open
 
+    def local_players(self):
+        """The players on this computer: all of them, except in an online
+        game (those that joined from another device are left out)."""
+        return self.players if self.online is None else self.online.local_players(self.players)
+
     def toggle_event_info(self):
         self.event_info_open = not self.event_info_open
         self.io.left_pressed = 0  # the click shouldn't reach the map behind the button
@@ -838,12 +862,16 @@ class Engine:
         col_w = (w - 60) // 2
         col_x = (x + 20, x + 40 + col_w)
 
+        # In an online game a joined device can't end or save the host's game
+        # (nor pair its controllers): it leaves through its own menu (viewer.py).
+        remote = self.online is not None and self.online.is_remote(io.source)
+
         quit_rect = pg.Rect(col_x[0], y + 45, col_w, 40)
-        if self._menu_button(quit_rect, t("Exit Game"), (245, 150, 150), mouse):
+        if self._menu_button(quit_rect, t("Exit Game"), (245, 150, 150), mouse, enabled=not remote):
             self.pending_quit = True
 
         save_as_rect = pg.Rect(col_x[1], y + 45, col_w, 40)
-        if self._menu_button(save_as_rect, t("Save As"), (150, 200, 245), mouse):
+        if self._menu_button(save_as_rect, t("Save As"), (150, 200, 245), mouse, enabled=not remote):
             self.save_as_open = True
             self.save_as_slot = None
             self.save_as_names = [read_save_name(slot_path(i)) for i in range(SAVE_SLOT_COUNT)]
@@ -862,7 +890,7 @@ class Engine:
 
         if self.controls is not None and self.controls.pads:
             pads_rect = pg.Rect(col_x[1], save_as_rect.bottom + 25 + len(columns[1]) * 46, col_w, 40)
-            if self._menu_button(pads_rect, t("Controllers"), (150, 200, 245), mouse):
+            if self._menu_button(pads_rect, t("Controllers"), (150, 200, 245), mouse, enabled=not remote):
                 self.open_pairing()
 
         # China's pagoda and Japan's torii: owed by whoever holds that
@@ -1056,7 +1084,7 @@ class Engine:
         dim.fill((0, 0, 0, 140))
         screen.blit(dim, (0, 0))
 
-        humans = [p for p in self.players if not p.is_bot]
+        humans = [p for p in self.local_players() if not p.is_bot]
         row_h, gap = 48, 10
         w, h = 480, 85 + len(humans) * (row_h + gap) + 70
         x, y = view.WIDTH * 0.5 - w * 0.5, view.HEIGHT * 0.5 - h * 0.5
@@ -1201,15 +1229,21 @@ class Engine:
             name = self.io.country_at(self.view, self.countries.values(), Position(*pad.pos))
             if name is not None:
                 sounds.play_country(name)
+        # Online: the pointers of the devices that joined, the same way.
+        for pointer in self.online.pointers() if self.online is not None else []:
+            if not pointer.tapped(controls.A) or (pointer in pads.clickers and not bot_acting):
+                continue
+            names = self.online.names_of(pointer)
+            if not names or current.name in names:
+                continue
+            name = self.io.country_at(self.view, self.countries.values(), Position(*pointer.pos))
+            if name is not None:
+                sounds.play_country(name)
 
     def get_players(self, mode="prompt"):
         if mode == "default":
             self.default_game = True
-            return [
-                Player("Hugo", color=(60, 110, 230)),
-                Player("Joeri", color=(40, 160, 70)),
-                Player("Tètè", color=(210, 40, 40)),
-            ]
+            return [Player(name, color=color) for name, color in DEFAULT_PLAYERS]
         if mode == "count":
             self.default_game = False
             names = self.player_names
@@ -1222,11 +1256,7 @@ class Engine:
         default = input("Play default? ")
         if default in {"yes", "y", "Y", "YES"}:
             self.default_game = True
-            return [
-                Player("Hugo", color=(60, 110, 230)),
-                Player("Joeri", color=(40, 160, 70)),
-                Player("Tètè", color=(210, 40, 40)),
-            ]
+            return [Player(name, color=color) for name, color in DEFAULT_PLAYERS]
         else:
             self.default_game = False
             while True:

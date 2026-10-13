@@ -78,6 +78,19 @@ def read_save_name(path):
     except (OSError, ValueError):
         return None
 
+def read_save_players(path):
+    """[(name, colour, is_bot)] of the players in the save at `path`, in
+    order (the online lobby's seats for a saved game), or None if there's
+    no readable save there."""
+    try:
+        with open(path) as f:
+            players = json.load(f)["players"]
+        return [(str(p["name"]), tuple(int(c) for c in p["color"]), bool(p.get("is_bot", False)))
+                for p in players]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
 # Sentinel used in place of a player name for countries/connections that
 # belong to nobody (engine.default_player), since "the neutral player" has
 # no stable, save-proof identity of its own to look up by name.

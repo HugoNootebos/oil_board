@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The OIL relay, started at login and kept running (install.sh fills in @PYTHON@ and @DIR@).
+     caffeinate -i keeps the Mac from going to sleep on its own while the relay runs. -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>nl.oil.relay</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/caffeinate</string>
+        <string>-i</string>
+        <string>@PYTHON@</string>
+        <string>@DIR@/relay.py</string>
+        <string>--port</string>
+        <string>@PORT@</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>@DIR@</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>@LOG@</string>
+    <key>StandardErrorPath</key>
+    <string>@LOG@</string>
+</dict>
+</plist>

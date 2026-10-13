@@ -239,6 +239,7 @@ INFO_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
     <key>LSApplicationCategoryType</key><string>public.app-category.strategy-games</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSBluetoothAlwaysUsageDescription</key><string>OIL uses Bluetooth for game controllers.</string>
+    <key>NSLocalNetworkUsageDescription</key><string>OIL finds and joins online games on your local network.</string>
 </dict>
 </plist>
 """

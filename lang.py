@@ -23,12 +23,31 @@ LANGUAGES = ("nl", "en")
 DEFAULT_LANGUAGE = "nl"
 
 
-def _load_language():
+def read_settings():
+    """Everything in saves/settings.json (the language, and online play's
+    device id and server address, see net.py); {} if there's nothing."""
     try:
         with open(SETTINGS_PATH) as f:
-            code = json.load(f).get("language")
-    except (OSError, ValueError, AttributeError):
-        return DEFAULT_LANGUAGE
+            settings = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    return settings if isinstance(settings, dict) else {}
+
+
+def write_setting(key, value):
+    """Remember `key` in saves/settings.json, keeping the other settings."""
+    settings = read_settings()
+    settings[key] = value
+    try:
+        os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
+        with open(SETTINGS_PATH, "w") as f:
+            json.dump(settings, f)
+    except OSError:
+        pass  # still in effect for this session
+
+
+def _load_language():
+    code = read_settings().get("language")
     return code if code in LANGUAGES else DEFAULT_LANGUAGE
 
 
@@ -39,12 +58,7 @@ def set_language(code):
     """Switch to `code` and remember it for the next time the game starts."""
     global language
     language = code
-    try:
-        os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
-        with open(SETTINGS_PATH, "w") as f:
-            json.dump({"language": code}, f)
-    except OSError:
-        pass  # still switched for this session
+    write_setting("language", code)
 
 
 def t(text):
@@ -114,6 +128,11 @@ class Join(Msg):
 NL = {
     # Menus
     "Main Menu": "Hoofdmenu",
+    "Local Game": "Lokaal spel",
+    "Online Game": "Online spel",
+    "Coming soon": "Binnenkort",
+    "Host": "Hosten",
+    "Join": "Meedoen",
     "New Game": "Nieuw spel",
     "Continue": "Doorgaan",
     "No saved game found": "Geen opgeslagen spel gevonden",
@@ -130,6 +149,65 @@ NL = {
     "Start Game": "Start spel",
     "Player {}": "Speler {}",
 
+    # Online play (lobby.py, online.py, viewer.py)
+    "Waiting for a player...": "Wachten op een speler...",
+    "This computer": "Deze computer",
+    "Open": "Open",
+    "Joined": "Aangesloten",
+    "Connecting...": "Verbinden...",
+    "Everyone online can see this game and join it": "Iedereen online kan dit spel zien en meedoen",
+    "The online server can't be reached: only your local network can see this game":
+        "De online server is niet bereikbaar: alleen je lokale netwerk kan dit spel zien",
+    "This game couldn't be opened to others": "Dit spel kon niet voor anderen worden geopend",
+    "Waiting for the connection": "Wachten op de verbinding",
+    "Every seat needs a player": "Elke plek heeft een speler nodig",
+    "Two players have the same name": "Twee spelers hebben dezelfde naam",
+    "No games yet: waiting for someone to host one...": "Nog geen spellen: wachten tot iemand er een host...",
+    "No online server is set up: only games on your local network show up":
+        "Er is geen online server ingesteld: alleen spellen op je lokale netwerk worden getoond",
+    "Looking for the online server...": "Online server zoeken...",
+    "The online server can't be reached right now: only games on your local network show up":
+        "De online server is nu niet bereikbaar: alleen spellen op je lokale netwerk worden getoond",
+    "Host's address:": "Adres van de host:",
+    "e.g. 192.168.1.20": "bv. 192.168.1.20",
+    "A game": "Een spel",
+    "{}'s game": "Spel van {}",
+    "Another version: update the game to join": "Andere versie: werk het spel bij om mee te doen",
+    "Waiting for players": "Wacht op spelers",
+    "Playing, 1 free seat": "Bezig, 1 vrije plek",
+    "Playing, {} free seats": "Bezig, {} vrije plekken",
+    "Playing (you can watch)": "Bezig (je kunt kijken)",
+    "{} of {} players": "{} van {} spelers",
+    "Online": "Online",
+    "Local network": "Lokaal netwerk",
+    "That game can't be reached": "Dat spel is niet bereikbaar",
+    "That game is full": "Dat spel is vol",
+    "That game is no longer open": "Dat spel is niet meer open",
+    "The host doesn't answer": "De host antwoordt niet",
+    "Joining...": "Meedoen...",
+    "This game has already started: take a free seat, then Play":
+        "Dit spel is al begonnen: neem een vrije plek en klik op Spelen",
+    "Waiting for the host to start the game": "Wachten tot de host het spel start",
+    "At the host": "Bij de host",
+    "Other device": "Ander apparaat",
+    "Take seat": "Plek nemen",
+    "Leave seat": "Plek vrijgeven",
+    "Play": "Spelen",
+    "Watch": "Kijken",
+    "Esc: menu (leave the game, fullscreen)": "Esc: menu (spel verlaten, volledig scherm)",
+    "Back to game": "Terug naar het spel",
+    "Fullscreen": "Volledig scherm",
+    "Windowed": "In een venster",
+    "Leave game": "Spel verlaten",
+    "The host ended the game": "De host heeft het spel beëindigd",
+    "The host closed the game": "De host heeft het spel gesloten",
+    "The host has left the game": "De host heeft het spel verlaten",
+    "You were removed from the game": "Je bent uit het spel verwijderd",
+    "The connection to the game was lost": "De verbinding met het spel is verbroken",
+    "The online connection was lost": "De online verbinding is verbroken",
+    "The game goes on here. To play on together, host it again: Online Game, Host, Continue":
+        "Het spel gaat hier verder. Om samen verder te spelen, host het opnieuw: Online spel, Hosten, Doorgaan",
+
     # The app's Update button in the main menu (updater.py)
     "Update": "Bijwerken",
     "Checking...": "Controleren...",
@@ -137,7 +215,6 @@ NL = {
     "Installing libraries...": "Bibliotheken installeren...",
     "Restarting...": "Herstarten...",
     "Install {}": "Installeer {}",
-    "Up to date": "Up-to-date",
     "Version: {}": "Versie: {}",
     "No internet connection": "Geen internetverbinding",
     "Update failed, try again later": "Bijwerken mislukt, probeer het later opnieuw",

@@ -1,7 +1,8 @@
 """
-Main menu shown before the game starts: "New Game" (jumps straight into
-the default game mode) vs "Continue" (pick the autosave or a named save
-slot, loaded onto a freshly built default-mode game). Runs as its own small pygame loop, before an
+Main menu shown before the game starts: "Local Game" (then "New Game", or
+"Continue": pick the autosave or a named save slot, loaded onto a freshly
+built default-mode game) vs "Online Game" (then "Host" or "Join", whose
+screens are in lobby.py). Each screen runs as its own small pygame loop, before an
 Engine exists yet -- it only needs a window and a font, not the game
 itself.
 """
@@ -29,6 +30,10 @@ FLAG_SIZE = (52, 36)
 
 # Window and taskbar icon (the app's own icon is packaging/icon.png).
 ICON_IMAGE = "./images/icon.png"
+
+# False greys the main menu's Online Game button out ("Coming soon"), so
+# run_online_menu isn't reached.
+ONLINE_PLAY = True
 
 
 def _open_window(width, height):
@@ -81,9 +86,9 @@ def _save_entries():
 
 
 def run_main_menu(width=960, height=640):
-    """Blocks until the player picks an option. Returns "new" or
-    "continue". The Continue button is disabled (and unclickable) if no
-    save file exists yet."""
+    """Blocks until the player picks an option. Returns "local" or
+    "online". The Online Game button is disabled (and unclickable) until
+    online play exists (ONLINE_PLAY)."""
     pg.init()
     pg.font.init()
     screen = _open_window(width, height)
@@ -92,9 +97,9 @@ def run_main_menu(width=960, height=640):
     button_font = game_font(32)
     hint_font = game_font(18)
 
-    has_save = any(os.path.isfile(path) for _, path, _ in _save_entries())
-    # The app has an Update button (updater.py); a copy run from the game's
-    # own folder doesn't.
+    # The app has an Update button (updater.py), top left, shown once there's
+    # a newer version to install; a copy run from the game's own folder
+    # doesn't.
     app = updater.managed()
     if app:
         updater.mark_started()
@@ -102,34 +107,44 @@ def run_main_menu(width=960, height=640):
     update_font = game_font(26)
 
     button_w, button_h = 300, 70
-    new_game_rect = pg.Rect(width // 2 - button_w // 2, height // 2 - 120, button_w, button_h)
-    continue_rect = pg.Rect(width // 2 - button_w // 2, height // 2 - 10, button_w, button_h)
-    update_rect = pg.Rect(width // 2 - button_w // 2, height // 2 + 95, button_w, 56)
+    local_rect = pg.Rect(width // 2 - button_w // 2, height // 2 - 120, button_w, button_h)
+    online_rect = pg.Rect(width // 2 - button_w // 2, height // 2 - 10, button_w, button_h)
     quit_rect = pg.Rect(width // 2 - button_w // 2, height // 2 + 180, button_w, button_h)
     flags = {
         key: pg.transform.smoothscale(pg.image.load(path).convert_alpha(), FLAG_SIZE)
         for key, path in FLAG_IMAGES.items()
     }
     flag_rect = pg.Rect(width - FLAG_SIZE[0] - 20, 20, *FLAG_SIZE)
+    update_rect = pg.Rect(20, 20, 240, 56)
+    update_open = False  # widened under the pointer to show a long label whole
 
     clock = pg.time.Clock()
     while True:
         _, mouse_pos, clicks = _input()
+        update_shown = app and _update_shown(updater.state)
+        if update_shown:
+            label, color, clickable = _update_look(updater.state)
+            # A label too long for the box (the new version's name) widens it
+            # while the pointer is on it, up to the flag.
+            wide = update_rect.copy()
+            wide.w = min(max(update_rect.w, update_font.size(label)[0] + 16), flag_rect.x - 12 - wide.x)
+            update_open = (wide if update_open else update_rect).collidepoint(mouse_pos)
+            update_box = wide if update_open else update_rect
         for click, _ in clicks:
             if flag_rect.collidepoint(click):
                 lang.set_language("en" if lang.language == "nl" else "nl")
                 pg.display.set_caption(t("Main Menu"))
                 sounds.play("click")
                 continue
-            if app and update_rect.collidepoint(click):
+            if update_shown and update_box.collidepoint(click):
                 sounds.play("error" if updater.state.busy else "click")
                 updater.state.start_update()
                 continue
-            sounds.play("error" if not has_save and continue_rect.collidepoint(click) else "click")
-            if new_game_rect.collidepoint(click):
-                return "new"
-            if has_save and continue_rect.collidepoint(click):
-                return "continue"
+            sounds.play("error" if not ONLINE_PLAY and online_rect.collidepoint(click) else "click")
+            if local_rect.collidepoint(click):
+                return "local"
+            if ONLINE_PLAY and online_rect.collidepoint(click):
+                return "online"
             if quit_rect.collidepoint(click):
                 pg.quit()
                 raise SystemExit
@@ -140,29 +155,31 @@ def run_main_menu(width=960, height=640):
         screen.blit(title, (width // 2 - title.get_width() // 2, height // 2 - 230))
 
         _draw_button(
-            screen, button_font, new_game_rect, t("New Game"),
-            (150, 245, 150), hovered=new_game_rect.collidepoint(mouse_pos),
+            screen, button_font, local_rect, t("Local Game"),
+            (150, 245, 150), hovered=local_rect.collidepoint(mouse_pos),
         )
         _draw_button(
-            screen, button_font, continue_rect, t("Continue"),
-            (150, 200, 245) if has_save else (110, 110, 110),
-            hovered=has_save and continue_rect.collidepoint(mouse_pos),
+            screen, button_font, online_rect, t("Online Game"),
+            (150, 200, 245) if ONLINE_PLAY else (110, 110, 110),
+            hovered=ONLINE_PLAY and online_rect.collidepoint(mouse_pos),
         )
-        if not has_save:
-            hint = hint_font.render(t("No saved game found"), True, (200, 200, 200))
-            screen.blit(hint, (width // 2 - hint.get_width() // 2, continue_rect.bottom + 10))
+        if not ONLINE_PLAY:
+            hint = hint_font.render(t("Coming soon"), True, (200, 200, 200))
+            screen.blit(hint, (width // 2 - hint.get_width() // 2, online_rect.bottom + 10))
         _draw_button(
             screen, button_font, quit_rect, t("Quit"),
             (240, 100, 100), hovered=quit_rect.collidepoint(mouse_pos),
         )
-        if app:
-            label, color, clickable = _update_look(updater.state)
-            _draw_button(screen, update_font, update_rect, label, color,
-                         hovered=clickable and update_rect.collidepoint(mouse_pos))
+        if update_shown:
+            while update_font.size(label)[0] > update_box.w - 16:
+                label = label[:-4] + "..."
+            _draw_button(screen, update_font, update_box, label, color,
+                         hovered=clickable and update_open)
             note = UPDATE_NOTES.get(updater.state.status)
             if note:
                 hint = hint_font.render(t(note), True, (240, 180, 120))
-                screen.blit(hint, (width // 2 - hint.get_width() // 2, update_rect.bottom + 4))
+                screen.blit(hint, (max(8, update_rect.centerx - hint.get_width() // 2), update_rect.bottom + 8))
+        if app:
             version = updater.installed()["title"]
             if version:
                 text = hint_font.render(t("Version: {}").format(version), True, (150, 150, 160))
@@ -186,6 +203,13 @@ UPDATE_NOTES = {
 }
 
 
+def _update_shown(update):
+    """Whether the main menu shows the Update button: only once the check
+    found a newer version, and while it's being installed (or after that
+    failed, to try again)."""
+    return update.latest is not None and update.status != "current"
+
+
 def _update_look(update):
     """(label, colour, clickable) of the main menu's Update button for the
     updater's state (updater.UpdateState)."""
@@ -199,12 +223,75 @@ def _update_look(update):
     if update.status == "ready":
         return t("Restarting..."), grey, False
     if update.status == "available":
-        title = update.latest["title"]
-        title = title if len(title) <= 18 else title[:17] + "..."
-        return t("Install {}").format(title), (245, 220, 120), True
-    if update.status == "current":
-        return t("Up to date"), plain, True
+        return t("Install {}").format(update.latest["title"]), (245, 220, 120), True
     return t("Update"), plain, True
+
+
+def run_local_menu(width=960, height=640):
+    """Shown after "Local Game". Returns "new", "continue" or None for Back.
+    The Continue button is disabled (and unclickable) if no save file exists
+    yet."""
+    has_save = any(os.path.isfile(path) for _, path, _ in _save_entries())
+    return _run_choice_menu(t("Local Game"), [
+        (t("New Game"), "new", (150, 245, 150), None),
+        (t("Continue"), "continue", (150, 200, 245), None if has_save else t("No saved game found")),
+    ], width, height)
+
+
+def run_online_menu(width=960, height=640):
+    """Shown after "Online Game". Returns "host", "join" or None for Back
+    (lobby.py takes it from there)."""
+    return _run_choice_menu(t("Online Game"), [
+        (t("Host"), "host", (150, 245, 150), None),
+        (t("Join"), "join", (150, 200, 245), None),
+    ], width, height)
+
+
+def _run_choice_menu(title_text, choices, width, height):
+    """A title, a column of buttons and Back. choices: (label, value, colour,
+    disabled hint or None); a disabled button is grey, unclickable and shows
+    its hint under it. Returns the value of the one picked, or None for Back."""
+    pg.init()
+    pg.font.init()
+    screen = _open_window(width, height)
+    pg.display.set_caption(title_text)
+    title_font = game_font(40)
+    button_font = game_font(32)
+    hint_font = game_font(18)
+
+    button_w, button_h = 300, 70
+    rects = [pg.Rect(width // 2 - button_w // 2, height // 2 - 120 + i * 110, button_w, button_h)
+             for i in range(len(choices))]
+    back_rect = pg.Rect(width // 2 - 110, rects[-1].bottom + 60, 220, 56)
+
+    clock = pg.time.Clock()
+    while True:
+        _, mouse_pos, clicks = _input()
+        for click, _ in clicks:
+            sounds.play("error" if any(hint and rect.collidepoint(click)
+                                       for rect, (_, _, _, hint) in zip(rects, choices)) else "click")
+            for rect, (_, value, _, hint) in zip(rects, choices):
+                if not hint and rect.collidepoint(click):
+                    return value
+            if back_rect.collidepoint(click):
+                return None
+
+        screen.fill((30, 30, 40))
+        title = title_font.render(title_text, True, (255, 255, 255))
+        screen.blit(title, (width // 2 - title.get_width() // 2, height // 2 - 220))
+
+        for rect, (label, _, color, hint) in zip(rects, choices):
+            _draw_button(screen, button_font, rect, label, (110, 110, 110) if hint else color,
+                         hovered=not hint and rect.collidepoint(mouse_pos))
+            if hint:
+                text = hint_font.render(hint, True, (200, 200, 200))
+                screen.blit(text, (width // 2 - text.get_width() // 2, rect.bottom + 10))
+
+        _draw_button(screen, button_font, back_rect, t("Back"), (220, 220, 220),
+                     hovered=back_rect.collidepoint(mouse_pos))
+
+        _present(screen)
+        clock.tick(60)
 
 
 def run_load_menu(width=960, height=640):

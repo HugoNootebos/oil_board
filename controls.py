@@ -13,7 +13,10 @@ tanks or dice, an event's chooser); the others can still move their
 cursor around, drawn faded. On a bot's turn every paired controller may
 click (the bot's phase takes no clicks, so that's the settings and event
 buttons, the map's hover panels, panning and zooming). The real mouse
-keeps working for everyone. In the start menus every controller clicks.
+keeps working for everyone -- except in an online game, where it doesn't
+click while a player on a joined device decides; that device's mouse and
+controllers do (online.RemotePointer, taken like a controller here). In
+the start menus every controller clicks.
 
 Controllers are paired with players by name: on the player-names screen
 (menu.py) or in the game's Controllers panel (Engine._draw_pairing).
@@ -131,11 +134,13 @@ class Controls:
         self.waiting = []
         self.mouse_active = 0  # ticks the mouse was last moved or clicked
         self.mouse_fresh = (False, False, False)  # its buttons pressed this frame
-        # The controllers that may click this frame, in the game (`frame`).
+        # The controllers that may click this frame, in the game (`frame`),
+        # and whether the mouse may.
         self.clickers = []
+        self.mouse_ok = True
+        self.parked = _Parked()
         self._ticks = None
         self._cursor_visible = True
-        self._sprites = {}
         if sdl_controller is not None:
             sdl_controller.init()
             for index in range(sdl_controller.get_count()):  # those already plugged in
@@ -263,7 +268,11 @@ class Controls:
         """In the game: decide which controllers may click this frame (see
         the module docstring) and return the pointer Io follows -- the one
         of them used last, or None (the mouse) when the mouse was used more
-        recently."""
+        recently. In an online game (engine.online, online.py) the joined
+        devices' pointers may be among them, and the mouse only clicks when
+        `mouse_ok` (not while a joined device's player decides)."""
+        online = getattr(engine, "online", None)
+        self.mouse_ok = True
         if engine.pairing_open:
             self.clickers = list(self.pads)
         else:
@@ -273,16 +282,25 @@ class Controls:
             else:
                 self.clickers = [pad for pad in self.pads
                                  if self.bindings.get(pad.instance_id) == acting.name]
-        source = self._latest(self.clickers)
-        self._show_cursor(source is None)
+            if online is not None:
+                self.clickers += online.remote_clickers(acting)
+                self.mouse_ok = online.mouse_allowed(acting)
+        source = self._latest(self.clickers, self.mouse_ok, engine.io)
+        self._show_cursor(not isinstance(source, Pad))  # a joined device's pointer: the mouse is still here
         return source
 
     def fresh(self, source):
         """Buttons of `source` (a Pad, or None for the mouse) pressed this frame."""
         return source.fresh if source is not None else self.mouse_fresh
 
-    def _latest(self, pads):
+    def _latest(self, pads, mouse_ok=True, io=None):
         latest = max(pads, key=lambda pad: pad.last_active, default=None)
+        if not mouse_ok:
+            if latest is not None:
+                return latest
+            if io is not None and io.source is not self.parked:
+                self.parked.x, self.parked.y = io.mouse_position.x, io.mouse_position.y
+            return self.parked  # nobody here may click: a pointer that stays where it was
         if latest is None or latest.last_active <= self.mouse_active:
             return None
         return latest
@@ -318,32 +336,56 @@ class Controls:
         for pad in self.pads:
             color, faded = (looks or {}).get(pad, (UNPAIRED_COLOR, False))
             number = pad.number if color == UNPAIRED_COLOR else None
-            sprite, margin = self._sprite(color, faded, scale, number)
+            sprite, margin = cursor_sprite(color, faded, scale, number)
             surface.blit(sprite, (round(offset[0] + pad.x * scale) - margin,
                                   round(offset[1] + pad.y * scale) - margin))
 
-    def _sprite(self, color, faded, scale, number):
-        key = (tuple(color), faded, round(scale, 3), number)
-        if key not in self._sprites:
-            margin = max(2, round(2 * scale))
-            points = [(margin + x * scale, margin + y * scale) for x, y in ARROW]
-            w, h = int(16 * CURSOR_SIZE * scale) + 2 * margin, int(25 * CURSOR_SIZE * scale) + 2 * margin
-            label = None
-            if number is not None:
-                label = game_font(max(8, int(14 * scale)), bold=True).render(str(number), True, (0, 0, 0))
-                w += label.get_width() + margin
-            sprite = pg.Surface((w, h), pg.SRCALPHA)
-            pg.draw.polygon(sprite, color, points)
-            pg.draw.polygon(sprite, (0, 0, 0), points, max(1, round(1.5 * scale)))
-            if label is not None:
-                lx, ly = int(16 * CURSOR_SIZE * scale) + margin, int(13 * CURSOR_SIZE * scale)
-                pg.draw.rect(sprite, color, (lx - 2, ly - 1, label.get_width() + 4, label.get_height() + 2))
-                pg.draw.rect(sprite, (0, 0, 0), (lx - 2, ly - 1, label.get_width() + 4, label.get_height() + 2), 1)
-                sprite.blit(label, (lx, ly))
-            if faded:
-                sprite.set_alpha(FADED_ALPHA)
-            self._sprites[key] = (sprite, margin)
-        return self._sprites[key]
+
+class _Parked:
+    """The pointer Io follows in an online game while nobody on this
+    computer may click (Controls._latest): it never presses anything."""
+
+    pressed = fresh = (False, False, False)
+
+    def __init__(self):
+        self.x = self.y = 0
+
+    @property
+    def pos(self):
+        return int(self.x), int(self.y)
+
+
+_sprites = {}
+
+
+def cursor_sprite(color, faded, scale, number=None):
+    """(sprite, margin) of a controller's arrow cursor in `color` (faded:
+    see-through), its tip `margin` px in from the sprite's corner, with the
+    controller's `number` next to it if given. Also the cursors of an
+    online game's other devices (online.py, viewer.py)."""
+    key = (tuple(color), faded, round(scale, 3), number)
+    if key not in _sprites:
+        margin = max(2, round(2 * scale))
+        points = [(margin + x * scale, margin + y * scale) for x, y in ARROW]
+        w, h = int(16 * CURSOR_SIZE * scale) + 2 * margin, int(25 * CURSOR_SIZE * scale) + 2 * margin
+        label = None
+        if number is not None:
+            label = game_font(max(8, int(14 * scale)), bold=True).render(str(number), True, (0, 0, 0))
+            w += label.get_width() + margin
+        sprite = pg.Surface((w, h), pg.SRCALPHA)
+        pg.draw.polygon(sprite, color, points)
+        pg.draw.polygon(sprite, (0, 0, 0), points, max(1, round(1.5 * scale)))
+        if label is not None:
+            lx, ly = int(16 * CURSOR_SIZE * scale) + margin, int(13 * CURSOR_SIZE * scale)
+            pg.draw.rect(sprite, color, (lx - 2, ly - 1, label.get_width() + 4, label.get_height() + 2))
+            pg.draw.rect(sprite, (0, 0, 0), (lx - 2, ly - 1, label.get_width() + 4, label.get_height() + 2), 1)
+            sprite.blit(label, (lx, ly))
+        if faded:
+            sprite.set_alpha(FADED_ALPHA)
+        if len(_sprites) > 200:
+            _sprites.clear()  # sizes from old window sizes
+        _sprites[key] = (sprite, margin)
+    return _sprites[key]
 
 
 _controls = None
