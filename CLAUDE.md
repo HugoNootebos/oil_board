@@ -41,7 +41,8 @@ controllers over while Steam is running. Of the tools, `bot_selfplay.py`
 The golden traces depend on the Python version: from Python 3.11 on, strings
 hash differently, so a few ties between equally good moves (the bot
 iterating over sets of country names) go the other way. Compare them on
-the Python 3.9 that made them. numpy 2 is fine.
+the Python that made them: since 14 Oct 2026 (after Update 4.10's eight new
+events) both files were written on Windows with Python 3.12. numpy 2 is fine.
 
 ## Files
 
@@ -69,7 +70,7 @@ the Python 3.9 that made them. numpy 2 is fine.
 | `bot_kpi.py` | The KPI recorder behind those tables (first ship, water protection, retention, cards, emptied countries, hoards, spend-down, assets bought/destroyed and why, what the one move a turn moves). Wraps game methods; changes no play. |
 | `bot_fork.py` | Forked what-ifs: play a game, fork it at a moment (e.g. the leader's turn once 2 players are left) and let one seat continue with different tunables (`--arm NAME:KEY=VALUE,...`), same board and dice for every arm. Resolves a behaviour that matters within a few turns (a strike, the endgame) with a few hundred forks, where whole games need thousands. `python3 bot_fork.py OUT.jsonl 4 SEED GAMES --stage 2:0,2 --min-share 0.5 --arm off:endgame_alive=0 --arm on:` then `--report OUT.jsonl`; run several in parallel. |
 | `bot_checks.py` | Headless PASS/FAIL checks of bot decisions on small boards (exposure, retention, strike step, finisher): `python3 bot_checks.py [filter]`. Add a check there when adding a bot behaviour. |
-| `bot_golden.py`, `golden_traces.json`, `golden_traces_new.json` | Golden traces: 12 whole games boiled down to an md5 per game. `python3 bot_golden.py` says whether the bots still play exactly like the traces in `golden_traces.json` (those of `old_bot.py`, before the retraining; only matches with the new tunables off, see below); `python3 bot_golden.py --golden golden_traces_new.json` compares with the bot as it was left after the retraining (rewrite it with `--update` when play is changed on purpose); `--bot FILE`, `--tweak k=v` to vary. |
+| `bot_golden.py`, `golden_traces.json`, `golden_traces_new.json` | Golden traces: 12 whole games boiled down to an md5 per game. `python3 bot_golden.py` says whether the bots still play exactly like the traces in `golden_traces.json` (those of `old_bot.py`, before the retraining; only matches with the new tunables off, see below, and not where the 4.10 events come up); `python3 bot_golden.py --golden golden_traces_new.json` compares with the bot as it was left after the retraining (rewrite it with `--update` when play is changed on purpose); `--bot FILE`, `--tweak k=v` to vary. |
 | `old_bot.py` | Frozen copy of bot.py from 2 Oct 2026, before the retraining: the baseline every A/B test and the golden traces compare against. |
 | `bot_research/` | Reports and prototype scripts of the research behind the bot retraining (reports in `bot_research/reports/`; `backup_before_wp0/` holds the files as they were before it started; `compare_assets.py` puts several A/B result files side by side). Not used by the game. |
 | `event_sandbox.py` | Interactive test board for events: `python3 event_sandbox.py`. Fixed 4-player board, events only when picked (F2), shows what each start/end changed; keys for editing the board (see its docstring / F1). Saves go to temp files. |
@@ -517,4 +518,11 @@ green (the new tunables off: `--tweak exposure=0 --tweak retention=0 --tweak
 strike=0 --tweak finish_max=0 --tweak endgame_alive=0 --tweak endgame_lead=1.1
 --tweak asset_hold=0 --tweak asset_move=0 --tweak asset_attack=0 --tweak asset_carry=0
 --tweak asset_wipe=0`
-reproduces the traces of `old_bot.py`).
+reproduces the traces of `old_bot.py`) -- except for 5 of the 12 games
+since Update 4.10: `old_bot.py` doesn't know the rules its events brought
+(immigrants who must stay put, `Country.free`/`keep`; the "give back"
+move), and the decisions it has no method for (`share_oil`, `bid_for`,
+`keep_development`, `turn_order`) are made by today's bot with its
+tunables on (bot_selfplay's fallback). So for a change that should leave
+play unchanged, `--golden golden_traces_new.json` (12 of 12) is the check;
+the 7 games that still match are the old-bot check.
