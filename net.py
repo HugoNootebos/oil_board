@@ -42,7 +42,7 @@ PROTOCOL = 1  # host <-> devices (online.py, viewer.py)
 # The main relay's address ("name:port"), once the home relay is set up
 # (packaging/relay/README.md). OIL_SERVER or "online_server" in
 # saves/settings.json override it.
-DEFAULT_SERVER = ""
+DEFAULT_SERVER = "oilboard.duckdns.org:47800"
 
 PING_EVERY = 10.0  # seconds; the relay drops a connection quiet for SILENT_LIMIT
 
