@@ -1657,13 +1657,22 @@ class AttackPhase(Phase):
                          sum(not a for a in attack_loss), conquered=defence.units <= 0)
         # A failed attack, over sea or over land: rolling 1 die and losing
         # it, or 2 dice and losing both, destroys every asset brought along.
-        if len(A) in (1, 2) and n == len(A) and all(attack_loss):
+        # Over sea that includes the ship or plane carrying the troops
+        # across, so that battle is over.
+        failed = len(A) in (1, 2) and n == len(A) and all(attack_loss)
+        escort_lost = failed and not self.attack_via_land
+        if failed:
             ships, tanks, planes = self.selected_ships, self.selected_tanks, self.selected_planes
             if ships or tanks or planes:
                 attack_from.ships = max(attack_from.ships - ships, 0)
                 attack_from.tanks = max(attack_from.tanks - tanks, 0)
                 attack_from.planes = max(attack_from.planes - planes, 0)
                 self.selected_ships = self.selected_tanks = self.selected_planes = 0
+                # Destroyed tanks give no +1 any more: neither by themselves
+                # nor through their paid oil passed on to a tank brought in
+                # from home for the next round.
+                self.tank_fee_paid = max(self.tank_fee_paid - self.active_tanks, 0)
+                manager.tank_fees[self.attack_from] = (self.defence_country, self.tank_fee_paid)
                 self.active_tanks = 0
                 engine.log_destroyed(player, defence.name, ships, tanks, planes)
 
@@ -1686,6 +1695,13 @@ class AttackPhase(Phase):
             # they attacked from goes neutral, same as any other country
             # emptied out to 0.
             self.abandon(attack_from)
+            player.subattack = 0
+            self.attack_from = None
+            self.defence_country = None
+        elif escort_lost:
+            # Troops are left but nothing to cross the water with: back to
+            # picking an attacker (a spare ship or plane there can start a
+            # new attack).
             player.subattack = 0
             self.attack_from = None
             self.defence_country = None

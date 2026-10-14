@@ -118,6 +118,12 @@ menu and move phase once dice are cast.
 - A failed attack roll destroys every asset brought along (ships, tanks,
   planes): rolling 1 die and losing it, or 2 dice and losing both. Over sea
   and (since 9 Oct 2026) over land, bridges and rails alike; 3 dice never do.
+  Over sea (and by air) that also ends the battle: with the ship/plane gone
+  the attacker goes back to picking an attacking country, even with troops
+  left (a spare ship/plane there can start a new attack). Over land the
+  attack may go on, but destroyed tanks no longer add their +1, and their
+  paid oil is gone too (`tank_fee_paid` drops by the destroyed active
+  tanks), so a tank brought in from home for the next round pays again.
 - Food caps armies: at the start of a turn every troop beyond the food *in
   stock* starves (that turn's harvest only comes in after), so an army
   can't outgrow its food income for long. When troops starve, the turn's production (and
@@ -277,6 +283,17 @@ that signature).
   button installs). History only covers what has been committed, so still be
   careful with destructive edits. Commit or push only when the user asks:
   a push to Master is a release to every player.
+- **Version numbers in commits:** every update committed for GitHub gets the
+  next version: the previous one plus 0.1 (4.3 → 4.4 … 4.9 → 5.0); a bigger
+  jump only when the user asks for it. Find the previous one with
+  `git log --format=%s | grep -m1 "^Update [0-9]"`. The subject is
+  `Update <version>: <name>`, the name being the user's name for the update
+  (e.g. `Update 4.4: no audio fix`); the body lists the major changes, one
+  `- ` bullet each, in plain words. The subject is what players see: the
+  updater shows it on the Update button and as "Version:" in the main menu
+  (`updater.UpdateState.check`, `.version`'s "title"). Up to 4.3 subjects
+  were just `Update 4.3`; the commits after it (online play, "no audio fix")
+  had no number, so the first numbered one after them is 4.4.
 
 ## Online play
 
