@@ -159,7 +159,7 @@ def _play(app):
         if any(pad.tapped(controls.START) for pad in pads.clickers) and not app.turn_manager.dialog_active:
             app.toggle_settings()
         wheel += [step for pad in pads.clickers for step in pad.zoom_steps]
-        app.bystander_clicks()  # the other players' controllers say a country's name
+        app.bystander_clicks()  # the other players' controllers (online: mice too) say a country's name
         if not app.modal_open and pads.needs_pairing(app.local_players()) and any(
                 pad.tapped(controls.A) and pads.player_of(pad, app.local_players()) is None for pad in pads.pads):
             app.open_pairing()  # a controller nobody has yet wants in

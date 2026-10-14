@@ -238,6 +238,8 @@ class Country:
             center += np.array([-10, 10])
         if name == "Canada":
             center += np.array([-30, 30])
+        if name == "Siberië":
+            center = np.array([558, 104])  # in the far east, just north of the bay above Vladivostok
         self.mass_center = Position(int(center[0]), int(center[1]))
 
     def set_outline(self, raw_polygon):

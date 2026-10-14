@@ -246,7 +246,9 @@ player, a human defender picking tanks/dice, an event's `chooser`, the
 owner of a country the mouse attacks; online, that's also how a joined
 device gets the click); the other cursors are drawn faded.
 On a bot's turn every paired controller clicks. The mouse always works.
-A player whose turn it isn't pressing A on a country hears its name
+A player whose turn it isn't pressing A on a country hears its name;
+online also clicking it with a mouse: a joined device's, or the host's own
+while a joined device's player decides
 (`Engine.bystander_clicks`, `sounds.play_country`: `sounds/countries/<country>.flac`,
 matched ignoring case/accents/spaces/hyphens; pygame can't play .m4a, so
 voice memos are converted with `afconvert -f flac -d flac@22050`).

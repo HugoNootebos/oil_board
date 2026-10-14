@@ -32,6 +32,7 @@ import online  # noqa: E402
 import relay  # noqa: E402
 import sounds  # noqa: E402
 from engine import Engine  # noqa: E402
+from models import Position  # noqa: E402
 
 PORT0 = 47900
 
@@ -463,6 +464,73 @@ def test_clicks():
     check("closing ends the session", app.online is None and sounds.listener is None)
 
 
+def test_names():
+    app = _game()
+    seats = [online.Seat("A", kind="host"), online.Seat("B"), online.Seat("C")]
+    s = _session(seats)
+    s._member_joined({"member": 1, "device": "dev"})
+    s._member_joined({"member": 2, "device": "dev2"})
+    for member, seat in ((1, 1), (2, 2)):
+        s._seat_request(s.members[member], "take", {"seat": seat})
+        s.members[member].viewing = True
+    s.start_game(app)
+    pads, view = app.controls, app.view
+    mouse = s.members[1].pointers["m"]
+    said = []
+    play_country, get_pos = sounds.play_country, pg.mouse.get_pos
+    sounds.play_country = said.append
+    app.turn = 0
+    for _ in range(2):
+        _frame(app)  # the buttons drawn, so country_at knows what covers the map
+
+    def spot(country):
+        x = (country.mass_center.x + view.offset.x) * view.zoom + 0.5 * view.WIDTH
+        y = (country.mass_center.y + view.offset.y) * view.zoom + 0.5 * view.HEIGHT
+        return x, y
+
+    name = next(n for n, c in app.countries.items() if 100 < spot(c)[0] < 860 and 100 < spot(c)[1] < 540
+                and app.io.country_at(view, app.countries.values(), Position(*spot(c))) == n)
+    x, y = spot(app.countries[name])
+    pg.mouse.get_pos = lambda: (x * view.scale + view.ox, y * view.scale + view.oy)
+
+    def click(device=False, host=False):
+        """One frame with a click of the device's mouse and/or the host's
+        (runner.play's order); what it said."""
+        del said[:]
+        mouse.feed({"x": x, "y": y, "held": [controls.A] if device else [], "down": [controls.A] if device else []},
+                   pg.time.get_ticks())
+        pads.handle_events([pg.event.Event(pg.MOUSEBUTTONDOWN, button=1, pos=(0, 0))] if host else [])
+        s.update()
+        app.io_handle()
+        app.bystander_clicks()
+        mouse.feed({"x": x, "y": y, "held": [], "down": []}, pg.time.get_ticks())
+        pads.handle_events([])
+        s.update()
+        app.io_handle()
+        return list(said)
+
+    try:
+        check("the host's player's turn: a joined player's mouse on a country says its name",
+              click(device=True) == [name])
+        check("(the host's own mouse doesn't: it plays)", click(host=True) == [])
+        app.turn = 1
+        _frame(app)
+        check("a joined player's turn: the host's mouse on a country says its name",
+              not pads.mouse_ok and click(host=True) == [name])
+        check("(the joined player's own mouse doesn't: it plays)", click(device=True) == [])
+        app.turn = 2
+        _frame(app)
+        check("another device's player's turn: both say it",
+              click(device=True) == [name] and click(host=True) == [name])
+        seats[0].kind = "open"  # nobody plays on the host's computer
+        app.turn = 1
+        _frame(app)
+        check("no player on the host's computer: its mouse says nothing", click(host=True) == [])
+    finally:
+        sounds.play_country, pg.mouse.get_pos = play_country, get_pos
+        s.close()
+
+
 # --- a whole hosted game, through a local relay -----------------------------------
 
 def test_game():
@@ -558,7 +626,7 @@ def _game_through_relay():
         conn.close()
 
 
-TESTS = [test_relay, test_discovery, test_stream, test_seats, test_clicks, test_game]
+TESTS = [test_relay, test_discovery, test_stream, test_seats, test_clicks, test_names, test_game]
 
 
 def main():

@@ -1247,16 +1247,23 @@ class Engine:
 
     def bystander_clicks(self):
         """A player whose turn it isn't, pressing A with their controller's
-        cursor on a country, hears that country's name. Not for a click
-        the game takes (a defender's dice, an event's pick: those
-        controllers click, see controls.py), nor through the shop menu,
-        the card menu or a dialog."""
+        cursor on a country, hears that country's name; online also with
+        their mouse (a joined device's, or the host's while a joined
+        device's player decides). Not for a click the game takes (a
+        defender's dice, an event's pick: those controllers click, see
+        controls.py), nor through the shop menu, the card menu or a dialog."""
         pads = self.controls
         if pads is None or self.modal_open or self.card_menu.show:
             return
         current = self.players[self.turn]
         if current.attack == 3 and current.subattack < 8:
             return  # shop menu open
+
+        def say(position):
+            name = self.io.country_at(self.view, self.countries.values(), Position(*position))
+            if name is not None:
+                sounds.play_country(name)
+
         bot_acting = self.turn_manager.acting_player().is_bot  # then every paired controller clicks
         for pad in pads.pads:
             if not pad.tapped(controls.A) or (pad in pads.clickers and not bot_acting):
@@ -1264,19 +1271,24 @@ class Engine:
             player = pads.player_of(pad, self.players)
             if player is None or player is current:
                 continue
-            name = self.io.country_at(self.view, self.countries.values(), Position(*pad.pos))
-            if name is not None:
-                sounds.play_country(name)
+            say(pad.pos)
+        if self.online is None:
+            return
         # Online: the pointers of the devices that joined, the same way.
-        for pointer in self.online.pointers() if self.online is not None else []:
+        for pointer in self.online.pointers():
             if not pointer.tapped(controls.A) or (pointer in pads.clickers and not bot_acting):
                 continue
             names = self.online.names_of(pointer)
             if not names or current.name in names:
                 continue
-            name = self.io.country_at(self.view, self.countries.values(), Position(*pointer.pos))
-            if name is not None:
-                sounds.play_country(name)
+            say(pointer.pos)
+        # And the host's own mouse, which doesn't click while a joined
+        # device's player decides: for the players on this computer.
+        if not pads.mouse_ok and pads.mouse_fresh[0]:
+            names = [seat.name for seat in self.online.seats if seat.kind == "host"]
+            if names and current.name not in names:
+                x, y = pg.mouse.get_pos()
+                say((int((x - self.view.ox) / self.view.scale), int((y - self.view.oy) / self.view.scale)))
 
     def get_players(self, mode="prompt"):
         if mode == "default":
