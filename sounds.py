@@ -24,6 +24,16 @@ _error_played = False
 VOLUMES = {"click": 0.5, "abomb": 0.25, "conquer_country": 0.2}  # per-sound volume (default 1.0)
 
 
+def init_pygame():
+    """What the menus and the game need of pygame (window, fonts,
+    controllers): pg.init() without the mixer, which _ready() opens itself,
+    once. pg.init() tries the mixer again on every call, and on a Windows PC
+    without an audio output each try waits ~8 s before it fails."""
+    pg.display.init()
+    pg.font.init()
+    pg.joystick.init()
+
+
 def _ready():
     global _ok
     if _ok is None:

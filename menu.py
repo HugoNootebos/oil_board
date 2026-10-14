@@ -89,8 +89,7 @@ def run_main_menu(width=960, height=640):
     """Blocks until the player picks an option. Returns "local" or
     "online". The Online Game button is disabled (and unclickable) until
     online play exists (ONLINE_PLAY)."""
-    pg.init()
-    pg.font.init()
+    sounds.init_pygame()
     screen = _open_window(width, height)
     pg.display.set_caption(t("Main Menu"))
     title_font = game_font(48)
@@ -251,8 +250,7 @@ def _run_choice_menu(title_text, choices, width, height):
     """A title, a column of buttons and Back. choices: (label, value, colour,
     disabled hint or None); a disabled button is grey, unclickable and shows
     its hint under it. Returns the value of the one picked, or None for Back."""
-    pg.init()
-    pg.font.init()
+    sounds.init_pygame()
     screen = _open_window(width, height)
     pg.display.set_caption(title_text)
     title_font = game_font(40)
@@ -297,8 +295,7 @@ def _run_choice_menu(title_text, choices, width, height):
 def run_load_menu(width=960, height=640):
     """Shown after "Continue": the autosave plus the save slots, each with
     its name. Returns the path of the one picked, or None for Back."""
-    pg.init()
-    pg.font.init()
+    sounds.init_pygame()
     screen = _open_window(width, height)
     pg.display.set_caption(t("Continue"))
     title_font = game_font(40)
@@ -388,8 +385,7 @@ def run_new_game_menu(width=960, height=640):
     """Shown after "New Game" is picked. Blocks until the player chooses
     either the named default game ("De 3 Neven") or a plain N-player game.
     Returns "default" or an int player count (3-6)."""
-    pg.init()
-    pg.font.init()
+    sounds.init_pygame()
     screen = _open_window(width, height)
     pg.display.set_caption(t("New Game"))
     title_font = game_font(40)
@@ -459,8 +455,7 @@ def run_player_names_menu(count, width=960, height=640):
     that player's (controls.py), the mouse clicking it takes it away
     again. Returns (names, bots), both in order; bots[i] is True for a
     bot, False for a human."""
-    pg.init()
-    pg.font.init()
+    sounds.init_pygame()
     screen = _open_window(width, height)
     pg.display.set_caption(t("Player Names"))
     title_font = game_font(40)

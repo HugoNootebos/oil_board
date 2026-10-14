@@ -109,8 +109,7 @@ def _start(session, setup, row_pads):
 
 def _screen(caption):
     """A lobby screen's canvas (as menu.py's screens: the menu window)."""
-    pg.init()
-    pg.font.init()
+    sounds.init_pygame()
     screen = _open_window(WIDTH, HEIGHT)
     pg.display.set_caption(caption)
     return screen

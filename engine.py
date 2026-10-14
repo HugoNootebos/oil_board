@@ -50,8 +50,7 @@ class Engine:
         # given (e.g. called directly rather than through that screen).
         self.player_count = player_count
         self.player_names = player_names
-        pg.init()
-        pg.font.init()
+        sounds.init_pygame()
         self.font = game_font(20)
         self.logical_size = (width, height)
         self.fullscreen = True
