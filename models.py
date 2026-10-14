@@ -825,13 +825,13 @@ class Io:
                                 if self._contains(b, self.mouse_position)), None)
         self.hover_country = self.country_at(view, countries, self.mouse_position)
 
-    def country_at(self, view, countries, position):
+    def country_at(self, view, countries, position, buttons=None):
         """The name of the country at `position` (logical px), or None --
-        also when a button drawn last frame covers it. A country's troop
-        circle counts as part of it (it can overhang the border, e.g. on
-        small countries); when several circles are under it, the nearest
-        centre wins."""
-        if any(self._contains(b, position) for b in self.last_buttons):
+        also when a button drawn last frame (or one of `buttons`) covers
+        it. A country's troop circle counts as part of it (it can overhang
+        the border, e.g. on small countries); when several circles are
+        under it, the nearest centre wins."""
+        if any(self._contains(b, position) for b in (self.last_buttons if buttons is None else buttons)):
             return None  # the map behind a button is out of reach
         best = None
         found = None

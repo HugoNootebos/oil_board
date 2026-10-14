@@ -50,12 +50,12 @@ the Python 3.9 that made them. numpy 2 is fine.
 | `runner.py` | Entry point: start menus → `play(app)` loop. "Exit Game" returns to the start menu; closing the window quits. F5/F9 quicksave/quickload (autosave file), Esc toggles fullscreen. |
 | `menu.py` | Start menu (with the language flag; Local Game / Online Game), new-game menu, player-name entry (with controller pairing), Continue/load screen (autosave + 4 named slots). Each is its own small pygame loop. |
 | `lobby.py` | Online Game's screens: Host (a new or saved game, then its lobby of seats) and Join (the games on every relay found, a game's lobby, then the viewer), plus a message screen. See Online play below. |
-| `online.py` | The host's side of an online game: `HostSession` (seats, joined devices, who may click, cursors, sounds), `RemotePointer` (a joined device's mouse or controller, taken like a `controls.Pad`), `FrameStream` (the screen as JPEG tiles). |
+| `online.py` | The host's side of an online game: `HostSession` (seats, joined devices, who may click, cursors, sounds, each device's country info panel), `RemotePointer` (a joined device's mouse or controller, taken like a `controls.Pad`), `FrameStream` (the screen as JPEG tiles). |
 | `viewer.py` | A joined device's side of an online game: shows the host's screen, sends its mouse and controllers, plays the host's sounds; its own Esc menu (leave, fullscreen) and chat. |
 | `chat.py` | The online game's chat (`Chat`): messages, the button under the settings button with its unread badge, the panel, typing. One per device (host: `HostSession.chat`, a joined device: `Viewer.chat`). |
 | `net.py` | Online plumbing (standard library only): `Connection` to a relay (send/receive threads), `RoomBrowser` (relays on this computer, the LAN and the main server, told apart by id), `find_main_relay`, `PROTOCOL`, `DEFAULT_SERVER`, `device_id`. |
 | `relay.py` | The relay server: rooms, routing, LAN beacons. `python3 relay.py` on the home computer; `start_embedded` runs one inside a host's game for a LAN game. Standard library only and self-contained. |
-| `online_checks.py` | Headless PASS/FAIL checks of online play (relay, discovery, stream, seats, who clicks, the chat, a whole game through a local relay): `python3 online_checks.py [filter]`. |
+| `online_checks.py` | Headless PASS/FAIL checks of online play (relay, discovery, stream, seats, who clicks, the chat, the hover panels, a whole game through a local relay): `python3 online_checks.py [filter]`. |
 | `controls.py` | Game controllers, one per player, each with its own cursor (`Pad`). `Controls` (one, `controls.get()`) reads them, pairs them with players, decides which may click (`frame`) and draws the cursors. See Game controllers below. |
 | `lang.py` | Dutch/English: `t(text)`, `Msg`/`Join` (log text translated when drawn), the current `language`, `set_language` (saved in `saves/settings.json`), the `NL` (English source → Dutch) and `EN` (Dutch source → English) tables. |
 | `engine.py` | `Engine`: window/view, cached map layer rendering, troop markers, HUD buttons, settings menu (Exit Game, Save As, display toggles), fonts/images, player setup. |
@@ -358,6 +358,20 @@ differs per process and Python version, and timers use `pg.time.get_ticks()`.)
   gets the history (`old`, not counted as unread). Not saved; mouse and
   keyboard only. The host's own chat click isn't sent as a sound
   (`sounds.play(..., shared=False)`).
+- **The country info panel** (top right) is each device's own too, online:
+  the country its own pointer is over, left out of the picture
+  (`draw_gui` skips it when `app.online`; a local game is unchanged).
+  `HostSession.show_hovers` (from `Engine.present`, after `online.capture`)
+  picks per device: of its used pointers over a country (`device_country_at`:
+  not through the buttons on screen, the chat button, the host's open chat,
+  the shop menu or a dialog), the one whose player decides soonest
+  (`_turn_rank`: the acting player, then by turns to go; no player last),
+  between equals the one used last. A controller stands for its paired
+  player, a device's mouse for its players without a controller of their
+  own. The host draws its own; each joined device gets its panel as a PNG
+  (`hover{rect, png}`, `Engine.country_panel`, ~15 KB) when it changes, at
+  most every `HOVER_MS`, and draws it over the picture (not while its
+  mouse is on its own chat).
 - Raise `net.PROTOCOL` whenever the messages between a host and its devices
   change, and `relay.RELAY_PROTOCOL` when the relay's do (then the home relay
   needs `packaging/relay/install.sh` again).

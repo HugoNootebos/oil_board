@@ -1,9 +1,9 @@
 """
 Automated checks for online play (net.py, relay.py, online.py, viewer.py,
 lobby.py, chat.py): the relay's routing, finding relays, the screen stream,
-the lobby's seats, who may click in the game, the chat, and a whole hosted
-game with a device joining it through a real (local) relay. PASS/FAIL per
-check.
+the lobby's seats, who may click in the game, the chat, each device's
+country info panel, and a whole hosted game with a device joining it
+through a real (local) relay. PASS/FAIL per check.
 
     python3 online_checks.py [name filter]
 
@@ -657,6 +657,97 @@ def test_chat():
     v._draw((500, 300))
 
 
+def _spots(app, count):
+    """`count` countries in view, each with a point (logical) that is on it."""
+    view, found = app.view, []
+    for country in app.countries.values():
+        x = (country.mass_center.x + view.offset.x) * view.zoom + 0.5 * view.WIDTH
+        y = (country.mass_center.y + view.offset.y) * view.zoom + 0.5 * view.HEIGHT
+        if 250 < x < 650 and 150 < y < 450 and app.device_country_at((x, y)) == country.name:
+            found.append((country.name, (x, y)))
+    return found[:count]
+
+
+def test_hover():
+    app = _game()
+    seats = [online.Seat("A", kind="host"), online.Seat("B"), online.Seat("C")]
+    s = _session(seats)
+    sent = []
+    s._send = lambda message, to=0: sent.append((to, message))
+    s._member_joined({"member": 1, "device": "dev"})
+    s._member_joined({"member": 2, "device": "watcher"})
+    for i in (1, 2):
+        s._seat_request(s.members[1], "take", {"seat": i})
+    s.members[1].viewing = s.members[2].viewing = True
+    s.start_game(app)
+    app.turn = 1
+    _frame(app)
+    (x_name, x_at), (y_name, y_at), (z_name, z_at) = _spots(app, 3)
+    one, watcher = s.members[1], s.members[2]
+    now = pg.time.get_ticks()
+    one.pointers["m"].feed({"x": x_at[0], "y": x_at[1], "held": [], "down": []}, now)
+    s._input(one, {"type": "pad", "n": 4, "x": y_at[0], "y": y_at[1], "held": []})
+    s._pads(one, {"4": "C"})
+    watcher.pointers["m"].feed({"x": z_at[0], "y": z_at[1], "held": [], "down": []}, now)
+
+    def shown(member):
+        time.sleep(online.HOVER_MS / 1000 + 0.02)  # (a device gets at most one every HOVER_MS)
+        _frame(app)
+        return member.hover[0] if member.hover is not None else None
+
+    check("B's turn: the device shows what B's pointer (its mouse) is over", shown(one) == x_name)
+    last = [message for to, message in sent if to == 1 and message["type"] == "hover"][-1]
+    check("sent as a picture with its place", isinstance(last.get("png"), str) and len(last.get("rect", [])) == 4)
+    app.turn = 2
+    check("C's turn: what C's controller is over", shown(one) == y_name)
+    app.turn = 0
+    check("someone else's turn: the pointer of whoever of them is next (B)", shown(one) == x_name)
+    check("a device watching sees what its own mouse is over", shown(watcher) == z_name)
+    one.pointers["m"].feed({"x": chat.BUTTON.centerx, "y": chat.BUTTON.centery, "held": [], "down": []},
+                           pg.time.get_ticks())
+    check("not through the chat button (a device's own)", shown(one) == y_name)
+    app.turn_manager.toggle_shop()
+    check("not while the shop menu is open", shown(one) is None and shown(watcher) is None)
+    app.turn_manager.toggle_shop()
+    check("(and again once it's closed)", shown(watcher) == z_name)
+
+    mine = next(name for name, _ in _spots(app, 20)
+                if app.countries[name].owner in (app.default_player, app.players[app.turn]))
+    at = next(point for name, point in _spots(app, 20) if name == mine)
+    view = app.view
+    real_pos, real_focused = pg.mouse.get_pos, pg.mouse.get_focused
+    try:
+        pg.mouse.get_pos = lambda: _window_pos(view, *at)
+        pg.mouse.get_focused = lambda: True
+        app.controls.mouse_active = pg.time.get_ticks()
+        _frame(app)
+        _frame(app)
+    finally:
+        pg.mouse.get_pos, pg.mouse.get_focused = real_pos, real_focused
+    image, rect = app.country_panel(mine)
+    corner = next((rect.x + x, rect.y + y) for y in range(2, rect.h - 2) for x in range(2, rect.w - 2)
+                  if all(tuple(image.get_at((x + dx, y + dy)))[:3] == app.gui.gray1
+                         for dx in range(-2, 3) for dy in range(-2, 3)))  # plain background
+    on_screen = tuple(pg.display.get_surface().get_at(_window_pos(view, *corner)))[:3]
+    check("the host sees the panel of the country its own mouse is over",
+          app.io.hover_country == mine and max(abs(a - b) for a, b in zip(on_screen, app.gui.gray1)) < 12, on_screen)
+    check("but it's not in the game's picture (what the devices get)", app.ui.get_at(corner)[3] == 0)
+    s.close()
+
+    conn = FakeConn([last])
+    v = viewer.Viewer(conn, 1, [])
+    v._receive()
+    check("a device takes in its panel", v.hover is not None and list(v.hover[1]) == last["rect"])
+    v._draw((500, 300))
+    conn.incoming = [{"type": "hover"}]
+    v._receive()
+    check("and puts it away again", v.hover is None)
+    conn.incoming = [{"type": "hover", "rect": [0, 0, 10, 10], "png": "not a picture"},
+                     {"type": "hover", "rect": [900, 600, 200, 200], "png": last["png"]}]
+    v._receive()
+    check("a broken or misplaced panel isn't shown", v.hover is None)
+
+
 def test_game():
     real = net.find_main_relay
     net.find_main_relay = lambda stop=None: None  # no main relay: the host starts its own
@@ -765,7 +856,8 @@ def _game_through_relay():
         conn.close()
 
 
-TESTS = [test_relay, test_discovery, test_stream, test_seats, test_clicks, test_names, test_chat, test_game]
+TESTS = [test_relay, test_discovery, test_stream, test_seats, test_clicks, test_names, test_chat, test_hover,
+         test_game]
 
 
 def main():

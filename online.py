@@ -11,16 +11,21 @@ take like a game controller (controls.Pad): it only clicks when its
 player's decision is up (`remote_clickers`), and while it is, the host's
 own mouse doesn't click (`mouse_allowed`). What the devices see is the
 host's screen (`FrameStream`), with everyone's cursor drawn on top by each
-device itself, and they hear the host's sounds (sounds.listener).
+device itself, and they hear the host's sounds (sounds.listener). What is
+each device's own is left out of that picture and drawn by the device: its
+chat (chat.py) and the info panel of the country its pointer is over
+(`show_hovers`: the host makes it, the device shows it).
 
 Messages from the host to its devices (through the relay, "to" a member
 or all): seats{state, title, seats}, start, cursors{c}, sound{kind, name},
-chat{lines, old}, end{reason}, and the screen as BINARY
+chat{lines, old}, hover{rect, png} (no rect: none), end{reason}, and the
+screen as BINARY
 (`FrameStream.update_since`). From a device: take/release/name{seat, text}
 (its seats), pads{bind}, ready (it shows the game now), ack (an update
 arrived), mouse/pad (its input), chat{text} (see chat.py).
 """
 
+import base64
 import io
 import json
 import struct
@@ -48,6 +53,7 @@ BLUR_SHARE = 0.4           # a change bigger than this share of the picture (the
 HALF_MS = 100              # and at most 10 times a second
 MAX_IN_FLIGHT = 2          # updates on their way to a device before it has to say it got them
 CURSOR_MS = 33             # cursors at most 30 times a second
+HOVER_MS = 80              # a device's country info panel at most 12 times a second
 MAX_PADS = 8               # game controllers per device
 NAME_MAX = 20
 
@@ -317,6 +323,8 @@ class Member:
         self.in_flight = 0
         self.blurred = False   # it got a half-size picture: it gets it sharp once things stand still
         self.sent_at = -HALF_MS
+        self.hover = None      # the country info panel it has (show_hovers)
+        self.hover_at = -HOVER_MS
 
 
 class HostSession:
@@ -339,6 +347,7 @@ class HostSession:
         self._cursors_at = 0
         self._cursor_due = False
         self._picture_due = False
+        self._hover_due = False
         self.chat = chat.Chat(self.say)  # this computer's chat (the host's messages go out from `say`)
         if connect:  # (online_checks.py tries a session without a network)
             threading.Thread(target=self._open, name="oil-host", daemon=True).start()
@@ -469,6 +478,7 @@ class HostSession:
                     member.in_flight = max(0, member.in_flight - 1)
                 elif kind == "ready":
                     member.viewing, member.base, member.in_flight = True, -1, 0
+                    member.hover = None
                     self._cursors = None  # it needs them all
                     if self.chat.lines:
                         self._send({"type": "chat", "lines": self.chat.lines, "old": True}, to=member.id)
@@ -625,7 +635,7 @@ class HostSession:
     @property
     def busy(self):
         """Something still has to go out: keep drawing frames."""
-        return self.stream.pending or self._cursor_due or self._picture_due
+        return self.stream.pending or self._cursor_due or self._picture_due or self._hover_due
 
     def capture(self, window, rect):
         """Engine.present: the game's area of the window, before any cursor."""
@@ -714,6 +724,112 @@ class HostSession:
         """sounds.listener: the devices hear what the host hears."""
         if self.viewers:
             self._send({"type": "sound", "kind": kind, "name": name})
+
+    # --- in the game: each device's country info panel ----------------------------------
+
+    def _turn_rank(self, names):
+        """How soon the players `names` decide: the one deciding now first,
+        then by turns to go; no player at all last."""
+        app = self.app
+        acting = app.turn_manager.acting_player()
+        count = len(app.players)
+        ranks = [0 if player is acting else 1 + (i - app.turn) % count
+                 for i, player in enumerate(app.players)
+                 if player.name in names and not getattr(player, "eliminated", False)]
+        return min(ranks, default=count + 1)
+
+    def _pointers_here(self):
+        """This computer's pointers that are in use: (position, the players it
+        stands for, when last used). A controller stands for its player, the
+        mouse for this computer's players without one of their own."""
+        app, pads = self.app, self.app.controls
+        here = [seat.name for seat in self.seats if seat.kind == "host"]
+        entries, own = [], set()
+        for pad in pads.pads if pads is not None else []:
+            player = pads.player_of(pad, app.players)
+            names = [player.name] if player is not None and player.name in here else []
+            own.update(names)
+            if pad.last_active >= 0:
+                entries.append(((pad.x, pad.y), names, pad.last_active))
+        if pg.mouse.get_focused():
+            x, y = pg.mouse.get_pos()
+            view = app.view
+            entries.append((((x - view.ox) / view.scale, (y - view.oy) / view.scale),
+                            [name for name in here if name not in own] or here,
+                            pads.mouse_active if pads is not None else 0))
+        return entries
+
+    def _pointers_of(self, member):
+        """A joined device's pointers that it has used, as `_pointers_here`."""
+        names = self._names(member.id)
+        own = set(member.pad_names.values()) & set(names)
+        entries = []
+        for pointer in member.pointers.values():
+            if pointer.last_active < 0:
+                continue
+            if pointer.number == "m":
+                stands_for = [name for name in names if name not in own] or names
+            else:
+                stands_for = self.names_of(pointer)
+            entries.append(((pointer.x, pointer.y), stands_for, pointer.last_active))
+        return entries
+
+    def _hovered(self, entries, chat_here=None):
+        """The country a device's info panel shows: of its pointers over a
+        country, the one whose player decides soonest; between equals the
+        one used last."""
+        best = None
+        for position, names, used in entries:
+            name = self.app.device_country_at(position, chat_here)
+            if name is not None:
+                key = (self._turn_rank(names), -used)
+                if best is None or key < best[0]:
+                    best = (key, name)
+        return best[1] if best is not None else None
+
+    def show_hovers(self, window, scale, offset):
+        """Every device's country info panel, for the country its own pointer
+        is over (Engine.present, after the picture for the devices is
+        taken): drawn here for this computer, sent as a picture to each
+        device that joined (when it changes, at most every HOVER_MS)."""
+        if self.state != "game":
+            return
+        panels = {}
+
+        def panel(name):
+            if name not in panels:
+                image, rect = self.app.country_panel(name)
+                panels[name] = [image, rect, (name, tuple(rect), hash(pg.image.tobytes(image, "RGBA"))), None]
+            return panels[name]
+
+        name = self._hovered(self._pointers_here(), self.chat)
+        if name is not None:
+            image, rect = panel(name)[:2]
+            size = (max(1, round(rect.w * scale)), max(1, round(rect.h * scale)))
+            window.blit(image if scale == 1 else pg.transform.smoothscale(image, size),
+                        (round(offset[0] + rect.x * scale), round(offset[1] + rect.y * scale)))
+        now = pg.time.get_ticks()
+        self._hover_due = False
+        for member in self.members.values():
+            if not member.viewing:
+                continue
+            name = self._hovered(self._pointers_of(member))
+            shown = panel(name) if name is not None else None
+            key = shown[2] if shown is not None else None
+            if key == member.hover:
+                continue
+            if 0 <= now - member.hover_at < HOVER_MS:
+                self._hover_due = True  # (busy: a frame more to send it)
+                continue
+            message = {"type": "hover"}
+            if shown is not None:
+                if shown[3] is None:
+                    data = io.BytesIO()
+                    pg.image.save(shown[0], data, "panel.png")
+                    shown[3] = base64.b64encode(data.getvalue()).decode("ascii")
+                message.update(rect=list(shown[1]), png=shown[3])
+            self._send(message, to=member.id)
+            member.hover, member.hover_at = key, now
 
     # --- in the game: the chat (chat.py) ---------------------------------------------
 

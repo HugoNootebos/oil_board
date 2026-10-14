@@ -8,8 +8,14 @@ there when one of its players decides (online.HostSession.remote_clickers).
 Esc (or a controller's Back button) opens a small menu of this device's
 own: back to the game, fullscreen or windowed, leave the game. The chat
 (chat.py) is this device's own too: drawn over the host's picture, its
-clicks and keys stay here; only a message sent goes to the host.
+clicks and keys stay here; only a message sent goes to the host. And so is
+the info panel of the country under this device's pointer, which the host
+makes for it (online.HostSession.show_hovers) and it draws over the picture.
 """
+
+import base64
+import binascii
+import io
 
 import pygame as pg
 
@@ -62,6 +68,9 @@ class Viewer:
         self._bind_sent = None
         self._drawn = None
         self._swallowed = set()  # mouse buttons pressed on the chat: not sent as held
+        self.hover = None        # (image, logical rect): the country info panel for this device's pointer
+        self.hover_version = 0
+        self._hover_scaled = None
         self.chat = chat.Chat(lambda text: self.conn.send({"type": "chat", "text": text}), me)
         self._layout()
 
@@ -72,6 +81,7 @@ class Viewer:
         w, h = round(WIDTH * self.scale), round(HEIGHT * self.scale)
         self.area = pg.Rect((sw - w) // 2, (sh - h) // 2, w, h)
         self.scaled = None
+        self._hover_scaled = None
         self._drawn = None
 
     def _logical(self, pos):
@@ -192,6 +202,8 @@ class Viewer:
                     sounds.play(name)
             elif kind == "chat":
                 self.chat.add(message.get("lines"), old=bool(message.get("old")))
+            elif kind == "hover":
+                self._hover(message)
             elif kind == "seats" and isinstance(message.get("seats"), list):
                 self.seats = message["seats"]
             elif kind == "end":
@@ -202,6 +214,23 @@ class Viewer:
                 return "kicked"
         return "lost" if self.conn.closed else None
 
+    def _hover(self, message):
+        """The info panel of the country this device's pointer is over, as
+        the host made it (no rect: none)."""
+        self.hover = self._hover_scaled = None
+        self.hover_version += 1
+        rect, data = message.get("rect"), message.get("png")
+        if not (isinstance(rect, list) and len(rect) == 4 and isinstance(data, str)
+                and all(isinstance(v, int) and not isinstance(v, bool) for v in rect)):
+            return
+        rect = pg.Rect(rect)
+        try:
+            image = pg.image.load(io.BytesIO(base64.b64decode(data)), "panel.png")
+        except (ValueError, binascii.Error, pg.error):
+            return
+        if image.get_size() == rect.size and pg.Rect(0, 0, WIDTH, HEIGHT).contains(rect):
+            self.hover = (image, rect)
+
     def _leave(self):
         self.conn.send({"type": "leave"})
         self.conn.close()
@@ -211,8 +240,9 @@ class Viewer:
     def _draw(self, mouse):
         hint = pg.time.get_ticks() < self.hint_until
         pads = [(pad.number, pad.pos) for pad in self.pads.pads]
+        on_chat = self.chat.covers(mouse)  # reading the chat: no country info
         key = (self.seq, self.window.get_size(), str(self.cursors), pads, self.menu_open,
-               mouse if self.menu_open else None, hint, self.chat.key(mouse))
+               mouse if self.menu_open else None, hint, self.chat.key(mouse), self.hover_version, on_chat)
         if key == self._drawn:
             return  # nothing new to show
         self._drawn = key
@@ -221,6 +251,12 @@ class Viewer:
             self.scaled = pg.transform.smoothscale(self.frame, area.size)
         window.fill((0, 0, 0))
         window.blit(self.scaled, area.topleft)
+        if self.hover is not None and not on_chat:
+            image, rect = self.hover
+            if self._hover_scaled is None:
+                self._hover_scaled = pg.transform.smoothscale(
+                    image, (max(1, round(rect.w * scale)), max(1, round(rect.h * scale))))
+            window.blit(self._hover_scaled, (area.x + round(rect.x * scale), area.y + round(rect.y * scale)))
         self.chat.draw(window, scale, area.topleft, mouse)
         own = {}  # this device's controllers: how the host says they look
         for x, y, r, g, b, faded, member, number in self.cursors:

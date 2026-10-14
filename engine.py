@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import pygame as pg
 import sounds
 import controls
+import chat as online_chat
 from fonts import game_font
 from lang import t, Msg, Join
 import numpy as np
@@ -464,7 +465,10 @@ class Engine:
             # What the devices that joined see: before any cursor (they draw
             # everyone's cursors themselves).
             self.online.capture(view.window, self._logical_clip())
-            # Then this computer's own chat (online only), which they don't see.
+            # Then what's each device's own, which they don't see from here:
+            # the info panel of the country this computer's pointer is over
+            # (theirs get theirs) and this computer's chat.
+            self.online.show_hovers(view.window, view.scale, (view.ox, view.oy))
             self.online.draw_chat(view.window, view.scale, (view.ox, view.oy))
         if self.controls is not None and self.controls.pads:
             self.controls.draw(view.window, view.scale, (view.ox, view.oy), self._pad_looks())
@@ -638,23 +642,10 @@ class Engine:
 
         self._handle_action_box()
         self.gui.draw_overlay(self.view)
-        if self.io.hover_country is not None:
-            hovered = self.countries[self.io.hover_country]
-            owner_stats = None
-            owner = hovered.owner
-            # What the owner holds, only when it's another real player.
-            if owner is not self.default_player and owner is not self.players[self.turn]:
-                amounts = {r: getattr(owner, r) for r in ("food", "wood", "steel", "oil", "nuclear")}
-                amounts["helmets"] = self.production(owner)["helmets"]
-                amounts["cards"] = len(owner.cards)
-                owner_stats = (owner, amounts, self.mini_images)
-            self.gui.draw_country_stats(
-                view=self.view,
-                country=hovered,
-                font=self.font,
-                images=self.hud_images,
-                owner_stats=owner_stats,
-            )
+        if self.io.hover_country is not None and self.online is None:
+            # (Online every device shows the country its own pointer is
+            # over: online.HostSession.show_hovers.)
+            self._draw_country_info(self.io.hover_country)
         player = self.players[self.turn]
         self.gui.draw_player_stats(self.view, player, self.font, self.hud_images, self.production(player))
         self.gui.draw_attack_phase(
@@ -696,6 +687,54 @@ class Engine:
             self._draw_event_info()
         elif self.pairing_open:
             self._draw_pairing()
+
+    def _draw_country_info(self, name):
+        """The info panel (top right) of the country called `name`, on view.screen."""
+        hovered = self.countries[name]
+        owner_stats = None
+        owner = hovered.owner
+        # What the owner holds, only when it's another real player.
+        if owner is not self.default_player and owner is not self.players[self.turn]:
+            amounts = {r: getattr(owner, r) for r in ("food", "wood", "steel", "oil", "nuclear")}
+            amounts["helmets"] = self.production(owner)["helmets"]
+            amounts["cards"] = len(owner.cards)
+            owner_stats = (owner, amounts, self.mini_images)
+        self.gui.draw_country_stats(
+            view=self.view,
+            country=hovered,
+            font=self.font,
+            images=self.hud_images,
+            owner_stats=owner_stats,
+        )
+
+    def country_panel(self, name):
+        """The info panel of the country called `name` on its own (online,
+        for a device's pointer): (image, its rect in the logical 960x640)."""
+        view = self.view
+        layer = getattr(self, "_panel_layer", None)
+        if layer is None or layer.get_size() != (view.WIDTH, view.HEIGHT):
+            layer = self._panel_layer = pg.Surface((view.WIDTH, view.HEIGHT), pg.SRCALPHA)
+        layer.fill((0, 0, 0, 0))
+        screen, view.screen = view.screen, layer
+        try:
+            self._draw_country_info(name)
+        finally:
+            view.screen = screen
+        rect = layer.get_bounding_rect()
+        return layer.subsurface(rect).copy(), rect
+
+    def device_country_at(self, position, chat=None):
+        """The country a device's pointer at `position` (logical) is over,
+        for that device's info panel: None through the buttons on screen,
+        the chat (its button is every device's; `chat` the host's own, panel
+        and all), the shop menu or a dialog."""
+        current = self.players[self.turn]
+        if self.modal_open or (current.attack == 3 and current.subattack < 8):
+            return None
+        point = (int(position[0]), int(position[1]))
+        if online_chat.BUTTON.collidepoint(point) or (chat is not None and chat.covers(point)):
+            return None
+        return self.io.country_at(self.view, self.countries.values(), Position(*point), self.io.buttons)
 
     BUTTON_STEP = 68  # top-left row: settings, shop, cards, event cards (60 wide + 8 gap)
 
