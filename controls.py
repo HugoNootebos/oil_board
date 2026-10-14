@@ -273,9 +273,10 @@ class Controls:
         `mouse_ok` (not while a joined device's player decides)."""
         online = getattr(engine, "online", None)
         self.mouse_ok = True
-        if engine.pairing_open:
-            # The Controllers panel: this computer's mouse and controllers
-            # click, no joined device does.
+        if engine.pairing_open and online is None:
+            # The Controllers panel: every controller clicks. (Online it's
+            # this computer's own menu, which takes its pointers out of the
+            # game below.)
             self.clickers = list(self.pads)
         else:
             acting = engine.turn_manager.acting_player()

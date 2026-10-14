@@ -3,8 +3,9 @@ Online play's plumbing: connections to a relay, finding relays, and this
 device's own id. Standard library only (no pygame).
 
 How an online game works: the host's computer plays the game as always
-(online.HostSession), and the devices that joined it show a picture of its
-screen and send their mouse and controllers back (viewer.py). They don't
+(online.HostSession), and the devices that joined it draw a copy of it
+from the state it sends them, with the game's layer (dice, popups...) it
+draws on top, and send their mouse and controllers back (viewer.py). They don't
 talk to each other directly but through a relay (relay.py), which every
 one of them connects out to, so nobody but the relay's computer needs a
 port open. There are two kinds of relay:
@@ -37,7 +38,7 @@ import uuid
 from relay import (BEACON_EVERY, BEACON_PORT, BINARY, HEADER, JSON, MAX_MESSAGE, MEMBER, PORT,
                    RELAY_PROTOCOL, SILENT_LIMIT, pack, pack_json)
 
-PROTOCOL = 4  # host <-> devices (online.py, viewer.py, chat.py); 2: the chat, 3: hover panels, 4: own menus
+PROTOCOL = 5  # host <-> devices (online.py, viewer.py, chat.py); 2: the chat, 3: hover panels, 4: own menus, 5: devices draw the map
 
 # The main relay's address ("name:port"), once the home relay is set up
 # (packaging/relay/README.md). OIL_SERVER or "online_server" in

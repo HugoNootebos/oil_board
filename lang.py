@@ -199,6 +199,7 @@ NL = {
     "Fullscreen": "Volledig scherm",
     "Windowed": "In een venster",
     "Leave game": "Spel verlaten",
+    "Waiting for the game...": "Wachten op het spel...",
     "The host": "De host",
     "Spectator": "Toeschouwer",
     "No messages yet": "Nog geen berichten",

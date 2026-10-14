@@ -1,9 +1,11 @@
 """
 Automated checks for online play (net.py, relay.py, online.py, viewer.py,
-lobby.py, chat.py): the relay's routing, finding relays, the screen stream,
-the lobby's seats, who may click in the game, the chat, each device's
-country info panel, and a whole hosted game with a device joining it
-through a real (local) relay. PASS/FAIL per check.
+lobby.py, chat.py): the relay's routing, finding relays, the stream of the
+game's layer, the lobby's seats, who may click in the game, the game's
+state on a device's own copy of the game (its own view, cursors), the
+chat, each device's country info panel and own menus, and a whole hosted
+game with a device joining it through a real (local) relay. PASS/FAIL per
+check.
 
     python3 online_checks.py [name filter]
 
@@ -23,11 +25,11 @@ import traceback
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ["OIL_SAVES_DIR"] = tempfile.mkdtemp(prefix="oil_online_checks_")
 
-import numpy as np  # noqa: E402
 import pygame as pg  # noqa: E402
 
 import chat  # noqa: E402
 import controls  # noqa: E402
+import lang  # noqa: E402
 import lobby  # noqa: E402
 import models  # noqa: E402
 import net  # noqa: E402
@@ -194,19 +196,20 @@ def test_discovery():
     main.stop(0)
 
 
-# --- the screen stream ------------------------------------------------------------
+# --- the stream of the game's layer ---------------------------------------------------
 
-def _scene(surface, shift=0):
-    surface.fill((0, 150, 235))
-    for i in range(12):
-        pg.draw.polygon(surface, (40 + i * 15, 155, 60), [(i * 80 + shift, 80), (i * 80 + 120, 300), (i * 80 + 30, 600)])
-    pg.draw.rect(surface, (250, 225, 130), (300, 200, 360, 200))
+def _layer():
+    """A game's layer: see-through, with a HUD panel and a half-dark dim."""
+    layer = pg.Surface(online.OVERLAY_SIZE, pg.SRCALPHA)
+    pg.draw.rect(layer, (200, 200, 200, 255), (810, 256, 150, 384))
+    pg.draw.rect(layer, (0, 0, 0, 140), (0, 0, 300, 200))
+    pg.draw.circle(layer, (250, 225, 130, 255), (480, 320), 50)
+    return layer
 
 
-def _error(a, b):
-    pa = np.frombuffer(pg.image.tobytes(a, "RGB"), np.uint8).astype(int)
-    pb = np.frombuffer(pg.image.tobytes(b, "RGB"), np.uint8).astype(int)
-    return float(np.abs(pa - pb).mean())
+def _same(a, b):
+    """Whether two layers are the same, pixel for pixel, alpha and all."""
+    return pg.image.tobytes(a, "RGBA") == pg.image.tobytes(b, "RGBA")
 
 
 def _area(update):
@@ -216,64 +219,48 @@ def _area(update):
 
 
 def test_stream():
-    window = pg.Surface((960, 640))
-    _scene(window)
-    stream = online.FrameStream()
-    check("the first capture is a change", stream.capture(window, now=1000) and stream.seq == 1)
-    device = pg.Surface(online.STREAM_SIZE)
-    update, half = stream.update_since(-1)
-    check("a device's first update is the whole picture, sharp",
-          _area(update)[0] == online.STREAM_SIZE[0] * online.STREAM_SIZE[1] and not half)
-    check("it says its frame number", online.apply_update(device, update) == 1)
-    error = _error(device, stream.frame)
-    check("the device's picture is the host's (JPEG close)", error < 3, error)
-    check("the same update is made once and shared", stream.update_since(-1)[0] is update)
+    layer = _layer()
+    stream = online.OverlayStream()
+    check("the first capture is a change", stream.capture(layer, now=1000) and stream.seq == 1)
+    device = pg.Surface(online.OVERLAY_SIZE, pg.SRCALPHA)
+    device.fill((9, 9, 9, 9))
+    update = stream.update_since(-1)
+    check("a device's first update is the whole layer",
+          _area(update)[0] == online.OVERLAY_SIZE[0] * online.OVERLAY_SIZE[1])
+    check("it says its capture number", online.apply_update(device, update) == 1)
+    check("the device's layer is the host's exactly, see-through where the map shows",
+          _same(device, stream.frame) and device.get_at((600, 100))[3] == 0 and device.get_at((100, 100))[3] == 140)
+    check("the same update is made once and shared", stream.update_since(-1) is update)
+    check("mostly see-through, it's small", len(update) < 40000, len(update))
 
-    pg.draw.rect(window, (255, 0, 0), (100, 100, 20, 20))
-    check("too soon after the last capture: owed", not stream.capture(window, now=1020) and stream.pending)
-    check("then taken", stream.capture(window, now=1060) and stream.seq == 2 and not stream.pending)
-    area, rects = _area(stream.update_since(1)[0])
+    pg.draw.rect(layer, (255, 0, 0, 255), (100, 100, 20, 20))
+    check("too soon after the last capture: owed", not stream.capture(layer, now=1020) and stream.pending)
+    check("then taken", stream.capture(layer, now=1060) and stream.seq == 2 and not stream.pending)
+    area, rects = _area(stream.update_since(1))
     check("a small change sends only its tiles", area <= 4 * online.TILE ** 2 and rects <= 2, (area, rects))
-    check("nothing new: nothing sent", stream.update_since(2) == (None, False))
-    check("an unchanged picture is no new frame", not stream.capture(window, now=1200) and stream.seq == 2)
+    check("nothing new: nothing sent", stream.update_since(2) is None)
+    check("an unchanged layer is no new capture", not stream.capture(layer, now=1200) and stream.seq == 2)
 
-    pg.draw.rect(window, (0, 255, 0), (800, 500, 30, 30))
-    stream.capture(window, now=1300)
-    area_last, _ = _area(stream.update_since(2)[0])
-    area_both, rects_both = _area(stream.update_since(1)[0])
-    check("a device behind gets everything since its frame in one update",
+    layer.fill((0, 0, 0, 0), (440, 280, 80, 80))  # (something closed: see-through again)
+    pg.draw.rect(layer, (0, 255, 0, 255), (800, 500, 30, 30))
+    stream.capture(layer, now=1300)
+    area_last, _ = _area(stream.update_since(2))
+    area_both, rects_both = _area(stream.update_since(1))
+    check("a device behind gets everything since its capture in one update",
           area_both > area_last and rects_both >= 2, (area_both, area_last))
-    online.apply_update(device, stream.update_since(1)[0])
-    check("and then has the host's picture", _error(device, stream.frame) < 3)
+    online.apply_update(device, stream.update_since(1))
+    check("and then has the host's layer (what went see-through too)", _same(device, stream.frame))
 
     for x in range(0, 960, 128):
         for y in range(0, 640, 128):
-            pg.draw.rect(window, (x % 255, y % 255, 90), (x, y, 10, 10))
-    stream.capture(window, now=1400)
-    check("many scattered pieces go as one box", _area(stream.update_since(stream.seq - 1)[0])[1] == 1)
-
-    _scene(window, shift=37)  # the map moved: nearly everything changed
-    stream.capture(window, now=1500)
-    update, half = stream.update_since(stream.seq - 1)
-    online.apply_update(device, update)
-    check("a big change (the map moving) goes at half size", half and len(update) < 60000, len(update))
-    error = _error(device, stream.frame)
-    check("which the device shows, a bit soft", 1 < error < 12, error)
-    update, half = stream.update_since(-1)
-    online.apply_update(device, update)
-    check("and sharp again from frame -1", not half and _error(device, stream.frame) < 3)
+            pg.draw.rect(layer, (x % 255, y % 255, 90, 255), (x, y, 10, 10))
+    stream.capture(layer, now=1400)
+    check("many scattered pieces go as one box", _area(stream.update_since(stream.seq - 1))[1] == 1)
     try:
         online.apply_update(device, b"\x00\x00\x00\x05junk!")
         check("garbage is no update", False)
     except ValueError:
         check("garbage is no update", True)
-
-    big = pg.Surface((1600, 1000))
-    _scene(big)
-    other = online.FrameStream()
-    other.capture(big, rect=(10, 20, 1500, 1000), now=0)
-    check("any size of window is scaled to the stream's",
-          other.frame.get_size() == online.STREAM_SIZE)
 
 
 # --- the lobby's seats -----------------------------------------------------------
@@ -394,35 +381,35 @@ def test_clicks():
     _frame(app)
     check("a joined player decides: their device clicks, the host's mouse doesn't",
           not pads.mouse_ok and mouse in pads.clickers and app.io.source is mouse)
-    def own():
-        return s.devices[1].fields
-    mouse.feed({"x": 50, "y": 50, "held": [controls.A], "down": [controls.A]}, pg.time.get_ticks())
+    s._input(s.members[1], {"type": "mouse", "x": 50, "y": 50, "held": [], "down": [], "menu": True})
     _frame(app)
-    check("their click on settings opens their own settings, not the host's",
-          own()["settings_open"] and not app.settings_open)
-    _frame(app)
-    check("while it's open their clicks are its, not the game's", mouse not in pads.clickers)
-    for x, y in ((300, 165), (600, 165), (220, 227)):  # Exit Game, Save As, the first toggle
-        mouse.feed({"x": x, "y": y, "held": [], "down": []}, pg.time.get_ticks())
-        _frame(app)
-        mouse.feed({"x": x, "y": y, "held": [controls.A], "down": [controls.A]}, pg.time.get_ticks())
-        _frame(app)
-        mouse.feed({"x": x, "y": y, "held": [], "down": []}, pg.time.get_ticks())
-        _frame(app)
-    check("a joined device can't exit, save or change the settings",
-          not app.pending_quit and not own()["save_as_open"] and not app.settings["assets"] and own()["settings_open"])
-    mouse.feed({"x": 5, "y": 630, "held": [], "down": [controls.A]}, pg.time.get_ticks())
-    _frame(app)
-    check("a click and release within one frame still clicks (closing the menu)", not own()["settings_open"])
-    _frame(app)
-    mouse.feed({"x": 50, "y": 50, "held": [], "down": [controls.A, controls.A]}, pg.time.get_ticks())
-    _frame(app)
-    opened = own()["settings_open"]
-    _frame(app)
-    _frame(app)
-    check("two clicks arriving together are two clicks (opened, then closed)", opened and not own()["settings_open"])
+    check("while their device has a menu of its own open, its clicks are that menu's, not the game's",
+          mouse not in pads.clickers and not pads.mouse_ok)
+    s._input(s.members[1], {"type": "mouse", "x": 50, "y": 50, "held": [], "down": [], "menu": False})
     _frame(app)
     check("and then the game gets their clicks again", mouse in pads.clickers)
+    mouse.feed({"x": 50, "y": 50, "held": [controls.A], "down": [controls.A]}, pg.time.get_ticks())
+    _frame(app)
+    check("their click on the settings button opens nothing here (their settings are their own)",
+          not app.settings_open and not s.devices[0].look)
+    mouse.next_frame()
+    mouse.feed({"x": 5, "y": 630, "held": [], "down": [controls.A]}, pg.time.get_ticks())
+    mouse.next_frame()
+    check("a click and release within one frame still clicks", mouse.pressed[0] and mouse.fresh[0])
+    mouse.next_frame()
+    mouse.feed({"x": 5, "y": 630, "held": [], "down": [controls.A, controls.A]}, pg.time.get_ticks())
+    taps = []
+    for _ in range(3):
+        mouse.next_frame()
+        taps.append(mouse.tapped(controls.A))
+    check("two clicks arriving together are two clicks (a frame up in between)", taps == [True, False, True], taps)
+    s._input(s.members[1], {"type": "mouse", "x": 5, "y": 630, "view": [2.5, -100, -50.5]})
+    check("its device's view comes with its input (it points at the map through it)",
+          mouse.view.zoom == 2.5 and (mouse.view.offset.x, mouse.view.offset.y) == (-100, -50.5))
+    s._input(s.members[1], {"type": "mouse", "x": 5, "y": 630, "view": [99, "x", None]})
+    check("(a broken one is left out)", mouse.view.zoom == 2.5)
+    s._input(s.members[1], {"type": "mouse", "x": 5, "y": 630, "view": [99, 0, 0]})
+    check("(a zoom past the limits is kept within them)", mouse.view.zoom == models.View.MAX_ZOOM)
 
     app.turn = 2
     _frame(app)
@@ -582,9 +569,9 @@ def test_chat():
     view = app.view
     check("online the host has the chat button (under the settings button)",
           tuple(pg.display.get_surface().get_at(_window_pos(view, *spot)))[:3] == chat.COLOR)
-    scale = online.STREAM_SIZE[0] / controls.WIDTH
-    streamed = tuple(s.stream.frame.get_at((int(spot[0] * scale), int(spot[1] * scale))))[:3]
-    check("but the devices don't see it in the picture (they have their own)", streamed != chat.COLOR, streamed)
+    streamed = tuple(s.stream.frame.get_at(spot))
+    check("but it's not in the game's layer the devices get (they have their own)",
+          streamed[:3] != chat.COLOR, streamed)
 
     def to_logical(pos):
         return (pos[0] - view.ox) / view.scale, (pos[1] - view.oy) / view.scale
@@ -649,63 +636,307 @@ def test_chat():
     v._draw((500, 300))
 
 
-def _spots(app, count):
-    """`count` countries in view, each with a point (logical) that is on it."""
-    view, found = app.view, []
-    for country in app.countries.values():
+# --- a device's own copy of the game, linked to a host in this process ---------------
+
+class Wire:
+    """The relay between a host session (its `conn`) and the devices, in
+    this process: what the host sends goes to the devices it's for."""
+
+    def __init__(self):
+        self.closed = False
+        self.wake = None
+        self.inboxes = {}   # member -> messages for it
+        self.incoming = []  # from the devices, for the host
+        self.sent = []      # everything the host sent: (to, message)
+
+    def send(self, message):
+        message = dict(message)
+        to = message.pop("to", 0)
+        self.sent.append((to, message))
+        for member, inbox in self.inboxes.items():
+            if to in (0, member):
+                inbox.append(message)
+
+    def send_binary(self, data, to=0):
+        self.sent.append((to, data))
+        for member, inbox in self.inboxes.items():
+            if to in (0, member):
+                inbox.append(data)
+
+    def poll(self):
+        incoming, self.incoming = self.incoming, []
+        return incoming
+
+    def close(self):
+        self.closed = True
+
+
+class DeviceConn:
+    """A device's end of a Wire."""
+
+    def __init__(self, wire, member):
+        self.wire, self.member = wire, member
+        self.sent = []
+        self.closed = False
+        self.wake = None
+        wire.inboxes[member] = []
+
+    def send(self, message):
+        self.sent.append(message)
+        self.wire.incoming.append(dict(message, **{"from": self.member}))
+
+    def poll(self):
+        incoming, self.wire.inboxes[self.member] = self.wire.inboxes[self.member], []
+        return incoming
+
+    def close(self):
+        self.closed = True
+
+
+def _linked(turn=1, watcher=False):
+    """A host's game (A here, B and C on device 1; device 2 only watches)
+    and device 1's viewer (its copy of the game made from what came in)."""
+    app = _game()
+    app.turn = turn
+    seats = [online.Seat("A", kind="host"), online.Seat("B"), online.Seat("C")]
+    s = _session(seats)
+    wire = s.conn = Wire()
+    numbers = (1, 2) if watcher else (1,)
+    for number in numbers:
+        s._member_joined({"member": number, "device": "dev{}".format(number)})
+    for i in (1, 2):
+        s._seat_request(s.members[1], "take", {"seat": i})
+    s.start_game(app)
+    v = viewer.Viewer(DeviceConn(wire, 1), 1, [seat.to_json() for seat in seats])
+    others = [DeviceConn(wire, number) for number in numbers[1:]]
+    # (The device's copy opens a window: the host draws off screen.)
+    app.view.window = pg.Surface(app.view.window.get_size())
+    for number in numbers:
+        wire.incoming.append({"type": "ready", "from": number})
+    for _ in range(3):
+        _both(app, v)
+    return app, s, v, wire, others
+
+
+_device_mouse = [((0, 0), (False, False, False))]  # the device's mouse (window px, buttons), see _Mouse
+
+
+def _both(app, v, events=()):
+    """A frame on the host, then one on the device (nothing held back by
+    the host's timing). One process, one pg.mouse: the host's mouse is out
+    of the window, the device's where _Mouse put it."""
+    s = app.online
+    s._state_at, s._cursors_at, s.stream._captured_at = -10 ** 9, -10 ** 9, None
+    for device in s.devices.values():
+        device.sent_at = -10 ** 9
+    saved = pg.mouse.get_pos, pg.mouse.get_pressed, pg.mouse.get_focused
+    try:
+        pg.mouse.get_pos, pg.mouse.get_focused = (lambda: (0, 0)), (lambda: False)
+        pg.mouse.get_pressed = lambda num_buttons=3: (False, False, False)
+        _frame(app)
+        at, held = _device_mouse[0]
+        pg.mouse.get_pos, pg.mouse.get_pressed = (lambda: at), (lambda num_buttons=3: held)
+        v.frames_left = max(v.frames_left, 1)
+        return v.frame(list(events))
+    finally:
+        pg.mouse.get_pos, pg.mouse.get_pressed, pg.mouse.get_focused = saved
+
+
+def _device_pos(v, x, y):
+    """Logical (x, y) in the device's window."""
+    return round(v.area.x + x * v.scale), round(v.area.y + y * v.scale)
+
+
+class _Mouse:
+    """The device's mouse at a logical point (in its window) for the frames
+    in it (_both), its left button held or not (or `held`: all three)."""
+
+    def __init__(self, v, x, y, held=False):
+        self.state = (_device_pos(v, x, y), held if isinstance(held, tuple) else (held, False, False))
+
+    def __enter__(self):
+        self.saved, _device_mouse[0] = _device_mouse[0], self.state
+
+    def __exit__(self, *exc):
+        _device_mouse[0] = self.saved
+
+
+def _device_click(app, v, x, y):
+    """The device's mouse clicks at (x, y) (logical), the host's game taking
+    whatever is sent."""
+    at = _device_pos(v, x, y)
+    with _Mouse(v, x, y):
+        _both(app, v, [_event(pg.MOUSEMOTION, pos=at, rel=(1, 1), buttons=(0, 0, 0))])
+    with _Mouse(v, x, y, held=True):
+        _both(app, v, [_event(pg.MOUSEBUTTONDOWN, button=1, pos=at)])
+        _both(app, v)
+    with _Mouse(v, x, y):
+        _both(app, v, [_event(pg.MOUSEBUTTONUP, button=1, pos=at)])
+        _both(app, v)
+
+
+def _spots(game, view, count, overlay=None):
+    """`count` countries in view, each with a point (logical) that is on it
+    (and not under the game's layer)."""
+    found = []
+    for country in game.countries.values():
         x = (country.mass_center.x + view.offset.x) * view.zoom + 0.5 * view.WIDTH
         y = (country.mass_center.y + view.offset.y) * view.zoom + 0.5 * view.HEIGHT
-        if 250 < x < 650 and 150 < y < 450 and app.device_country_at((x, y)) == country.name:
-            found.append((country.name, (x, y)))
+        if not (250 < x < 650 and 150 < y < 450):
+            continue
+        if overlay is not None and overlay.get_at((int(x), int(y)))[3]:
+            continue
+        if game.io.country_at(view, game.countries.values(), Position(int(x), int(y)), []) == country.name:
+            found.append((country.name, (int(x), int(y))))
     return found[:count]
 
 
+def test_state():
+    app, s, v, wire, _ = _linked()
+    game = v.game
+    check("the device makes its copy of the game from the host's state",
+          game is not None and [p.name for p in game.players] == ["A", "B", "C"] and game.mirror is v)
+    fulls = [to for to, m in wire.sent if isinstance(m, dict) and m.get("type") == "state" and m.get("full")]
+    check("(all of it once, to that device)", fulls == [1], fulls)
+    check("the same board: owners, troops, resources", all(
+        game.countries[n].owner.name == c.owner.name and game.countries[n].units == c.units
+        and game.countries[n].food == c.food for n, c in app.countries.items()))
+    check("whose turn it is, the players' stock", game.turn == app.turn
+          and [(p.food, p.wood, p.attack) for p in game.players] == [(p.food, p.wood, p.attack) for p in app.players])
+
+    name = next(n for n, c in app.countries.items() if c.owner is app.default_player)
+    del wire.sent[:]
+    app.countries[name].owner, app.countries[name].units = app.players[2], 33
+    _both(app, v)
+    changes = [m for _, m in wire.sent if isinstance(m, dict) and m.get("type") == "state"]
+    check("a change arrives", game.countries[name].owner is game.players[2] and game.countries[name].units == 33)
+    check("only what changed is sent", len(changes) == 1 and list(changes[0]["countries"]) == [name]
+          and not changes[0]["set"], changes)
+    del wire.sent[:]
+    _both(app, v)
+    check("nothing changed: nothing sent", not [m for _, m in wire.sent if isinstance(m, dict)
+                                                and m.get("type") == "state"])
+
+    mine = next(n for n, c in app.countries.items() if c.owner is app.players[1])
+    app.players[1].attack, app.players[1].subattack = 1, 1
+    app.turn_manager.phases[1].attack_from = mine
+    _both(app, v)
+    _both(app, v)
+    check("the countries the player picked are highlighted on the device too",
+          game.countries[mine].shade == 1 and game.players[1].attack == 1 and game.players[1].subattack == 1)
+    app.turn_manager.phases[1].attack_from = None
+    app.players[1].attack, app.players[1].subattack = 0, 0
+    _both(app, v)
+    check("(and not once it's dropped)", game.countries[mine].shade == 0)
+
+    app.log_action(app.players[1], lang.Msg("'s {} was destroyed in {}", "ship", name))
+    _both(app, v)
+    check("the action log comes along (to be translated on the device)",
+          len(game.action_log) == len(app.action_log) and isinstance(game.action_log[-1][1][0], lang.Msg))
+    del wire.sent[:]
+    app.log_action("one more")
+    _both(app, v)
+    logs = [m for _, m in wire.sent if isinstance(m, dict) and m.get("type") == "log"]
+    check("a new line goes on its own", len(logs) == 1 and len(logs[0]["lines"]) == 1 and not logs[0].get("reset")
+          and str(game.action_log[-1][0][0]) == "one more")
+    app.action_log = [[["a loaded game's", (255, 255, 255)]]]
+    _both(app, v)
+    check("a log that was replaced (a game loaded) is sent anew",
+          [str(line[0][0]) for line in game.action_log] == ["a loaded game's"])
+
+    saved = lang.language
+    try:
+        lang.language = "nl" if saved == "en" else "en"
+        _both(app, v)
+        check("the device shows the game in the host's language",
+              v.state["online"]["lang"] == lang.language)
+    finally:
+        lang.language = saved
+
+    view = game.view
+    host_view = (app.view.zoom, app.view.offset.x, app.view.offset.y)
+    view.zoom_at(Position(480, 320), 1.8)
+    view.offset = view.offset + Position(60, -20)
+    _both(app, v)
+    _both(app, v)
+    member = s.members[1]
+    check("the device pans and zooms its own map; the host's stays", host_view ==
+          (app.view.zoom, app.view.offset.x, app.view.offset.y) and abs(member.view.zoom - view.zoom) < 1e-3
+          and abs(member.view.offset.x - view.offset.x) < 0.01)
+
+    (target, at), = _spots(game, view, 1, v.overlay)
+    host_there = app.io.country_at(app.view, app.countries.values(), Position(*at), [])
+    with _Mouse(v, *at):
+        _both(app, v, [_event(pg.MOUSEMOTION, pos=_device_pos(v, *at), rel=(1, 1), buttons=(0, 0, 0))])
+        _both(app, v)
+    check("its turn: the host's game points at what the device's pointer is over in its own view",
+          app.io.source is member.pointers["m"] and app.io.hover_country == target and host_there != target,
+          (app.io.hover_country, target, host_there))
+    with _Mouse(v, at[0] + 40, at[1], held=(False, False, True)):
+        _both(app, v, [_event(pg.MOUSEBUTTONDOWN, button=3, pos=_device_pos(v, at[0] + 40, at[1]))])
+        _both(app, v)
+    check("its right button held (dragging its own map) doesn't move the host's",
+          host_view == (app.view.zoom, app.view.offset.x, app.view.offset.y))
+    with _Mouse(v, at[0] + 40, at[1]):
+        _both(app, v, [_event(pg.MOUSEBUTTONUP, button=3, pos=_device_pos(v, at[0] + 40, at[1]))])
+
+    entry = [100, 200, 0, 0, 0, False, 0, "m"] + online.map_spot(app.view, 100, 200)
+    x, y = online.cursor_spot(entry, view, pg.Surface((960, 640), pg.SRCALPHA))
+    check("a cursor over the map is drawn at the same map point on every device",
+          [round(c) for c in online.map_spot(view, x, y)] == [round(c) for c in entry[8:]], (x, y))
+    cover = pg.Surface((960, 640), pg.SRCALPHA)
+    cover.fill((0, 0, 0, 140), (50, 150, 100, 100))
+    check("over the game's layer (a popup) at the same place on the screen",
+          online.cursor_spot(entry, view, cover) == (100, 200))
+    _both(app, v)
+    check("the cursors come with their map point", v.cursors and all(len(c) == 10 for c in v.cursors), v.cursors)
+    s.close()
+
+
 def test_hover():
+    app, s, v, wire, _ = _linked(turn=1)
+    game = v.game
+    game.view.zoom_at(Position(480, 320), 1.5)
+    for _ in range(2):
+        _both(app, v)
+    (name, at), = _spots(game, game.view, 1, v.overlay)
+
+    def hovered(x, y):
+        with _Mouse(v, x, y):
+            _both(app, v, [_event(pg.MOUSEMOTION, pos=_device_pos(v, x, y), rel=(1, 1), buttons=(0, 0, 0))])
+            _both(app, v)
+        return v._hovered()
+
+    check("the device shows the panel of the country its own pointer is over, in its own view",
+          hovered(*at) == name)
+    image, rect = game.country_panel(name)
+    corner = next((rect.x + x, rect.y + y) for y in range(2, rect.h - 2) for x in range(2, rect.w - 2)
+                  if all(tuple(image.get_at((x + dx, y + dy)))[:3] == game.gui.gray1
+                         for dx in range(-2, 3) for dy in range(-2, 3)))  # plain background
+    on_screen = tuple(pg.display.get_surface().get_at(_device_pos(v, *corner)))[:3]
+    check("drawn on its screen", max(abs(a - b) for a, b in zip(on_screen, game.gui.gray1)) < 12, on_screen)
+    check("the host sends no panels (nor draws them in its layer)",
+          not [m for _, m in wire.sent if isinstance(m, dict) and m.get("type") == "hover"]
+          and s.stream.frame.get_at(corner)[3] == 0)
+    check("not through the game's layer (the HUD)", hovered(900, 600) is None)
+    check("not through the chat button (its own)", hovered(chat.BUTTON.centerx, chat.BUTTON.centery) is None)
+    app.turn_manager.toggle_shop()
+    check("not while its player's shop is open", hovered(*at) is None and v.private is not None)
+    app.turn_manager.toggle_shop()
+    check("(and again once it's closed)", hovered(*at) == name and v.private is None)
+    s.close()
+
     app = _game()
     seats = [online.Seat("A", kind="host"), online.Seat("B"), online.Seat("C")]
     s = _session(seats)
-    sent = []
-    s._send = lambda message, to=0: sent.append((to, message))
     s._member_joined({"member": 1, "device": "dev"})
-    s._member_joined({"member": 2, "device": "watcher"})
-    for i in (1, 2):
-        s._seat_request(s.members[1], "take", {"seat": i})
-    s.members[1].viewing = s.members[2].viewing = True
+    s.members[1].viewing = True
     s.start_game(app)
-    app.turn = 1
-    _frame(app)
-    (x_name, x_at), (y_name, y_at), (z_name, z_at) = _spots(app, 3)
-    one, watcher = s.members[1], s.members[2]
-    now = pg.time.get_ticks()
-    one.pointers["m"].feed({"x": x_at[0], "y": x_at[1], "held": [], "down": []}, now)
-    s._input(one, {"type": "pad", "n": 4, "x": y_at[0], "y": y_at[1], "held": []})
-    s._pads(one, {"4": "C"})
-    watcher.pointers["m"].feed({"x": z_at[0], "y": z_at[1], "held": [], "down": []}, now)
-
-    def shown(member):
-        time.sleep(online.HOVER_MS / 1000 + 0.02)  # (a device gets at most one every HOVER_MS)
-        _frame(app)
-        return member.hover[0] if member.hover is not None else None
-
-    check("B's turn: the device shows what B's pointer (its mouse) is over", shown(one) == x_name)
-    last = [message for to, message in sent if to == 1 and message["type"] == "hover"][-1]
-    check("sent as a picture with its place", isinstance(last.get("png"), str) and len(last.get("rect", [])) == 4)
-    app.turn = 2
-    check("C's turn: what C's controller is over", shown(one) == y_name)
     app.turn = 0
-    check("someone else's turn: the pointer of whoever of them is next (B)", shown(one) == x_name)
-    check("a device watching sees what its own mouse is over", shown(watcher) == z_name)
-    one.pointers["m"].feed({"x": chat.BUTTON.centerx, "y": chat.BUTTON.centery, "held": [], "down": []},
-                           pg.time.get_ticks())
-    check("not through the chat button (a device's own)", shown(one) == y_name)
-    app.turn_manager.toggle_shop()
-    check("not while the shop menu is open", shown(one) is None and shown(watcher) is None)
-    app.turn_manager.toggle_shop()
-    check("(and again once it's closed)", shown(watcher) == z_name)
-
-    mine = next(name for name, _ in _spots(app, 20)
+    _frame(app)
+    mine = next(name for name, _ in _spots(app, app.view, 20)
                 if app.countries[name].owner in (app.default_player, app.players[app.turn]))
-    at = next(point for name, point in _spots(app, 20) if name == mine)
+    at = next(point for name, point in _spots(app, app.view, 20) if name == mine)
     view = app.view
     real_pos, real_focused = pg.mouse.get_pos, pg.mouse.get_focused
     try:
@@ -719,120 +950,109 @@ def test_hover():
     image, rect = app.country_panel(mine)
     corner = next((rect.x + x, rect.y + y) for y in range(2, rect.h - 2) for x in range(2, rect.w - 2)
                   if all(tuple(image.get_at((x + dx, y + dy)))[:3] == app.gui.gray1
-                         for dx in range(-2, 3) for dy in range(-2, 3)))  # plain background
+                         for dx in range(-2, 3) for dy in range(-2, 3)))
     on_screen = tuple(pg.display.get_surface().get_at(_window_pos(view, *corner)))[:3]
     check("the host sees the panel of the country its own mouse is over",
           app.io.hover_country == mine and max(abs(a - b) for a, b in zip(on_screen, app.gui.gray1)) < 12, on_screen)
-    check("but it's not in the game's picture (what the devices get)", app.ui.get_at(corner)[3] == 0)
+    check("but it's not in the game's layer (what the devices get)", s.stream.frame.get_at(corner)[3] == 0)
     s.close()
-
-    conn = FakeConn([last])
-    v = viewer.Viewer(conn, 1, [])
-    v._receive()
-    check("a device takes in its panel", v.hover is not None and list(v.hover[1]) == last["rect"])
-    v._draw((500, 300))
-    conn.incoming = [{"type": "hover"}]
-    v._receive()
-    check("and puts it away again", v.hover is None)
-    conn.incoming = [{"type": "hover", "rect": [0, 0, 10, 10], "png": "not a picture"},
-                     {"type": "hover", "rect": [900, 600, 200, 200], "png": last["png"]}]
-    v._receive()
-    check("a broken or misplaced panel isn't shown", v.hover is None)
 
 
 def test_menus():
-    app = _game()
-    seats = [online.Seat("A", kind="host"), online.Seat("B"), online.Seat("C")]
-    s = _session(seats)
-    sent = []
-    s._send = lambda message, to=0: sent.append((to, message))
-    s._member_joined({"member": 1, "device": "dev"})
-    s._member_joined({"member": 2, "device": "watcher"})
-    for i in (1, 2):
-        s._seat_request(s.members[1], "take", {"seat": i})
-    s.members[1].viewing = s.members[2].viewing = True
-    s.start_game(app)
-    app.turn = 0
-    _frame(app)
-    one, watcher = s.devices[1], s.devices[2]
-    mouse, eyes = s.members[1].pointers["m"], s.members[2].pointers["m"]
+    app, s, v, wire, (eyes,) = _linked(turn=0, watcher=True)
+    game, member = v.game, s.members[1]
 
-    def click(pointer, x, y):
-        pointer.feed({"x": x, "y": y, "held": [controls.A], "down": [controls.A]}, pg.time.get_ticks())
-        _frame(app)
-        pointer.feed({"x": x, "y": y, "held": [], "down": []}, pg.time.get_ticks())
-        _frame(app)
+    def pressed_on_host():
+        return [m for m in v.conn.sent if m.get("type") in ("mouse", "pad") and m.get("down")]
 
-    def menu_to(number):
-        return [m for to, m in sent if to == number and m["type"] == "menu"]
-
-    shop = app._shop_button()
+    shop = game._shop_button()
     shop_at = (shop.pos.x + 30, shop.pos.y + 30)
-    click(mouse, *shop_at)
+    del v.conn.sent[:]
+    _device_click(app, v, *shop_at)
     check("anyone may open the shop: someone else's turn, a look of their own",
-          one.look == "shop" and app.players[0].attack != 3)
-    check("it's drawn for them (sent as a picture)", menu_to(1) and menu_to(1)[-1].get("png"))
-    check("and not in the game's picture", app.ui.get_at((400, 588))[3] == 0)
-    del sent[:]
-    time.sleep(online.HOVER_MS / 1000 + 0.02)
-    click(mouse, 225, 150)  # the bridge
-    errors = [(to, m) for to, m in sent if m["type"] == "sound" and m["name"] == "error"]
-    check("everything in it is out of reach (the error sound, for that device alone)",
-          errors and all(to == 1 for to, _ in errors) and app.players[1].subattack == 0, errors)
-    click(mouse, 5, 630)
-    check("a click outside closes it", one.look is None)
-    time.sleep(online.HOVER_MS / 1000 + 0.02)
-    _frame(app)
-    check("(and the device is told)", menu_to(1)[-1].get("png") is None)
+          v.device.look == "shop" and app.players[0].attack != 3)
+    check("its click isn't sent to the host, which hears the device has a menu open",
+          not pressed_on_host() and member.menu_open and member.pointers["m"] not in app.controls.clickers)
+    _device_click(app, v, 225, 150)  # the bridge
+    check("everything in it is out of reach", app.players[1].subattack == 0 and game.players[1].subattack == 0
+          and v.device.look == "shop")
+    _device_click(app, v, 5, 630)
+    check("a click outside closes it", v.device.look is None and not member.menu_open and not pressed_on_host())
 
-    click(mouse, app._card_button().pos.x + 30, 50)
-    check("cards: nothing to show when their player has none", one.look is None)
+    cards_at = (game._card_button().pos.x + 30, 50)
+    _device_click(app, v, *cards_at)
+    check("cards: nothing to show when their player has none", v.device.look is None)
     app.players[1].cards = [models.Kaertske(t, images=app.images) for t in (0, 1, 2)]
     app.players[2].cards = [models.Kaertske(0, images=app.images)]
-    click(mouse, app._card_button().pos.x + 30, 50)
+    _both(app, v)
+    _device_click(app, v, *cards_at)
     check("cards: those of their player whose turn comes soonest (B, then C)",
-          one.look == "cards" and one.cards.player is app.players[1])
+          v.device.look == "cards" and v.device.cards.player is game.players[1]
+          and [c.type for c in game.players[1].cards] == [0, 1, 2])
     check("only to look at: nothing picked for a trade", not any(card.use for card in app.players[1].cards))
-    click(mouse, 5, 630)
+    _device_click(app, v, 5, 630)
+
     app.turn = 1
-    _frame(app)
-    click(mouse, app._card_button().pos.x + 30, 50)
-    check("on B's turn their cards button is the game's own (with trading)",
-          one.look is None and app.card_menu.show and app.card_menu.player is app.players[1])
-    check("drawn on their screen only", one.drawn and app.ui.get_at((480, 330))[3] == 0)
-    click(mouse, 5, 630)
+    _both(app, v)
+    del v.conn.sent[:]
+    _device_click(app, v, *cards_at)
+    check("on B's turn their cards button is the game's own (with trading), clicked on the host",
+          v.device.look is None and pressed_on_host() and app.card_menu.show
+          and app.card_menu.player is app.players[1])
+    check("drawn on their screen only (sent to that device)", v.private is not None
+          and app.ui.get_at((480, 330))[3] == 0 and not [m for to, m in wire.sent if isinstance(m, dict)
+                                                       and m.get("type") == "menu" and m.get("png") and to != 1])
+    _device_click(app, v, 5, 630)
+    app.card_menu.show = False
     app.turn = 0
-    _frame(app)
+    _both(app, v)
 
-    click(eyes, app._card_button().pos.x + 30, 50)
-    check("someone watching has no cards to show", watcher.look is None)
-    click(eyes, app._event_button().pos.x + 30, 50)
-    check("the event card: on their screen", watcher.fields["event_info_open"] and not app.event_info_open)
-    time.sleep(online.HOVER_MS / 1000 + 0.02)
-    _frame(app)
-    check("(dimming their picture)", menu_to(2)[-1].get("dim"))
-    click(eyes, 400, 400)
-    check("a click closes it", not watcher.fields["event_info_open"])
+    event_at = (game._event_button().pos.x + 30, 50)
+    _device_click(app, v, *event_at)
+    check("the event card: on its own screen", game.event_info_open and not app.event_info_open)
+    _device_click(app, v, 400, 400)
+    check("a click closes it", not game.event_info_open)
 
+    settings_at = (game._settings_button().pos.x + 30, 50)
+    _device_click(app, v, *settings_at)
+    check("its settings: its own", game.settings_open and not app.settings_open and member.menu_open)
+    for x, y in ((300, 165), (600, 165)):  # Exit Game, Save As
+        _device_click(app, v, x, y)
+    check("a joined device can't exit or save", not app.pending_quit and not game.pending_quit
+          and not game.save_as_open and game.settings_open)
+    _device_click(app, v, 220, 227)  # the first toggle: show assets
+    check("what its map shows is its own to set", game.settings["assets"] and not app.settings["assets"])
+    _device_click(app, v, 5, 630)
+    check("(closed)", not game.settings_open)
+
+    app.turn = 1
+    for name in ("Japan", "China"):
+        app.countries[name].owner = app.players[1]
+        app.countries[name].landmark_owner = None
+    _both(app, v)
+    check("the pagoda and torii its player has to place are known on the device", v.owed == {"Japan", "China"})
+    v.place_landmark("Japan", "Japan")
+    _both(app, v)
+    check("dropped on its own map: placed by the host", app.countries["Japan"].landmark_owner is app.players[1])
+    eyes.send({"type": "landmark", "name": "China", "on": "China"})
+    _both(app, v)
+    check("not by a device whose turn it isn't", app.countries["China"].landmark_owner is None)
+    v.place_landmark("China", "Japan")
+    _both(app, v)
+    check("on the wrong one: its own country is punished (as on the host)", "China" in app.turn_manager.landmarks_punished)
+    del app.turn_manager.notices[:]  # (what was punished, and why)
+
+    app.turn = 0
     app.turn_manager.toggle_shop()
     _frame(app)
     host_layer = s.devices[0].layer
     check("the host's turn: its shop is the game's, on its screen alone",
           app.players[0].attack == 3 and s.devices[0].drawn
           and tuple(host_layer.get_at((400, 588)))[:3] == app.SHOP_COLOR and app.ui.get_at((400, 588))[3] == 0)
-    click(mouse, *shop_at)
-    check("meanwhile others look at theirs", one.look == "shop" and app.players[0].attack == 3)
-    click(mouse, 5, 630)
+    _device_click(app, v, *shop_at)
+    check("meanwhile others look at theirs", v.device.look == "shop" and app.players[0].attack == 3)
+    _device_click(app, v, 5, 630)
     app.turn_manager.toggle_shop()
-    _frame(app)
-
-    s._input(s.members[1], {"type": "pad", "n": 4, "x": 100, "y": 100, "held": [], "down": [controls.START]})
-    _frame(app)
-    check("a joined device's Start opens its own settings", one.fields["settings_open"] and not app.settings_open)
-    s._input(s.members[1], {"type": "pad", "n": 4, "x": 100, "y": 100, "held": [], "down": [controls.START]})
-    _frame(app)
-    _frame(app)  # (the same button twice in a row: a frame apart)
-    check("(and closes them)", not one.fields["settings_open"])
     app.toggle_settings()
     _frame(app)
     check("the host's own settings: on its screen, the game goes on",
@@ -844,8 +1064,63 @@ def test_menus():
                      {"type": "menu", "dim": True}])
     v = viewer.Viewer(conn, 1, [])
     v._receive()
-    check("a device takes in its menu (none, or a broken one: none)", v.menu is None and v.dim)
+    check("a device takes in the game's shop/cards (none, or a broken one: none)", v.private is None and v.dim)
     v._draw((500, 300))
+
+
+class _FakeController:
+    """A game controller standing still (for controls.Pad)."""
+
+    def get_axis(self, axis):
+        return 0
+
+    def set_led(self, color):
+        pass
+
+
+def test_pairing():
+    pads = controls.get()
+    pad = controls.Pad(_FakeController(), 4242, 7)
+    saved = list(pads.pads), dict(pads.bindings)
+    pads.pads.append(pad)  # (one process: the host and the device share it)
+    try:
+        app, s, v, wire, _ = _linked(turn=1)
+        game, member = v.game, s.members[1]
+        check("a device with a controller nobody has opens its own Controllers panel as the game starts",
+              game.pairing_open and not app.pairing_open and member.menu_open)
+        check("it's for this device's players", [p.name for p in game.local_players()] == ["B", "C"])
+        check("nobody else sees it (it's not in the game's layer)", s.stream.frame.get_at((480, 300))[3] == 0)
+        game._pairing_since = -10 ** 6
+        pad.x, pad.y = 480, 288  # on B's row
+        _both(app, v, [_event(pg.CONTROLLERBUTTONDOWN, instance_id=4242, button=controls.A)])
+        _both(app, v, [_event(pg.CONTROLLERBUTTONUP, instance_id=4242, button=controls.A)])
+        check("its controller pressing A on a row is that player's, and the host hears it",
+              pads.bindings.get(4242) == "B" and member.pad_names == {7: "B"}, (pads.bindings, member.pad_names))
+        _device_click(app, v, 480, 418)  # Done
+        check("Done closes it, and the device's clicks are the game's again",
+              not game.pairing_open and not member.menu_open and member.pointers["m"] in app.controls.clickers)
+
+        _device_click(app, v, game._settings_button().pos.x + 30, 50)
+        _device_click(app, v, 605, 276)  # Controllers, in its settings
+        check("a joined device opens it from its own settings", game.pairing_open and not game.settings_open
+              and not app.pairing_open)
+        _device_click(app, v, 480, 418)
+
+        app.open_pairing()
+        _both(app, v)
+        check("the host's panel is its own: on its screen alone, for its own players, the game goes on",
+              app.pairing_open and s.devices[0].drawn and app.ui.get_at((480, 300))[3] == 0
+              and not app.modal_open and [p.name for p in app.local_players()] == ["A"]
+              and member.pointers["m"] in app.controls.clickers)
+        app.pairing_open = False
+        s.close()
+
+        app = _game()
+        app.open_pairing()
+        _frame(app)
+        check("a local game: the panel stops the game, as it did", app.modal_open and pad in app.controls.clickers)
+    finally:
+        pads.pads[:], pads.bindings = saved
 
 
 def test_game():
@@ -899,30 +1174,29 @@ def _game_through_relay():
 
     app.turn = 1  # Bea's turn
     device.conn.send({"type": "ready"})
-    screen = pg.Surface(online.STREAM_SIZE)
-    got = None
+    layer = pg.Surface(online.OVERLAY_SIZE, pg.SRCALPHA)
+    got = state = None
     for _ in range(40):
         _frame(app)
+        state = state or device.wait("state", timeout=0.05)
         update = device.wait(lambda m: isinstance(m, bytes), timeout=0.05)
         if update is not None:
-            got = online.apply_update(screen, update)
+            got = online.apply_update(layer, update)
             device.conn.send({"type": "ack", "seq": got})
+        if got is not None and state is not None:
             break
-    check("the device gets the host's screen", got is not None)
-    if got is not None:
-        error = _error(screen, s.stream.frame)
-        check("and it is the host's screen (JPEG close)", error < 4, error)
+    check("the device gets the game's state, all of it", state is not None and state.get("full")
+          and [p["name"] for p in state["set"]["players"]] == ["Ann", "Bea", "Bot 3"]
+          and len(state["set"]["countries"]) == len(app.countries))
+    check("and the game's layer, exactly", got is not None and _same(layer, s.stream.frame))
     cursors = device.wait("cursors")
     check("and the cursors", cursors is not None and any(c[6] == me for c in cursors["c"]))
 
-    device.conn.send({"type": "mouse", "x": 50, "y": 50, "held": [controls.A], "down": [controls.A]})
-    device.conn.send({"type": "mouse", "x": 50, "y": 50, "held": [], "down": []})
-    for _ in range(60):
-        _frame(app)
-        if s.devices[me].fields["settings_open"]:
-            break
-        time.sleep(0.02)
-    check("the device's click works: its own settings open", s.devices[me].fields["settings_open"])
+    device.conn.send({"type": "mouse", "x": 50, "y": 60, "held": [], "down": [], "view": [2.0, -300.0, -200.0],
+                      "menu": True})
+    member = s.members[me]
+    check("the device's input comes in: where it points, its view, its own menu open", until(
+        lambda: member.pointers["m"].pos == (50, 60) and member.view.zoom == 2.0 and member.menu_open))
     sounds.play("click")
     sound = device.wait("sound")
     check("the device hears the host's sounds", sound is not None and sound["name"] == "click")
@@ -956,8 +1230,8 @@ def _game_through_relay():
         conn.close()
 
 
-TESTS = [test_relay, test_discovery, test_stream, test_seats, test_clicks, test_names, test_chat, test_hover,
-         test_menus, test_game]
+TESTS = [test_relay, test_discovery, test_stream, test_seats, test_clicks, test_names, test_state, test_chat,
+         test_hover, test_menus, test_pairing, test_game]
 
 
 def main():

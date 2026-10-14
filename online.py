@@ -1,35 +1,46 @@
 """
 The host's side of an online game (net.py has the whole picture, viewer.py
 is the side of a device that joined): the lobby's seats, the devices that
-joined and their pointers in the game, and the picture of the screen they
-get to see.
+joined and their pointers in the game, and what they get to see.
 
 The host's computer plays the game exactly as a local game (runner.play);
 a device that joined is just more pointers for it. Each device's mouse,
 and each of its game controllers, is a RemotePointer that Controls and Io
 take like a game controller (controls.Pad): it only clicks when its
 player's decision is up (`remote_clickers`), and while it is, the host's
-own mouse doesn't click (`mouse_allowed`). What the devices see is the
-host's screen (`FrameStream`), with everyone's cursor drawn on top by each
-device itself, and they hear the host's sounds (sounds.listener). What is
-each device's own is left out of that picture and drawn by the device: its
-chat (chat.py), the info panel of the country its pointer is over
-(`show_hovers`) and its own menus (settings, shop, cards, event card:
-Engine.own_menus, `show_menus`); the host makes those, the device shows
-them.
+own mouse doesn't click (`mouse_allowed`).
+
+Every device draws the map itself, from a copy of the game (viewer.py):
+it pans and zooms it on its own, and its pointer points at the map
+through its own view (RemotePointer.view, sent with its input). The host
+sends it the game's state (`_sync_state`: save_load.game_data, then only
+what changed, plus what's on screen: the countries highlighted, whose
+decision it is...) and the action log (`_sync_log`), and the game's layer
+(`OverlayStream`: everything the game draws over the map in the logical
+960x640 -- the HUD, dice, popups, dialogs, the event card coming up --
+as PNG pieces of what changed). What is each device's own it draws itself:
+its chat (chat.py), the info panel of the country its pointer is over, the
+action log (open or not), and its own menus (settings, the event card, a
+look at the shop and its cards). Only the game's shop and cards on its
+player's turn are the game's: the host draws them on the device's own
+layer and sends that as a picture (`show_menus`). A device's pagoda/torii
+dropped on its own map comes as landmark{name, on}.
 
 Messages from the host to its devices (through the relay, "to" a member
-or all): seats{state, title, seats}, start, cursors{c}, sound{kind, name},
-chat{lines, old}, hover{rect, png} and menu{rect, png, dim} (no rect: none),
-end{reason}, and the screen as BINARY
-(`FrameStream.update_since`). From a device: take/release/name{seat, text}
-(its seats), pads{bind}, ready (it shows the game now), ack (an update
-arrived), mouse/pad (its input), chat{text} (see chat.py).
+or all): seats{state, title, seats}, start, state{full, set, countries},
+log{lines, reset}, cursors{c}, sound{kind, name}, chat{lines, old},
+menu{rect, png, dim} (no rect: none), end{reason}, and the game's layer
+as BINARY (`OverlayStream.update_since`). From a device: take/release/
+name{seat, text} (its seats), pads{bind}, ready (it shows the game now),
+ack (a layer update arrived), mouse/pad (its input, with its view and
+whether it has a menu of its own open), landmark{name, on}, chat{text}
+(see chat.py).
 """
 
 import base64
 import io
 import json
+import math
 import struct
 import threading
 import time
@@ -39,29 +50,31 @@ import pygame as pg
 
 import chat
 import controls
+import lang
 import net
 import relay
+import save_load
 import sounds
 from lang import t
-from models import Io
+from models import Io, LANDMARKS, Position, View, WORLD_WIDTH
 
 # Posted (by the network threads) to wake a game loop waiting for events.
 NET_EVENT = pg.event.custom_type()
 
-STREAM_SIZE = (1200, 800)  # the picture devices get, the game's 960x640 area scaled
-TILE = 80                  # px: the picture is compared and sent in tiles this size
-CAPTURE_MS = 50            # at most 20 pictures a second
+OVERLAY_SIZE = (controls.WIDTH, controls.HEIGHT)  # the game's layer, logical px
+TILE = 80                  # px: the layer is compared and sent in tiles this size
+CAPTURE_MS = 50            # at most 20 captures a second
 MAX_RECTS = 12             # more changed pieces than this go as their bounding box
-BLUR_SHARE = 0.4           # a change bigger than this share of the picture (the map moving) goes at half size
-HALF_MS = 100              # and at most 10 times a second
 MAX_IN_FLIGHT = 2          # updates on their way to a device before it has to say it got them
 CURSOR_MS = 33             # cursors at most 30 times a second
-HOVER_MS = 80              # a device's country info panel at most 12 times a second
+HOVER_MS = 80              # a device's own layer (the game's shop/cards) at most 12 times a second
+STATE_MS = 50              # the game's state at most 20 times a second
+LOG_LINES = 100            # the action log a device gets on coming in
 MAX_PADS = 8               # game controllers per device
 NAME_MAX = 20
 
-MIDDLE = "middle"  # a mouse's middle button (pans the map, like the right one)
-BUTTONS = {controls.A, controls.B, controls.START, MIDDLE} | set(controls.ZOOM_BUTTONS)
+MIDDLE = "middle"  # a mouse's middle button
+BUTTONS = {controls.A, controls.B, MIDDLE}
 
 KINDS = ("open", "host", "bot")  # what the host can make a seat in a new game
 
@@ -80,6 +93,32 @@ def clean_name(text):
 
 def _button(value):
     return isinstance(value, (int, str)) and not isinstance(value, bool) and value in BUTTONS
+
+
+def _number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def map_spot(view, x, y):
+    """The map point under (x, y) (logical px) in `view`, as [x, y]."""
+    return [round((x - 0.5 * view.WIDTH) / view.zoom - view.offset.x, 1),
+            round((y - 0.5 * view.HEIGHT) / view.zoom - view.offset.y, 1)]
+
+
+def cursor_spot(entry, view, overlay):
+    """Where a cursor of the list `HostSession._cursor_list` makes
+    ([x, y, ..., map x, map y]) is drawn on a screen with `view`: over the
+    map, at the same map point (each device has its own view of it); over
+    the game's layer (`overlay`: a popup, the HUD...), at the same place on
+    the screen."""
+    x, y, mx, my = entry[0], entry[1], entry[8], entry[9]
+    inside = 0 <= x < overlay.get_width() and 0 <= y < overlay.get_height()
+    if mx is None or my is None or (inside and overlay.get_at((int(x), int(y)))[3]):
+        return x, y
+    period = WORLD_WIDTH * view.zoom
+    sx = (mx + view.offset.x) * view.zoom
+    sx = (sx + 0.5 * period) % period - 0.5 * period  # the copy of the world nearest the middle
+    return sx + 0.5 * view.WIDTH, (my + view.offset.y) * view.zoom + 0.5 * view.HEIGHT
 
 
 class Seat:
@@ -107,22 +146,24 @@ class Seat:
 class RemotePointer:
     """A joined device's mouse (number "m") or one of its game controllers
     (its number), as the host's game sees it: like a controls.Pad, so
-    Controls and Io take it as one more pointer. Its input arrives between
-    frames (`feed`) and is handed out a frame at a time (`next_frame`): a
-    second click of the same button within one frame waits for the next."""
+    Controls and Io take it as one more pointer, pointing at the map
+    through its device's `view` (which pans and zooms on the device). Its
+    input arrives between frames (`feed`) and is handed out a frame at a
+    time (`next_frame`): a second click of the same button within one frame
+    waits for the next."""
 
-    def __init__(self, member, number="m"):
+    pan = (0.0, 0.0)  # (the device pans and zooms its own map)
+    zoom_steps = ()
+
+    def __init__(self, member, number="m", view=None):
         self.member = member
         self.number = number
+        self.view = view
         self.x, self.y = controls.WIDTH * 0.5, controls.HEIGHT * 0.5
         self.held = set()
         self.taps = []
-        self.zoom = []
-        self.pan = (0.0, 0.0)
         self.last_active = -1
         self._presses = []
-        self._wheel = 0
-        self._pan = [0.0, 0.0]
 
     @property
     def pos(self):
@@ -140,10 +181,6 @@ class RemotePointer:
     def tapped(self, button):
         return button in self.taps
 
-    @property
-    def zoom_steps(self):
-        return list(self.zoom) + [controls.ZOOM_BUTTONS[b] for b in self.taps if b in controls.ZOOM_BUTTONS]
-
     def feed(self, message, now):
         try:
             x = min(max(float(message.get("x", self.x)), 0.0), controls.WIDTH - 1.0)
@@ -159,15 +196,6 @@ class RemotePointer:
         if presses:
             self._presses += presses
             self.last_active = now
-        wheel = message.get("wheel", 0)
-        if isinstance(wheel, int) and not isinstance(wheel, bool) and wheel:
-            self._wheel = min(max(self._wheel + wheel, -20), 20)
-            self.last_active = now
-        pan = message.get("pan")
-        if isinstance(pan, list) and len(pan) == 2 and all(isinstance(v, (int, float)) for v in pan):
-            self._pan = [min(max(self._pan[i] + pan[i], -2000.0), 2000.0) for i in range(2)]
-            if any(pan):
-                self.last_active = now
 
     def next_frame(self):
         taps, later = [], []
@@ -176,49 +204,42 @@ class RemotePointer:
             # to see it up for a frame in between, or it's no new click.
             (later if button in taps or button in self.taps else taps).append(button)
         self.taps, self._presses = taps, later
-        self.zoom = [1 if self._wheel > 0 else -1] * abs(self._wheel)
-        self._wheel = 0
-        self.pan = tuple(self._pan)
-        self._pan = [0.0, 0.0]
 
 
-class FrameStream:
-    """The host's screen as the joined devices get it: captured at most every
-    CAPTURE_MS, compared tile by tile with the capture before, and sent as
-    JPEG pieces of whatever changed since the frame a device already has
+class OverlayStream:
+    """The game's layer (Engine.ui: what the game draws over the map, in
+    the logical 960x640, see the module docstring) as the joined devices
+    get it: captured at most every CAPTURE_MS, compared tile by tile with
+    the capture before, and sent as PNG pieces (see-through where the map
+    shows) of whatever changed since the capture a device already has
     (`update_since`). A slow device so gets fewer, bigger updates rather
-    than falling ever further behind. While the map pans or zooms (nearly
-    everything changes) the picture goes at half size, a quarter of the
-    bytes; once it stands still the device gets it sharp again
-    (HostSession.pump)."""
+    than falling ever further behind."""
 
-    def __init__(self, size=STREAM_SIZE, tile=TILE):
+    def __init__(self, size=OVERLAY_SIZE, tile=TILE):
         self.size = size
         self.tile = tile
         self.cols, self.rows = size[0] // tile, size[1] // tile
-        self.seq = 0  # the current frame's number
+        self.seq = 0  # the current capture's number
         self.frame = None
         self.pending = False  # a capture was skipped (too soon after the last): one is still owed
         self._pixels = None
-        self._changed_at = np.zeros((self.rows, self.cols), dtype=np.int64)  # frame a tile last changed in
+        self._changed_at = np.zeros((self.rows, self.cols), dtype=np.int64)  # capture a tile last changed in
         self._captured_at = None
-        self._updates = {}  # base frame -> update to the current frame
+        self._updates = {}  # base capture -> update to the current one
 
-    def capture(self, surface, rect=None, now=None):
-        """Take the picture of `rect` (the game's area) of `surface`.
-        Returns True when it changed."""
+    def capture(self, surface, now=None):
+        """Take the layer `surface` (OVERLAY_SIZE, with alpha). Returns True
+        when it changed."""
         now = pg.time.get_ticks() if now is None else now
         if self._captured_at is not None and 0 <= now - self._captured_at < CAPTURE_MS:
             self.pending = True
             return False
         self._captured_at = now
         self.pending = False
-        rect = surface.get_rect() if rect is None else pg.Rect(rect).clip(surface.get_rect())
-        if rect.w < 1 or rect.h < 1:
-            return False
-        part = surface.subsurface(rect)
-        frame = part.copy() if rect.size == self.size else pg.transform.smoothscale(part, self.size)
-        pixels = np.frombuffer(pg.image.tobytes(frame, "RGB"), dtype=np.uint8).reshape(self.size[1], self.size[0], 3)
+        if surface.get_size() != self.size:
+            surface = pg.transform.smoothscale(surface, self.size)
+        pixels = np.frombuffer(pg.image.tobytes(surface, "RGBA"), dtype=np.uint8).reshape(
+            self.size[1], self.size[0], 4)
         if self._pixels is None:
             changed = np.ones((self.rows, self.cols), dtype=bool)
         else:
@@ -228,36 +249,28 @@ class FrameStream:
             return False
         self.seq += 1
         self._changed_at[changed] = self.seq
-        self.frame, self._pixels = frame, pixels
+        self.frame, self._pixels = surface.copy(), pixels
         self._updates = {}
         return True
 
     def update_since(self, base):
-        """(bytes, half) that bring a device that has frame `base` to the
-        current one; (None, False) when it already has it. base -1 (nothing
-        yet, or sharp again) is the whole picture, sharp; a change of more
-        than BLUR_SHARE of it goes as the whole picture at half size (half)."""
+        """The bytes that bring a device that has capture `base` to the
+        current one (base -1: nothing yet, the whole layer); None when it
+        already has it."""
         if self.frame is None or base >= self.seq:
-            return None, False
+            return None
         update = self._updates.get(base)
         if update is None:
-            rects = self._rects(self._changed_at > base)
-            width, height = self.size
-            half = base >= 0 and sum(w * h for _, _, w, h in rects) > BLUR_SHARE * width * height
-            if half:
-                rects = [(0, 0, width, height)]
+            rects = self._rects(self._changed_at > base) if base >= 0 else \
+                [(0, 0, self.size[0], self.size[1])]
             pieces, header = [], []
             for x, y, w, h in rects:
-                piece = self.frame.subsurface((x, y, w, h))
-                if half:
-                    piece = pg.transform.smoothscale(piece, (w // 2, h // 2))
                 buffer = io.BytesIO()
-                pg.image.save(piece, buffer, "update.jpg")
+                pg.image.save(self.frame.subsurface((x, y, w, h)), buffer, "update.png")
                 pieces.append(buffer.getvalue())
                 header.append([x, y, w, h, len(pieces[-1])])
-            head = json.dumps({"seq": self.seq, "size": list(self.size), "rects": header,
-                               "half": half}).encode("utf-8")
-            update = self._updates[base] = (struct.pack(">I", len(head)) + head + b"".join(pieces), half)
+            head = json.dumps({"seq": self.seq, "size": list(self.size), "rects": header}).encode("utf-8")
+            update = self._updates[base] = struct.pack(">I", len(head)) + head + b"".join(pieces)
         return update
 
     def _rects(self, mask):
@@ -293,21 +306,21 @@ class FrameStream:
 
 
 def apply_update(surface, data):
-    """Paint an update (FrameStream.update_since) onto `surface`, the
-    stream's size. Returns its frame number; ValueError if it's no update."""
+    """Put an update (OverlayStream.update_since) onto `surface` (with
+    alpha, the stream's size): its pieces replace what was there. Returns
+    its capture number; ValueError if it's no update."""
     try:
         (length,) = struct.unpack_from(">I", data)
         head = json.loads(data[4:4 + length].decode("utf-8"))
         position = 4 + length
         bounds = surface.get_rect()
-        half = bool(head.get("half"))
         for x, y, w, h, size in head["rects"]:
-            image = pg.image.load(io.BytesIO(data[position:position + size]), "update.jpg")
+            image = pg.image.load(io.BytesIO(data[position:position + size]), "update.png")
             position += size
-            if half and image.get_size() == (w // 2, h // 2):
-                image = pg.transform.smoothscale(image, (w, h))
-            if bounds.contains(pg.Rect(x, y, w, h)) and image.get_size() == (w, h):
-                surface.blit(image, (x, y))
+            rect = pg.Rect(x, y, w, h)
+            if bounds.contains(rect) and image.get_size() == (w, h):
+                surface.fill((0, 0, 0, 0), rect)
+                surface.blit(image, rect, special_flags=pg.BLEND_RGBA_MAX)  # (a copy, alpha and all)
         return int(head["seq"])
     except (struct.error, ValueError, KeyError, TypeError, pg.error) as error:
         raise ValueError("not an update") from error
@@ -319,22 +332,26 @@ class Member:
     def __init__(self, number, device):
         self.id = number
         self.device = device
-        self.pointers = {"m": RemotePointer(number, "m")}
+        # How it shows the map (its pointers point at the map through it).
+        self.view = View(None, View.START_ZOOM, Position(*View.START_OFFSET), controls.WIDTH, controls.HEIGHT)
+        self.pointers = {"m": RemotePointer(number, "m", self.view)}
         self.pad_names = {}    # its controllers: number -> player name
         self.viewing = False   # in the game (it said "ready"), not in the lobby
-        self.base = -1         # the frame it has (or will have, once what's on its way arrives)
+        self.menu_open = False  # it has a menu of its own open (its clicks are that menu's)
+        self.base = -1         # the layer capture it has (or will have, once what's on its way arrives)
         self.in_flight = 0
-        self.blurred = False   # it got a half-size picture: it gets it sharp once things stand still
-        self.sent_at = -HALF_MS
-        self.hover = None      # the country info panel it has (show_hovers)
-        self.hover_at = -HOVER_MS
+        self.has_state = False  # it has the game's state (then it gets what changes)
+        self.log_sent = False
+        self.log_last = None   # the last action-log line it has
 
 
 class Device:
     """A device's own menus in the game (Engine.own_menus): this computer's
-    (id 0) or a joined device's (its member number). Its pointer reads
-    clicks for them (`io`), they're drawn on its `layer` and its menu state
-    is kept in `fields` (the host's own is the engine's)."""
+    (id 0, run by the host) or a joined device's (its member number; run by
+    the device itself, viewer.py, which uses `look` and `cards`). On the
+    host its pointer reads clicks for them (`io`), they're drawn on its
+    `layer`, and a joined device's layer is where the game's shop and cards
+    are drawn on its player's turn (Engine.private_layer)."""
 
     def __init__(self, number):
         self.id = number
@@ -364,16 +381,17 @@ class HostSession:
         self.conn = None
         self.members = {}  # relay member number -> Member
         self.app = None
-        self.stream = FrameStream()
+        self.stream = OverlayStream()
         self._relay = None
         self._closing = False
         self._cursors = None
         self._cursors_at = 0
         self._cursor_due = False
-        self._picture_due = False
-        self._hover_due = False
         self._menu_due = False
-        self.devices = {0: Device(0)}  # their own menus, by device (0: this computer)
+        self._game_state = None  # what the devices that have it were sent last
+        self._state_at = -STATE_MS
+        self._state_due = False
+        self.devices = {0: Device(0)}  # their own layers, by device (0: this computer)
         self.chat = chat.Chat(self.say)  # this computer's chat (the host's messages go out from `say`)
         if connect:  # (online_checks.py tries a session without a network)
             threading.Thread(target=self._open, name="oil-host", daemon=True).start()
@@ -504,7 +522,7 @@ class HostSession:
                     member.in_flight = max(0, member.in_flight - 1)
                 elif kind == "ready":
                     member.viewing, member.base, member.in_flight = True, -1, 0
-                    member.hover = None
+                    member.has_state, member.log_sent, member.log_last = False, False, None
                     if member.id in self.devices:
                         self.devices[member.id].sent = None
                     self._cursors = None  # it needs them all
@@ -515,6 +533,8 @@ class HostSession:
                 elif kind == "chat":
                     if member.viewing:
                         self.say(message.get("text", ""), member)
+                elif kind == "landmark":
+                    got_input = self._landmark(member, message) or got_input
                 else:
                     changed = self._seat_request(member, kind, message) or changed
         if changed:
@@ -581,6 +601,12 @@ class HostSession:
                     member.pad_names[number] = name
 
     def _input(self, member, message):
+        view = message.get("view")
+        if isinstance(view, list) and len(view) == 3 and all(_number(v) for v in view):
+            member.view.zoom = min(max(float(view[0]), View.MIN_ZOOM), View.MAX_ZOOM)
+            member.view.offset = Position(*(min(max(float(v), -1e5), 1e5) for v in view[1:]))
+        if isinstance(message.get("menu"), bool):
+            member.menu_open = message["menu"]
         if message["type"] == "mouse":
             pointer = member.pointers["m"]
         else:
@@ -593,8 +619,27 @@ class HostSession:
             if pointer is None:
                 if len(member.pointers) > MAX_PADS:
                     return False
-                pointer = member.pointers[number] = RemotePointer(member.id, number)
+                pointer = member.pointers[number] = RemotePointer(member.id, number, member.view)
         pointer.feed(message, pg.time.get_ticks())
+        return True
+
+    def _landmark(self, member, message):
+        """A device's player dropped the pagoda/torii `name` on the country
+        `on` of its own map (Engine._drag_landmark there): as when it's
+        dropped here."""
+        app = self.app
+        name, on = message.get("name"), message.get("on")
+        if self.state != "game" or app is None or not isinstance(name, str) or not isinstance(on, str):
+            return False
+        manager = app.turn_manager
+        if self.current_device() != member.id or manager.dialog_active or name not in manager.landmarks_owed:
+            return False
+        if on == name:
+            manager.place_landmark(name)
+        elif on in LANDMARKS:
+            manager.misplace_landmark(name, on)
+        else:
+            return False
         return True
 
     def _lost(self):
@@ -658,6 +703,9 @@ class HostSession:
 
     # --- in the game: what goes out --------------------------------------------
 
+    def _viewing(self):
+        return [member for member in self.members.values() if member.viewing]
+
     @property
     def viewers(self):
         return any(member.viewing for member in self.members.values())
@@ -665,40 +713,33 @@ class HostSession:
     @property
     def busy(self):
         """Something still has to go out: keep drawing frames."""
-        return self.stream.pending or self._cursor_due or self._picture_due or self._hover_due or self._menu_due
+        return self.stream.pending or self._cursor_due or self._state_due or self._menu_due
 
-    def capture(self, window, rect):
-        """Engine.present: the game's area of the window, before any cursor."""
+    def capture(self, layer):
+        """Engine.present: the game's layer (Engine.ui, before what's this
+        computer's own is drawn on it)."""
         if self.state == "game" and self.viewers:
-            self.stream.capture(window, rect)
+            self.stream.capture(layer)
         else:
             self.stream.pending = False
 
     def pump(self):
-        """Send the devices what's new: the picture (each at its own pace)
-        and the cursors. Call after every frame."""
+        """Send the devices what's new: the game's state and log, its layer
+        (each at its own pace) and the cursors. Call after every frame."""
         conn = self.conn
         if conn is None or conn.closed or self.state != "game":
             return
         now = pg.time.get_ticks()
-        self._picture_due = False
-        for member in self.members.values():
-            if not member.viewing or member.in_flight >= MAX_IN_FLIGHT:
+        self._sync_state(now)
+        self._sync_log()
+        for member in self._viewing():
+            if member.in_flight >= MAX_IN_FLIGHT:
                 continue
-            update, half = self.stream.update_since(member.base)
-            if half and now - member.sent_at < HALF_MS:
-                self._picture_due = True  # moving: the next picture a little later
-                continue
-            if half:
-                member.blurred = True
-            elif member.blurred and not self.stream.pending:
-                update, _ = self.stream.update_since(-1)  # standing still: all of it sharp again
-                member.blurred = False
+            update = self.stream.update_since(member.base)
             if update is not None:
                 conn.send_binary(update, to=member.id)
                 member.base = self.stream.seq
                 member.in_flight += 1
-                member.sent_at = now
         self._cursor_due = False
         if not self.viewers:
             return
@@ -709,6 +750,73 @@ class HostSession:
             else:
                 self._send({"type": "cursors", "c": cursors})
                 self._cursors, self._cursors_at = cursors, now
+
+    def game_state(self):
+        """What a device needs to draw the game itself: the game's state as a
+        save has it (save_load.game_data, without the log and the host's
+        display settings), plus what's on screen ("online"): the steps of
+        the players' phases, the countries highlighted, whose decision it
+        is, whether a dialog is up, the pagoda/torii still to be placed and
+        the host's language. Plain JSON."""
+        app = self.app
+        manager = app.turn_manager
+        data = save_load.game_data(app, manager, log=False)
+        data.pop("settings", None)
+        data["online"] = {
+            "subattack": [player.subattack for player in app.players],
+            "shade": {name: country.shade for name, country in app.countries.items() if country.shade},
+            "acting": manager.acting_player().name,
+            "dialog": bool(manager.dialog_active),
+            "owed": sorted(manager.landmarks_owed),
+            "lang": lang.language,
+            "fast_bots": bool(app.settings.get("fast_bots")),
+        }
+        return json.loads(json.dumps(data, cls=save_load._NumpyEncoder))
+
+    def _sync_state(self, now):
+        """Every device in the game gets the game's state: all of it when it
+        comes in, then (at most every STATE_MS) what changed: the parts of
+        it that did, of the countries only those that changed."""
+        members = self._viewing()
+        if not members:
+            self._state_due = False
+            return
+        if 0 <= now - self._state_at < STATE_MS:
+            self._state_due = True
+            return
+        self._state_at, self._state_due = now, False
+        state, old = self.game_state(), self._game_state
+        if old is not None and state != old:
+            changed = {key: value for key, value in state.items() if key != "countries" and old.get(key) != value}
+            countries = {name: country for name, country in state["countries"].items()
+                         if old["countries"].get(name) != country}
+            for member in members:
+                if member.has_state:
+                    self._send({"type": "state", "set": changed, "countries": countries}, to=member.id)
+        self._game_state = state
+        for member in members:
+            if not member.has_state:
+                self._send({"type": "state", "full": True, "set": state}, to=member.id)
+                member.has_state = True
+
+    def _sync_log(self):
+        """Every device in the game gets the action log: its last LOG_LINES
+        lines when it comes in (or when the log was replaced: a game
+        loaded), then the lines added."""
+        recent = self.app.action_log[-LOG_LINES:]
+        newest = recent[-1] if recent else None
+        for member in self._viewing():
+            if member.log_sent and newest is member.log_last:
+                continue
+            start = None
+            if member.log_sent and member.log_last is not None:
+                start = next((i + 1 for i in range(len(recent) - 1, -1, -1) if recent[i] is member.log_last), None)
+            if start is None:
+                message = {"type": "log", "reset": True, "lines": [save_load.log_line(line) for line in recent]}
+            else:
+                message = {"type": "log", "lines": [save_load.log_line(line) for line in recent[start:]]}
+            self._send(json.loads(json.dumps(message, cls=save_load._NumpyEncoder)), to=member.id)
+            member.log_sent, member.log_last = True, newest
 
     def _look(self, names, clicker):
         """(colour, faded) of a cursor standing for the players `names`: the
@@ -723,7 +831,9 @@ class HostSession:
 
     def _cursor_list(self):
         """Every cursor: [x, y, r, g, b, faded, member (0: the host), "m" or a
-        controller's number], in the game's 960x640."""
+        controller's number, map x, map y]: where it is in the game's
+        960x640 and the map point it's over in its own device's view (see
+        cursor_spot)."""
         app, pads, view = self.app, self.app.controls, self.app.view
         entries = []
         x, y = pg.mouse.get_pos()
@@ -731,14 +841,17 @@ class HostSession:
         if pg.mouse.get_focused() and 0 <= x < controls.WIDTH and 0 <= y < controls.HEIGHT:
             names = [seat.name for seat in self.seats if seat.kind == "host"]
             color, faded = self._look(names, pads is None or pads.mouse_ok)
-            entries.append([x, y] + list(color) + [faded, 0, "m"])
+            entries.append([x, y] + list(color) + [faded, 0, "m"] + map_spot(view, x, y))
         if pads is not None:
             for pad, (color, faded) in app._pad_looks().items():
-                entries.append([round(pad.x), round(pad.y)] + [int(c) for c in color] + [bool(faded), 0, pad.number])
+                x, y = round(pad.x), round(pad.y)
+                entries.append([x, y] + [int(c) for c in color] + [bool(faded), 0, pad.number] + map_spot(view, x, y))
         clickers = pads.clickers if pads is not None else []
         for pointer in self.pointers():
             color, faded = self._look(self.names_of(pointer), pointer in clickers)
-            entries.append([round(pointer.x), round(pointer.y)] + list(color) + [faded, pointer.member, pointer.number])
+            x, y = round(pointer.x), round(pointer.y)
+            entries.append([x, y] + list(color) + [faded, pointer.member, pointer.number]
+                           + map_spot(pointer.view, x, y))
         return entries
 
     def draw_cursors(self, surface, scale, offset):
@@ -747,15 +860,16 @@ class HostSession:
         for pointer in self.pointers():
             color, faded = self._look(self.names_of(pointer), pointer in clickers)
             sprite, margin = controls.cursor_sprite(color, faded, scale)
-            surface.blit(sprite, (round(offset[0] + pointer.x * scale) - margin,
-                                  round(offset[1] + pointer.y * scale) - margin))
+            entry = [pointer.x, pointer.y, 0, 0, 0, faded, 0, 0] + map_spot(pointer.view, pointer.x, pointer.y)
+            x, y = cursor_spot(entry, self.app.view, self.app.ui)
+            surface.blit(sprite, (round(offset[0] + x * scale) - margin, round(offset[1] + y * scale) - margin))
 
     def _sound(self, kind, name):
         """sounds.listener: the devices hear what the host hears."""
         if self.viewers:
             self._send({"type": "sound", "kind": kind, "name": name})
 
-    # --- in the game: each device's country info panel ----------------------------------
+    # --- in the game: this computer's country info panel ----------------------------------
 
     def _turn_rank(self, names):
         """How soon the players `names` decide: the one deciding now first,
@@ -789,21 +903,6 @@ class HostSession:
                             pads.mouse_active if pads is not None else 0))
         return entries
 
-    def _pointers_of(self, member):
-        """A joined device's pointers that it has used, as `_pointers_here`."""
-        names = self._names(member.id)
-        own = set(member.pad_names.values()) & set(names)
-        entries = []
-        for pointer in member.pointers.values():
-            if pointer.last_active < 0:
-                continue
-            if pointer.number == "m":
-                stands_for = [name for name in names if name not in own] or names
-            else:
-                stands_for = self.names_of(pointer)
-            entries.append(((pointer.x, pointer.y), stands_for, pointer.last_active))
-        return entries
-
     def _hovered(self, number, entries, chat_here=None):
         """The country device `number`'s info panel shows: of its pointers
         over a country, the one whose player decides soonest; between equals
@@ -823,48 +922,18 @@ class HostSession:
         return best[1] if best is not None else None
 
     def show_hovers(self, window, scale, offset):
-        """Every device's country info panel, for the country its own pointer
-        is over (Engine.present, after the picture for the devices is
-        taken): drawn here for this computer, sent as a picture to each
-        device that joined (when it changes, at most every HOVER_MS)."""
+        """This computer's country info panel, for the country its own
+        pointer is over (Engine.present, after the game's layer is taken
+        for the devices, which draw their own)."""
         if self.state != "game":
             return
-        panels = {}
-
-        def panel(name):
-            if name not in panels:
-                image, rect = self.app.country_panel(name)
-                panels[name] = [image, rect, (name, tuple(rect), hash(pg.image.tobytes(image, "RGBA"))), None]
-            return panels[name]
-
         name = self._hovered(0, self._pointers_here(), self.chat)
-        if name is not None:
-            image, rect = panel(name)[:2]
-            size = (max(1, round(rect.w * scale)), max(1, round(rect.h * scale)))
-            window.blit(image if scale == 1 else pg.transform.smoothscale(image, size),
-                        (round(offset[0] + rect.x * scale), round(offset[1] + rect.y * scale)))
-        now = pg.time.get_ticks()
-        self._hover_due = False
-        for member in self.members.values():
-            if not member.viewing:
-                continue
-            name = self._hovered(member.id, self._pointers_of(member))
-            shown = panel(name) if name is not None else None
-            key = shown[2] if shown is not None else None
-            if key == member.hover:
-                continue
-            if 0 <= now - member.hover_at < HOVER_MS:
-                self._hover_due = True  # (busy: a frame more to send it)
-                continue
-            message = {"type": "hover"}
-            if shown is not None:
-                if shown[3] is None:
-                    data = io.BytesIO()
-                    pg.image.save(shown[0], data, "panel.png")
-                    shown[3] = base64.b64encode(data.getvalue()).decode("ascii")
-                message.update(rect=list(shown[1]), png=shown[3])
-            self._send(message, to=member.id)
-            member.hover, member.hover_at = key, now
+        if name is None:
+            return
+        image, rect = self.app.country_panel(name)
+        size = (max(1, round(rect.w * scale)), max(1, round(rect.h * scale)))
+        window.blit(image if scale == 1 else pg.transform.smoothscale(image, size),
+                    (round(offset[0] + rect.x * scale), round(offset[1] + rect.y * scale)))
 
     # --- in the game: each device's own menus (Engine.own_menus) --------------------------
 
@@ -897,45 +966,33 @@ class HostSession:
         return min(players, key=lambda p: self._turn_rank([p.name]), default=None)
 
     def own_menu_open(self, number):
-        """Whether device `number` has a menu of its own open."""
-        device = self.devices.get(number)
-        if device is None:
-            return False
-        if device.look is not None:
-            return True
-        state = (self.app.settings_open, self.app.event_info_open) if number == 0 else \
-            (device.fields["settings_open"], device.fields["event_info_open"])
-        return any(state)
+        """Whether device `number` has a menu of its own open (a joined
+        device says so with its input)."""
+        if number != 0:
+            member = self.members.get(number)
+            return member is not None and member.menu_open
+        device = self.devices[0]
+        return device.look is not None or self.app.settings_open or self.app.event_info_open or self.app.pairing_open
 
     def menu_blocks(self, pointer):
         """Whether `pointer`'s device has a menu of its own open: then its
-        clicks are the menu's, not the game's (controls.Controls.frame)."""
+        clicks are that menu's, not the game's (controls.Controls.frame)."""
         number = self.device_of_pointer(pointer)
         return number is not None and self.own_menu_open(number)
 
     def device_pointer(self, device):
-        """The pointer a device's own menus follow: the one it used last
-        (None: this computer's mouse); False when it has none yet."""
-        if device.id == 0:
-            pads = self.app.controls
-            if pads is None:
-                return None
-            used = [pad for pad in pads.pads if pad.last_active >= 0]
-            latest = max(used, key=lambda pad: pad.last_active, default=None)
-            return latest if latest is not None and latest.last_active > pads.mouse_active else None
-        member = self.members.get(device.id)
-        if member is None or not member.viewing:
-            return False
-        latest = max(member.pointers.values(), key=lambda p: p.last_active)
-        return latest if latest.last_active >= 0 else False
+        """The pointer this computer's own menus follow: the one it used
+        last (None: its mouse)."""
+        pads = self.app.controls
+        if pads is None:
+            return None
+        used = [pad for pad in pads.pads if pad.last_active >= 0]
+        latest = max(used, key=lambda pad: pad.last_active, default=None)
+        return latest if latest is not None and latest.last_active > pads.mouse_active else None
 
     def started_settings(self, device):
-        """Whether one of the device's controllers pressed Start (its settings)."""
-        if device.id == 0:
-            pads = self.app.controls.pads if self.app.controls is not None else []
-        else:
-            member = self.members.get(device.id)
-            pads = member.pointers.values() if member is not None else []
+        """Whether one of this computer's controllers pressed Start (its settings)."""
+        pads = self.app.controls.pads if self.app.controls is not None else []
         return any(pad.tapped(controls.START) for pad in pads)
 
     def new_frame(self):
@@ -952,15 +1009,11 @@ class HostSession:
             device.drawn = True
         return device.layer
 
-    def send_sound(self, number, kind, name):
-        """A sound of one joined device's own menu: for it alone."""
-        self._send({"type": "sound", "kind": kind, "name": name}, to=number)
-
     def show_menus(self, window, scale, offset):
-        """Every device's own layer (its menus, Engine.own_menus, and the
-        game's shop and cards on its player's turn): this computer's drawn
-        here, a joined device's sent to it as a picture when it changes (at
-        most every HOVER_MS), with whether it dims its picture."""
+        """Every device's own layer: this computer's menus (Engine.own_menus)
+        drawn here; on a joined device's player's turn the game's shop and
+        cards, sent to it as a picture when it changes (at most every
+        HOVER_MS)."""
         if self.state != "game":
             return
         now = pg.time.get_ticks()
@@ -1015,7 +1068,7 @@ class HostSession:
 
     def draw_chat(self, window, scale, offset):
         """This computer's chat, over the game (Engine.present: after the
-        picture for the devices is taken, so it's the host's alone)."""
+        game's layer for the devices is taken, so it's the host's alone)."""
         if self.state != "game":
             return
         mouse = None

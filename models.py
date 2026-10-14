@@ -817,7 +817,10 @@ class Io:
         cursor, which has `pos` (logical px) and `pressed` like
         pg.mouse.get_pressed(). `fresh`: which of its buttons were pressed
         this frame -- only used when the pointer just changed, so a button
-        already held on the new one isn't taken for a click."""
+        already held on the new one isn't taken for a click. A pointer with
+        a `view` of its own (an online device's, which pans and zooms its
+        map itself: online.RemotePointer) points at the map through that."""
+        view = getattr(source, "view", None) or view
         self.previous_mouse_state = self.mouse_state
         self.mouse_state = tuple(source.pressed if source is not None else pg.mouse.get_pressed())
         if source is not self.source:
@@ -897,6 +900,9 @@ class View:
 
     MIN_ZOOM = 0.3
     MAX_ZOOM = 6.0
+    # How the map is shown when a game starts (Engine; an online device's).
+    START_ZOOM = 1.21
+    START_OFFSET = (-401, -240)
 
     def __init__(self, screen, zoom, offset, WIDTH, HEIGHT):
         self.screen = screen

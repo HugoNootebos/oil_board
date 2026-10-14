@@ -169,13 +169,11 @@ def _country_to_dict(country, default_player):
     }
 
 
-def save_game(engine, manager, path=AUTOSAVE_PATH, event_schedule_pending=False, name=None):
-    """Write the current game state to `path` as JSON, under `name` (what
-    the load screen shows; the autosave is simply "Autosave").
-
-    event_schedule_pending marks a save taken as a turn starts, before
-    TurnManager._update_event_schedule has run for it (the autosave):
-    loading it runs that step, so the turn's event is drawn then."""
+def game_data(engine, manager, event_schedule_pending=False, name=None, log=True):
+    """The game's state as a save holds it (a dict; numpy values may still
+    be in it, see _NumpyEncoder). Also what an online game's host sends its
+    devices (online.HostSession), without the log (`log` False), which goes
+    on its own."""
     data = {
         "version": SAVE_VERSION,
         "save_name": name or "Autosave",
@@ -216,8 +214,6 @@ def save_game(engine, manager, path=AUTOSAVE_PATH, event_schedule_pending=False,
             "skip_turns": sorted(manager.skip_turns),
             "event_schedule_pending": event_schedule_pending,
         },
-        "action_log": [[[text.to_json() if isinstance(text, Msg) else text, list(color)] for text, color in line]
-                       for line in engine.action_log[-100:]],
         "players": [_player_to_dict(p) for p in engine.players],
         "countries": {
             name: _country_to_dict(country, engine.default_player)
@@ -233,6 +229,30 @@ def save_game(engine, manager, path=AUTOSAVE_PATH, event_schedule_pending=False,
             for c in engine.connections
         ],
     }
+    if log:
+        data["action_log"] = [log_line(line) for line in engine.action_log[-100:]]
+    return data
+
+
+def log_line(line):
+    """An action-log line as JSON (its Msg pieces as their template and
+    arguments, see lang.Msg)."""
+    return [[text.to_json() if isinstance(text, Msg) else text, list(color)] for text, color in line]
+
+
+def read_log_line(line):
+    """An action-log line back from JSON (log_line)."""
+    return [[Msg.from_json(text), tuple(color)] for text, color in line]
+
+
+def save_game(engine, manager, path=AUTOSAVE_PATH, event_schedule_pending=False, name=None):
+    """Write the current game state to `path` as JSON, under `name` (what
+    the load screen shows; the autosave is simply "Autosave").
+
+    event_schedule_pending marks a save taken as a turn starts, before
+    TurnManager._update_event_schedule has run for it (the autosave):
+    loading it runs that step, so the turn's event is drawn then."""
+    data = game_data(engine, manager, event_schedule_pending, name)
     # Saved while picking who starves (possibly from the shop opened
     # there): loading resumes at the starvation popup, so the troops
     # already taken off go back on.
@@ -262,24 +282,33 @@ def load_game(path, engine, manager):
     for old_name, new_name in RENAMED_COUNTRIES.items():
         text = text.replace(json.dumps(old_name)[1:-1], json.dumps(new_name)[1:-1])
         text = text.replace(old_name, new_name)
-    data = json.loads(text)
+    apply_data(json.loads(text), engine, manager)
+
+
+def apply_data(data, engine, manager, events=None, mirror=False):
+    """Put the game state `data` (game_data, as JSON) onto an already-built
+    `engine` and its `manager`. `events`: the Event objects by name
+    (default: events.EVENTS'). `mirror`: an online device's copy of the
+    host's game (viewer.py), which gets the host's state over and over: its
+    Player objects are kept (by name), its log is left alone and its
+    connections are made exactly those of `data` (an event may have taken
+    some away)."""
     engine._owner_snapshot = None  # loading changes owners without a sound
 
     # --- players ------------------------------------------------------
+    kept = {p.name: p for p in engine.players} if mirror else {}
     new_players = []
     for pdata in data["players"]:
-        player = Player(
-            pdata["name"],
-            food=pdata["food"],
-            wood=pdata["wood"],
-            steel=pdata["steel"],
-            nuclear=pdata["nuclear"],
-            oil=pdata["oil"],
-            color=pdata["color"],
-            troops=pdata["troops"],
-            # Saves from before the boat button got their boat at the start.
-            start_ship=pdata.get("boat_to_deploy", False),
-        )
+        player = kept.get(pdata["name"]) or Player(pdata["name"])
+        player.food = pdata["food"]
+        player.wood = pdata["wood"]
+        player.steel = pdata["steel"]
+        player.nuclear = pdata["nuclear"]
+        player.oil = pdata["oil"]
+        player.color = pdata["color"]
+        player.troops = pdata["troops"]
+        # Saves from before the boat button got their boat at the start.
+        player.start_ship = pdata.get("boat_to_deploy", False)
         player.attack = pdata["attack"]
         # Always resume at the safe/idle entry point of whichever phase
         # the player was in -- see the scope note at the top of this file.
@@ -289,7 +318,8 @@ def load_game(path, engine, manager):
         player.eliminated = pdata.get("eliminated", False)
         player.is_bot = pdata.get("is_bot", False)
         player.bot_personality = pdata.get("bot_personality", player.bot_personality)
-        player.cards = [Kaertske(card_type, images=engine.images) for card_type in pdata["cards"]]
+        if not mirror or [card.type for card in player.cards] != pdata["cards"]:
+            player.cards = [Kaertske(card_type, images=engine.images) for card_type in pdata["cards"]]
         new_players.append(player)
     engine.players = new_players
     players_by_name = {p.name: p for p in new_players}
@@ -325,27 +355,39 @@ def load_game(path, engine, manager):
         country.immigrants = min(cdata.get("immigrants", 0), country.units)
 
     # --- connections ------------------------------------------------------
+    found = set()
+    by_pair = {}
+    for c in engine.connections:
+        by_pair.setdefault(frozenset(c.connection), c)
     for cdata in data["connections"]:
         wanted = set(cdata["between"])
-        for c in engine.connections:
-            if set(c.connection) == wanted:
-                c.kind = cdata["kind"]
-                c.rails = cdata["rails"]
-                break
+        c = by_pair.get(frozenset(wanted))
+        if c is not None:
+            c.kind = cdata["kind"]
+            c.rails = cdata["rails"]
+            found.add(c)
         else:
-            if cdata.get("temporary"):
+            if mirror and wanted <= set(engine.countries):
+                route = Connection(wanted, cdata["kind"], rails=cdata["rails"])
+                route.temporary = cdata.get("temporary", False)
+                engine.connections.add(route)
+                found.add(route)
+            elif cdata.get("temporary"):
                 # A route an active event added (see JapanGoesCrazy); the
                 # event's on_end removes it again by this flag.
                 route = Connection(wanted, cdata["kind"], rails=cdata["rails"])
                 route.temporary = True
                 engine.connections.add(route)
 
+    if mirror:
+        engine.connections -= engine.connections - found
+
     # --- turn / manager state ------------------------------------------
     engine.turn = data["turn"]["current_player_index"]
-    engine.action_log = [[[Msg.from_json(text), tuple(color)] for text, color in line]
-                         for line in data.get("action_log", [])]
-    engine.action_log_open = False
-    engine.action_scroll = 0
+    if not mirror:
+        engine.action_log = [read_log_line(line) for line in data.get("action_log", [])]
+        engine.action_log_open = False
+        engine.action_scroll = 0
     engine.default_game = data.get("default_game", engine.default_game)
     # Settings toggles; keys missing from older saves keep their defaults.
     for key, value in data.get("settings", {}).items():
@@ -378,8 +420,10 @@ def load_game(path, engine, manager):
     # dropping just the unknown entries would desync it from
     # event_turn_index; it's simply redrawn fresh from here on, same as a
     # freshly-started game reaching that point.
-    from events import EVENTS
-    by_name = {e.name: e for e in EVENTS}
+    if events is None:
+        from events import EVENTS
+        events = {e.name: e for e in EVENTS}
+    by_name = events
     manager.event_turn_index = mdata.get("event_turn_index", 0)
     try:
         manager.event_bag = [by_name[n] for n in mdata.get("event_bag", [])]

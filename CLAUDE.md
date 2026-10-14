@@ -51,12 +51,12 @@ events) both files were written on Windows with Python 3.12. numpy 2 is fine.
 | `runner.py` | Entry point: start menus → `play(app)` loop. "Exit Game" returns to the start menu; closing the window quits. F5/F9 quicksave/quickload (autosave file), Esc toggles fullscreen. |
 | `menu.py` | Start menu (with the language flag; Local Game / Online Game), new-game menu, player-name entry (with controller pairing), Continue/load screen (autosave + 4 named slots). Each is its own small pygame loop. |
 | `lobby.py` | Online Game's screens: Host (a new or saved game, then its lobby of seats) and Join (the games on every relay found, a game's lobby, then the viewer), plus a message screen. See Online play below. |
-| `online.py` | The host's side of an online game: `HostSession` (seats, joined devices, who may click, cursors, sounds, each device's country info panel), `RemotePointer` (a joined device's mouse or controller, taken like a `controls.Pad`), `FrameStream` (the screen as JPEG tiles). |
-| `viewer.py` | A joined device's side of an online game: shows the host's screen, sends its mouse and controllers, plays the host's sounds; its own Esc menu (leave, fullscreen) and chat. |
+| `online.py` | The host's side of an online game: `HostSession` (seats, joined devices, who may click, the game's state and log for the devices, cursors, sounds, the host's own country info panel and menus), `RemotePointer` (a joined device's mouse or controller with its device's view, taken like a `controls.Pad`), `OverlayStream` (the game's layer as PNG tiles). |
+| `viewer.py` | A joined device's side of an online game: its own copy of the game made from the host's state, drawn with its own view (pan/zoom), the host's game layer on top, its own HUD buttons, country info panel, action log and menus; sends its mouse and controllers, plays the host's sounds; its own Esc menu (leave, fullscreen) and chat. |
 | `chat.py` | The online game's chat (`Chat`): messages, the button under the settings button with its unread badge, the panel, typing. One per device (host: `HostSession.chat`, a joined device: `Viewer.chat`). |
 | `net.py` | Online plumbing (standard library only): `Connection` to a relay (send/receive threads), `RoomBrowser` (relays on this computer, the LAN and the main server, told apart by id), `find_main_relay`, `PROTOCOL`, `DEFAULT_SERVER`, `device_id`. |
 | `relay.py` | The relay server: rooms, routing, LAN beacons. `python3 relay.py` on the home computer; `start_embedded` runs one inside a host's game for a LAN game. Standard library only and self-contained. |
-| `online_checks.py` | Headless PASS/FAIL checks of online play (relay, discovery, stream, seats, who clicks, the chat, the hover panels, own menus, a whole game through a local relay): `python3 online_checks.py [filter]`. |
+| `online_checks.py` | Headless PASS/FAIL checks of online play (relay, discovery, the game's layer stream, seats, who clicks, the state on a device's copy and its own view, the chat, the hover panels, own menus, a whole game through a local relay): `python3 online_checks.py [filter]`. |
 | `controls.py` | Game controllers, one per player, each with its own cursor (`Pad`). `Controls` (one, `controls.get()`) reads them, pairs them with players, decides which may click (`frame`) and draws the cursors. See Game controllers below. |
 | `lang.py` | Dutch/English: `t(text)`, `Msg`/`Join` (log text translated when drawn), the current `language`, `set_language` (saved in `saves/settings.json`), the `NL` (English source → Dutch) and `EN` (Dutch source → English) tables. |
 | `engine.py` | `Engine`: window/view, cached map layer rendering, troop markers, HUD buttons, settings menu (Exit Game, Save As, display toggles), online each device's own menus (`own_menus`), fonts/images, player setup. |
@@ -75,7 +75,7 @@ events) both files were written on Windows with Python 3.12. numpy 2 is fine.
 | `bot_research/` | Reports and prototype scripts of the research behind the bot retraining (reports in `bot_research/reports/`; `backup_before_wp0/` holds the files as they were before it started; `compare_assets.py` puts several A/B result files side by side). Not used by the game. |
 | `event_sandbox.py` | Interactive test board for events: `python3 event_sandbox.py`. Fixed 4-player board, events only when picked (F2), shows what each start/end changed; keys for editing the board (see its docstring / F1). Saves go to temp files. |
 | `event_checks.py` | Headless PASS/FAIL checks per event through the real game code: `python3 event_checks.py [filter]`. Add a test there when adding an event. |
-| `save_load.py` | JSON save/load, save paths (`saves/autosave.json`, `saves/slot1-4.json`; in the app `OIL_SAVES_DIR`), legacy `savegame.json` migration. |
+| `save_load.py` | JSON save/load (`game_data` / `apply_data`: the state as a dict and back, also what an online host sends its devices), save paths (`saves/autosave.json`, `saves/slot1-4.json`; in the app `OIL_SAVES_DIR`), legacy `savegame.json` migration. |
 | `updater.py` | The app's Update button (main menu): checks GitHub Master, downloads only the changed files into `game.new/` (pip-installs `libs.new/` when `requirements.txt` changed), marks it ready, restarts. Only active in the app (`managed()`). |
 | `packaging/relay/` | The home relay: `install.sh` (Mac: a LaunchAgent; optionally DuckDNS), `nl.oil.relay.plist`, `install.ps1` + `oil_relay.pyw` (Windows: a Startup-folder shortcut to a windowless launcher that logs, keeps the PC awake, restarts the relay and optionally updates DuckDNS), `README.md` (firewall, router port, two routers, dynamic DNS, `net.DEFAULT_SERVER`). |
 | `packaging/` | The app: `bootstrap.py` (the one fixed piece inside the app: puts an update in place, rolls back one that never reached the menu, starts `runner.py`), `build.py` (builds OIL.app / the Windows folder with python-build-standalone 3.12), `oil_installer.iss` (Windows installer), `make_icon.py` + `icon.png` (app icon; `images/icon.png` is the window icon), `release_notes.md`. |
@@ -270,7 +270,11 @@ In the start menus every controller clicks (`menu._input`).
 Pairing: the controller buttons on the player-names screen, or the
 Controllers panel (`Engine._draw_pairing`), which opens by itself when a
 game starts (or an unpaired controller presses A) while a controller
-nobody has is connected, and from the settings menu. Pairings are by
+nobody has is connected, and from the settings menu. Online it's each
+device's own menu: it pairs that device's controllers with that device's
+players (`Engine.local_players`), nobody else sees it and the game goes on
+(a joined device's in `viewer.py`, which tells the host with pads{bind}).
+Pairings are by
 player name and aren't saved (SDL numbers controllers anew every session);
 an unplugged controller plugged back in goes back to its player. A new
 decision in phases.py made by someone other than the current player needs
@@ -314,10 +318,12 @@ that signature).
 ## Online play
 
 Online Game › Host / Join (`lobby.py`). The host's computer plays the game
-exactly as a local one (`runner.play`); a device that joined only shows a
-picture of the host's screen and sends its input back (`viewer.py`). So
-whatever works locally works online, and a joined device's game version
-only has to have the same `net.PROTOCOL`. (Running the game on every device
+exactly as a local one (`runner.play`); a device that joined keeps a copy
+of the game that it only draws, never plays (`viewer.py`: `Viewer.game`,
+an `Engine` with `mirror` set), from the state the host sends it, and sends
+its input back. So the rules run in one place, whatever works locally works
+online, and a joined device's game version only has to have the same
+`net.PROTOCOL` (and draw the same state). (Running the game on every device
 in lockstep was rejected: bots iterate over sets of names, whose order
 differs per process and Python version, and timers use `pg.time.get_ticks()`.)
 
@@ -340,52 +346,82 @@ differs per process and Python version, and timers use `pg.time.get_ticks()`.)
   turn: everyone's), and then the host's own mouse doesn't
   (`Controls.mouse_ok`, `HostSession.mouse_allowed`) -- except for a device
   that dropped out, and once the game is won. Online the game-over Quit
-  takes the host back to the menu.
-- **Own menus** (`Engine.own_menus`, online only): every device opens the
-  settings, shop, cards and event card for itself, at any time, on its own
-  screen; the game goes on meanwhile (online `modal_open` leaves them out).
-  Each device (`online.Device`, `HostSession.devices`, 0 = this computer)
-  has its own `Io` (fed by the pointer it used last,
-  `HostSession.device_pointer`; a controller's Start opens its settings)
-  and its own layer; `Engine.device_context` swaps in its Io, layer and
-  menu state (`OWN_FIELDS`: the engine's own fields for the host, kept in
-  `Device.fields` for a joined device) and makes its sounds its own
-  (`sounds.private`). The shop and cards of the player whose turn it is
-  are the game's (ShopPhase, `card_menu`, through the HUD buttons in
-  `draw_gui`, only for a pointer of their device) and drawn on their
-  device's layer only (`Engine.private_layer`); anyone else gets a look
-  (`Device.look`): the shop with every item red (`ShopPhase.draw_look`),
-  the cards of their player whose turn comes soonest
-  (`HostSession.soonest_player`, nothing for a device that only watches).
-  A joined device's settings only look: Exit Game, Save As, the toggles
-  and Controllers are disabled; the pagoda/torii can be dragged by the
-  device whose turn it is (as on the host). While a device has a menu
-  open, `Controls.frame` takes its pointers out of the game
-  (`HostSession.menu_blocks`), it gets no hover panel and its clicks say
-  no country names. The host draws its layer after the capture
-  (`HostSession.show_menus`); a joined device gets its layer as a PNG
-  (`menu{rect, png, dim}`, ~15-30 KB, at most every `HOVER_MS`) and dims
-  its picture itself (`Engine._dim`).
-- **The picture:** `Engine.present` gives the game's area (before the
-  cursors) to `FrameStream` (1200x800, at most 20 a second); each device gets
-  JPEG pieces of the 80 px tiles changed since the frame it has, at most 2
-  updates unacknowledged, so a slow connection gets fewer, bigger updates.
-  While the map pans or zooms (more than 40% changes) the picture goes at
-  half size, at most 10 a second, and sharp again once it stands still:
-  about 0.3-0.45 MB/s per device while panning, nothing while still.
-  Cursors (at most 30 a second) and sounds (`sounds.listener`) go as
-  messages; each device draws the others' cursors itself.
+  takes the host back to the menu. Every device pans and zooms its own map,
+  so a pointer points at the map through its device's view
+  (`RemotePointer.view` = `Member.view`, sent with every input message as
+  `view: [zoom, x, y]`; `Io.update` uses a source's `view`); the host never
+  pans or zooms for a joined pointer (`Engine._remote_pointer`), and a
+  device sends no wheel, stick panning, LB/RB or Start.
+- **The state** (`HostSession._sync_state`, from `pump`, at most every
+  `STATE_MS`): `HostSession.game_state()` is `save_load.game_data` (as a
+  save, without the log and the host's display settings) plus `online`:
+  the players' `subattack`, the countries highlighted (`shade`: what the
+  acting player picked), the acting player, whether a dialog is up, the
+  pagoda/torii owed, the host's language and Fast bots. A device coming in
+  gets all of it (`state{full, set}`, ~24 KB), then only what changed
+  (`state{set, countries}`: changed top-level parts, changed countries; a
+  conquest is a few hundred bytes). The device puts it on its copy with
+  `save_load.apply_data(..., mirror=True)` (keeps its Player objects, its
+  log, and makes its connections exactly the host's) and its own deep copies
+  of the events (an event keeps state on itself). The action log goes on
+  its own (`_sync_log`: the last `LOG_LINES` lines on coming in or when the
+  log was replaced, then the new lines; `lang.Msg` as JSON, so it's
+  translated on the device). New state that a device must draw goes into
+  `game_data` (and so into saves) or `game_state`'s `online`.
+- **The game's layer** (`online.OverlayStream`): everything the game draws
+  over the map, `Engine.ui` in the logical 960x640 -- the HUD, dice,
+  popups, dialogs, the event card coming up, the pagoda/torii notice --
+  taken in `Engine.present` before the host's own action log is drawn on it
+  (at most 20 a second), compared in 80 px tiles, and sent as PNG pieces
+  with alpha (see-through where the map shows; ~40 KB the first time, then
+  only what changed, at most 2 updates unacknowledged per device). A device
+  lays it over its own map unchanged (`apply_update` replaces pixels), so it
+  is as sharp as on the host, and panning sends nothing at all. Whatever
+  the game draws must stay in screen coordinates (the map is each device's
+  own): something tied to a country goes through the state instead (like
+  `shade`).
+- **A device's own** (`viewer.py`): over its map and the game's layer it
+  draws, from its copy, the HUD buttons, the info panel of the country under
+  its pointer (not through the game's layer: `Viewer._hovered` looks at its
+  alpha), the action log (opened and scrolled on its own) and its own menus
+  (`Engine._own_menu` with `Engine.mirror` standing in for the session:
+  settings, the event card, a look at the shop, the cards of its player
+  whose turn comes soonest, the Controllers panel for its own controllers
+  and players, `Viewer.local_players`; it opens by itself as for the host).
+  Its settings can't exit, save or change Fast bots, but what its map shows
+  is its own. A click for
+  any of that (`Viewer._local_at`) stays on the device; other clicks go to
+  the host, and while a menu of its own is open none do (`menu: true` with
+  its input: `Member.menu_open`, `HostSession.menu_blocks`). The pagoda/
+  torii is dragged onto its own map and placed by the host
+  (`landmark{name, on}`, only for the current player's device,
+  `HostSession._landmark`). On its player's turn the shop and cards are the
+  game's: the host draws them on that device's layer
+  (`Engine.private_layer`) and sends it as a PNG (`menu{rect, png, dim}`,
+  `HostSession.show_menus`, at most every `HOVER_MS`). It shows the game in
+  the host's language (`lang.language`, put back when it leaves).
+- **The host's own menus** (`Engine.own_menus`, online only): the host opens
+  the settings, shop look, cards look, event card and Controllers panel
+  (its own controllers and players) for itself at any
+  time on its own screen (`online.Device` 0, `Engine.device_context`), the
+  game going on meanwhile (online `modal_open` leaves them out); its own
+  shop and cards on its turn are the game's, on its layer only.
+- **Cursors** (at most 30 a second) and sounds (`sounds.listener`) go as
+  messages; each device draws the others' cursors itself. A cursor is
+  `[x, y, r, g, b, faded, member, number, map x, map y]`: over the map it's
+  drawn at the same map point in each device's own view, over the game's
+  layer at the same place on the screen (`online.cursor_spot`, also for the
+  devices' cursors on the host).
 - **The idle loop:** network threads post `online.NET_EVENT` to wake
   `pg.event.wait()`; a device's input draws `SETTLE_FRAMES`, its "got it"
-  just one frame (which sends what's next).
-- Joined devices see the host's language and the host's one view (whoever
-  may click can pan or zoom, as at one table).
+  just one frame (which sends what's next). A device's loop draws only
+  after an event, a message or a tilted stick (`Viewer.frame`).
 - **The chat** (`chat.py`, online only: a local game has none): a button
   under the settings button (`images/chat.png`, a red badge counts unread
   messages) opens a panel to its right; while it's open every key is the
   chat's (Enter sends, Esc closes). It's each device's own, drawn outside
-  the picture: the host's in `Engine.present` after `online.capture`
-  (`HostSession.draw_chat`), a device's over the host's picture
+  the game's layer: the host's in `Engine.present` after `online.capture`
+  (`HostSession.draw_chat`), a device's over its own screen
   (`viewer.py`). Its clicks and keys never reach the game: on the host
   `runner.play` hands it the events first and `Engine.io_handle` puts its
   shapes on top of the Io buttons (for the host's mouse only); a device
@@ -395,20 +431,15 @@ differs per process and Python version, and timers use `pg.time.get_ticks()`.)
   gets the history (`old`, not counted as unread). Not saved; mouse and
   keyboard only. The host's own chat click isn't sent as a sound
   (`sounds.play(..., shared=False)`).
-- **The country info panel** (top right) is each device's own too, online:
-  the country its own pointer is over, left out of the picture
+- **The host's country info panel** (top right) is its own too, online: the
+  country its own pointer is over, left out of the game's layer
   (`draw_gui` skips it when `app.online`; a local game is unchanged).
   `HostSession.show_hovers` (from `Engine.present`, after `online.capture`)
-  picks per device: of its used pointers over a country (`device_country_at`:
-  not through the buttons on screen, the chat button, the host's open chat,
-  the shop menu or a dialog), the one whose player decides soonest
+  picks, of this computer's used pointers over a country
+  (`device_country_at`: not through the buttons on screen, the chat, the
+  shop menu or a dialog), the one whose player decides soonest
   (`_turn_rank`: the acting player, then by turns to go; no player last),
-  between equals the one used last. A controller stands for its paired
-  player, a device's mouse for its players without a controller of their
-  own. The host draws its own; each joined device gets its panel as a PNG
-  (`hover{rect, png}`, `Engine.country_panel`, ~15 KB) when it changes, at
-  most every `HOVER_MS`, and draws it over the picture (not while its
-  mouse is on its own chat).
+  between equals the one used last.
 - Raise `net.PROTOCOL` whenever the messages between a host and its devices
   change, and `relay.RELAY_PROTOCOL` when the relay's do (then the home relay
   needs `packaging/relay/install.sh` again).
