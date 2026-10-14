@@ -55,14 +55,14 @@ the Python 3.9 that made them. numpy 2 is fine.
 | `chat.py` | The online game's chat (`Chat`): messages, the button under the settings button with its unread badge, the panel, typing. One per device (host: `HostSession.chat`, a joined device: `Viewer.chat`). |
 | `net.py` | Online plumbing (standard library only): `Connection` to a relay (send/receive threads), `RoomBrowser` (relays on this computer, the LAN and the main server, told apart by id), `find_main_relay`, `PROTOCOL`, `DEFAULT_SERVER`, `device_id`. |
 | `relay.py` | The relay server: rooms, routing, LAN beacons. `python3 relay.py` on the home computer; `start_embedded` runs one inside a host's game for a LAN game. Standard library only and self-contained. |
-| `online_checks.py` | Headless PASS/FAIL checks of online play (relay, discovery, stream, seats, who clicks, the chat, the hover panels, a whole game through a local relay): `python3 online_checks.py [filter]`. |
+| `online_checks.py` | Headless PASS/FAIL checks of online play (relay, discovery, stream, seats, who clicks, the chat, the hover panels, own menus, a whole game through a local relay): `python3 online_checks.py [filter]`. |
 | `controls.py` | Game controllers, one per player, each with its own cursor (`Pad`). `Controls` (one, `controls.get()`) reads them, pairs them with players, decides which may click (`frame`) and draws the cursors. See Game controllers below. |
 | `lang.py` | Dutch/English: `t(text)`, `Msg`/`Join` (log text translated when drawn), the current `language`, `set_language` (saved in `saves/settings.json`), the `NL` (English source → Dutch) and `EN` (Dutch source → English) tables. |
-| `engine.py` | `Engine`: window/view, cached map layer rendering, troop markers, HUD buttons, settings menu (Exit Game, Save As, display toggles), fonts/images, player setup. |
+| `engine.py` | `Engine`: window/view, cached map layer rendering, troop markers, HUD buttons, settings menu (Exit Game, Save As, display toggles), online each device's own menus (`own_menus`), fonts/images, player setup. |
 | `phases.py` | All game rules as a state machine: `Phase` base class, one class per phase, and `TurnManager` (turn order, events schedule, eliminations, notices/dialogs). ~2,400 lines. |
 | `models.py` | `Player`, `Country` (drawing incl. troop markers + fort badges), `Connection` (routes, dotted sea routes, waypoint curves), `Dice`, `Io` (mouse input + hover/hit tests), `View`, `Gui` (side panels), `CardMenu`, `Kaertske`, `Button`. |
 | `board.py` | The map: `CONTINENTS`, `get_countries(default_player)` (resources/start units per country), `get_connections()` (land/sea links). |
-| `events.py` | World events: `Event` base class with hooks, one subclass per event, `EVENTS` list (23). |
+| `events.py` | World events: `Event` base class with hooks, one subclass per event, `EVENTS` list (31). |
 | `bot.py` | Computer player: `BotController` (plays a bot's turn step by step, values everything in troops), exact combat odds (`battle`), difficulty `LEVELS` and `PERSONALITIES`. |
 | `bot_selfplay.py` | Headless bot-vs-bot games and A/B tests for tuning bots: `python3 bot_selfplay.py [games] [players] [--vs FILE / --botA FILE / --tweakA k=v / --tweakB k=v / --personality p] [--jobs N] [--maxturns N] [--out FILE]`. Reproducible (same seed, same game); players can be a list (`3,4,5,6`); one JSON line per game (the file is appended to, so a rerun into the same file adds to it); runs `bot_report.py` at the end. `--refund-assets A` is a research oracle (side A gets the price of every ship/tank/plane/fort it loses back). See its docstring. |
 | `bot_report.py` | Tables from `bot_selfplay.py` results (`python3 bot_report.py FILE.jsonl`): pair-level A-B contrasts (win, placement, loot legacy and market, eliminations), game length, KPIs per behaviour. |
@@ -125,6 +125,14 @@ menu and move phase once dice are cast.
   attack may go on, but destroyed tanks no longer add their +1, and their
   paid oil is gone too (`tank_fee_paid` drops by the destroyed active
   tanks), so a tank brought in from home for the next round pays again.
+- Immigrants (`Country.immigrants`, from the event "Immigratie", saved) are
+  troops that never move or attack: part of `units` (they defend and eat),
+  the last to die (and only starve once the player has no other troops
+  left); setting `units` below them takes them along (a property
+  setter), so a fallen country loses them. Attacks, move-in, moves and the
+  rail/air screen leave them home; the bot counts `country.free` (troops
+  that can leave) and `country.keep` (that stay) where it used `units - 1`
+  and 1, which is the same without immigrants.
 - Food caps armies: at the start of a turn every troop beyond the food *in
   stock* starves (that turn's harvest only comes in after), so an army
   can't outgrow its food income for long. When troops starve, the turn's production (and
@@ -142,9 +150,13 @@ menu and move phase once dice are cast.
   `TurnManager._update_event_schedule`. Add one by subclassing `Event` in
   `events.py` and appending it to `EVENTS`; use the hooks (`on_start`,
   `on_end`, `modify_income`, `attack_bonus`, `dice_penalty`,
-  `discount_shop_cost`, `on_turn_start`, ...) rather than special-casing
+  `discount_shop_cost`, `on_turn_start`, `on_abandon`, `panel_lines` (extra
+  lines in the event panel), ...) rather than special-casing
   events in phases.py (or bot.py: bots see an event through those hooks,
   plus the `bot_*` hints for what they can't work out from them).
+- A cancelled turn (`TurnManager.skip_turns`, names, saved; "Woke") is
+  skipped as the turn starts (`_skip_cancelled`): no income, nothing, and
+  no event card is revealed on it.
 
 ## Translation
 
@@ -326,9 +338,33 @@ differs per process and Python version, and timers use `pg.time.get_ticks()`.)
   they click when `acting_player()` is one of their players (on a bot's
   turn: everyone's), and then the host's own mouse doesn't
   (`Controls.mouse_ok`, `HostSession.mouse_allowed`) -- except for a device
-  that dropped out, and once the game is won. Exit Game, Save As and
-  Controllers are greyed out in the settings menu for a remote pointer, and
-  online the game-over Quit takes the host back to the menu.
+  that dropped out, and once the game is won. Online the game-over Quit
+  takes the host back to the menu.
+- **Own menus** (`Engine.own_menus`, online only): every device opens the
+  settings, shop, cards and event card for itself, at any time, on its own
+  screen; the game goes on meanwhile (online `modal_open` leaves them out).
+  Each device (`online.Device`, `HostSession.devices`, 0 = this computer)
+  has its own `Io` (fed by the pointer it used last,
+  `HostSession.device_pointer`; a controller's Start opens its settings)
+  and its own layer; `Engine.device_context` swaps in its Io, layer and
+  menu state (`OWN_FIELDS`: the engine's own fields for the host, kept in
+  `Device.fields` for a joined device) and makes its sounds its own
+  (`sounds.private`). The shop and cards of the player whose turn it is
+  are the game's (ShopPhase, `card_menu`, through the HUD buttons in
+  `draw_gui`, only for a pointer of their device) and drawn on their
+  device's layer only (`Engine.private_layer`); anyone else gets a look
+  (`Device.look`): the shop with every item red (`ShopPhase.draw_look`),
+  the cards of their player whose turn comes soonest
+  (`HostSession.soonest_player`, nothing for a device that only watches).
+  A joined device's settings only look: Exit Game, Save As, the toggles
+  and Controllers are disabled; the pagoda/torii can be dragged by the
+  device whose turn it is (as on the host). While a device has a menu
+  open, `Controls.frame` takes its pointers out of the game
+  (`HostSession.menu_blocks`), it gets no hover panel and its clicks say
+  no country names. The host draws its layer after the capture
+  (`HostSession.show_menus`); a joined device gets its layer as a PNG
+  (`menu{rect, png, dim}`, ~15-30 KB, at most every `HOVER_MS`) and dims
+  its picture itself (`Engine._dim`).
 - **The picture:** `Engine.present` gives the game's area (before the
   cursors) to `FrameStream` (1200x800, at most 20 a second); each device gets
   JPEG pieces of the 80 px tiles changed since the frame it has, at most 2

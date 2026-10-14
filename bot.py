@@ -474,6 +474,41 @@ class BotController:
                 return max(own, key=lambda c: (self._hold_value(c), c.units))
             return max(countries, key=lambda c: (self._target_value(c), c.units))
 
+    def share_oil(self, player, others, pool):
+        """How `player` (a bot) shares out `pool` oil among `others` (Gas
+        wordt betaald in roebels): {player: amount}. All of it to whoever is
+        furthest behind, so it doesn't fuel the tanks of whoever leads."""
+        with self._acting_as(player):
+            weakest = min(others, key=lambda p: (self._lead(p), p.name))
+        return {p: pool if p is weakest else 0 for p in others}
+
+    def bid_for(self, player, country):
+        """`player`'s (a bot's) blind bid in oil for `country` with everything
+        on it (Groenland is niet te koop!): somewhat under what it's worth,
+        so a win still pays."""
+        with self._acting_as(player):
+            value = self._target_value(country) + country.units \
+                + self._asset_price(country.ships, country.tanks, country.planes, country.fort_lvl)
+            return min(player.oil, int(0.6 * value / self._weights()["oil"]))
+
+    def keep_development(self, player, country, food):
+        """Whether `player` (a bot) pays `food` to keep `country` developed
+        (Boze geesten in Lara's huis): when the extra half of its yield
+        over the horizon is worth more than the food."""
+        with self._acting_as(player):
+            gain = 0.5 * self.params["horizon"] * self._income_value(country)
+            return gain > food * self._weights()["food"]
+
+    def turn_order(self, player):
+        """The turn order `player` (a bot) sets (Israël is het slachtoffer):
+        itself, then the others weakest first, so whoever leads moves right
+        before it and it answers their moves at once. Not measured."""
+        manager = self.manager
+        others = [p for p in self.engine.players if p is not player and not manager._is_out(p)]
+        with self._acting_as(player):
+            others.sort(key=lambda p: (self._lead(p), p.name))
+        return [player] + others
+
     # --- per-frame driver --------------------------------------------------
 
     def update(self):
@@ -539,6 +574,13 @@ class BotController:
     def _human_picking(self):
         """An event has a human pick a country during the bot's turn (e.g.
         Verkeerde knop's Noord-Korea owner choosing where the nuke goes)."""
+        if self.player.attack in (7, 9, 10):
+            # Sharing out oil (OilSharePhase), setting the turn order
+            # (TurnOrderPhase) or an event's yes/no (EventChoicePhase).
+            chooser = getattr(self.manager.current_event, "chooser", None)
+            return chooser is not None and not chooser.is_bot
+        if self.player.attack == 8:
+            return True  # an auction's bid (BidPhase): only humans bid on screen
         chooser = self.manager.phases[5].chooser
         return self.player.attack == 5 and chooser is not None and not chooser.is_bot
 
@@ -597,10 +639,10 @@ class BotController:
 
     def _win_probability(self, from_c, target, attackers=None, active_tanks=None):
         event = self.manager.current_event
-        if event is not None and from_c.units > 1 and event.free_claim_allowed(self.engine, target):
+        if event is not None and from_c.free > 0 and event.free_claim_allowed(self.engine, target):
             return 1.0
         if attackers is None:
-            attackers = from_c.units - 1
+            attackers = from_c.free
         if active_tanks is None:
             active_tanks = min(from_c.tanks, self.player.oil)
         mods = self._combat_mods(from_c, target, active_tanks)
@@ -762,7 +804,7 @@ class BotController:
         one of ours, or the survivors in a country just taken (they move
         in, one stays behind, and go on over land)."""
         engine, player = self.engine, self.player
-        free = {c.name: c.units - 1 for c in self._owned() if c.units > 1}
+        free = {c.name: c.free for c in self._owned() if c.free > 0}
         remaining = self._owned(victim)
         chance, lost = 1.0, 0.0
         while remaining:
@@ -1195,7 +1237,7 @@ class BotController:
                 if not stacks or len(touched) < len(parts):
                     continue
                 extra = self.engine.production(enemy)["helmets"] // 3 + 3 + (10 if len(enemy.cards) >= 3 else 0)
-                attackers = sum(c.units - 1 for c in stacks.values()) + extra - int(round(killed.get(enemy, 0)))
+                attackers = sum(c.free for c in stacks.values()) + extra - int(round(killed.get(enemy, 0)))
                 tanks = max(min(c.tanks, enemy.oil) for c in stacks.values())
                 wiped = battle(attackers, defenders, (0, tanks, fort, 0))[0]
                 safe *= 1 - wiped * self.params["enemy_aggression"]
@@ -1389,7 +1431,7 @@ class BotController:
                     a_all += event.attack_bonus(engine, enemy) - event.dice_penalty(engine, owner)
                     d_all -= event.dice_penalty(engine, player)
                 mods = (int(a_all), min(enemy.tanks, owner.oil), int(d_all), min(tanks, player.oil))
-                attackers = enemy.units - 1 + self._enemy_extra(owner)
+                attackers = enemy.free + self._enemy_extra(owner)
                 worst = max(worst, battle(attackers, units, mods)[0])
             return worst * self.params["enemy_aggression"]
         return self._cached(("danger", country.name, units, fort, tanks), compute)
@@ -1449,7 +1491,7 @@ class BotController:
             for start, origin in countries.items():
                 if origin.owner is not owner or start in ghosts:
                     continue
-                force0 = origin.units - 1 + extra
+                force0 = origin.free + extra
                 if force0 < 1:
                     continue
                 carries = bool(origin.ships or (origin.planes and owner.oil))
@@ -1533,7 +1575,7 @@ class BotController:
                         a_all = event.attack_bonus(engine, enemy) - event.dice_penalty(engine, owner)
                         d_all = fort - event.dice_penalty(engine, player)
                     mods = (int(a_all), min(enemy.tanks, owner.oil), int(d_all), min(tanks, player.oil))
-                    attackers = enemy.units - 1 + self._enemy_extra(owner)
+                    attackers = enemy.free + self._enemy_extra(owner)
                     best = max(best, weight * battle(attackers, units, mods)[0])
                 hit = self._chain_map(owner, ghost).get(country.name)
                 if hit is not None:
@@ -1595,7 +1637,7 @@ class BotController:
         active = None if tanks is None else min(tanks, self.player.oil)
         best = 0.0
         for target, _ in self._targets_from(country, ships, planes):
-            best = max(best, self._attack_ev(country, target, units - 1, active, depth))
+            best = max(best, self._attack_ev(country, target, units - country.keep, active, depth))
         return best
 
     def _position_value(self, country, units, attack_weight=1.0, depth=2,
@@ -1659,6 +1701,8 @@ class BotController:
             owned = [c for c in self._owned() if c.units > 0]
             if not owned:
                 break
+            # Immigrants only starve once no other troops are left.
+            owned = [c for c in owned if c.units > c.immigrants] or owned
             spare = [c for c in owned if c.units > 1]
             if spare:
                 victim = min(spare, key=lambda c: self._position_value(c, c.units, 0.5)
@@ -1810,6 +1854,8 @@ class BotController:
         """Look at the board with some values changed for a moment:
         `changes` are (object, attribute, value)."""
         saved = [(obj, attr, getattr(obj, attr)) for obj, attr, _ in changes]
+        # A lower `units` takes a country's immigrants down with it: put them back too.
+        saved = [(obj, "immigrants", obj.immigrants) for obj, attr, _ in changes if attr == "units"] + saved
         for obj, attr, value in changes:
             setattr(obj, attr, value)
         self._cache = {}
@@ -1997,7 +2043,7 @@ class BotController:
             from_c = self.engine.countries[attack.attack_from]
             target = self.engine.countries[attack.defence_country]
             chance = self._win_probability(from_c, target, active_tanks=attack.active_tanks)
-            ev = self._attack_ev(from_c, target, from_c.units - 1, attack.active_tanks)
+            ev = self._attack_ev(from_c, target, from_c.free, attack.active_tanks)
             if self.params["asset_wipe"] and self.params["asset_hold"]:
                 ev = self._wipe_check(attack, from_c, target, ev)
                 chance = self._win_probability(from_c, target, active_tanks=attack.active_tanks)
@@ -2029,7 +2075,7 @@ class BotController:
             chance = self._win_probability(from_c, target)
             if chance < self._attack_min_p(from_c):
                 continue
-            score = self._jitter(self._attack_ev(from_c, target, from_c.units - 1))
+            score = self._jitter(self._attack_ev(from_c, target, from_c.free))
             if score <= 0:
                 continue
             if best is None or score > best[0]:
@@ -2085,7 +2131,7 @@ class BotController:
         with_tanks = ev - risk(attack.selected_tanks)
         if not attack.selected_tanks:
             return with_tanks
-        without = self._attack_ev(from_c, target, from_c.units - 1, 0) - risk(0)
+        without = self._attack_ev(from_c, target, from_c.free, 0) - risk(0)
         if without > with_tanks:
             self._say("leaves the tanks behind on the attack on " + target.name)
             attack.selected_tanks = attack.active_tanks = 0
@@ -2095,7 +2141,7 @@ class BotController:
     def _free_share(self, from_c):
         """How much of an attack from `from_c` is made with troops that
         starve at the next turn start anyway (0..1)."""
-        attackers = from_c.units - 1
+        attackers = from_c.free
         return min(1.0, self._economy()["starving"] / attackers) if attackers > 0 else 0.0
 
     def _attack_min_p(self, from_c):
@@ -2113,11 +2159,13 @@ class BotController:
         target = engine.countries[attack.defence_country]
         total = from_c.units + target.units
         least = attack.conquest_units
-        if total <= least:
-            moved = total
+        most = total - from_c.immigrants  # they stay
+        if most <= least:
+            moved = most
         else:
-            step = max(1, (total - 1 - least) // 8)
-            options = set(range(least, total, step)) | {least, total - 1}
+            keep = from_c.keep
+            step = max(1, (total - keep - least) // 8)
+            options = set(range(least, total - keep + 1, step)) | {least, total - keep}
             moved = max(options, key=lambda m: (
                 self._position_value(target, m) + self._position_value(from_c, total - m), m))
         target.units, from_c.units = moved, total - moved
@@ -2141,6 +2189,11 @@ class BotController:
                 self._say("develops " + country.name)
                 return
 
+        if not player.repositioned_this_turn and "give back" not in self._done:
+            self._done.add("give back")
+            if self._give_back(phase):
+                return
+
         if not player.repositioned_this_turn and "redistribute" not in self._done:
             # Rails/airports first: once repositioned, no origin can be picked.
             self._done.add("redistribute")
@@ -2155,6 +2208,39 @@ class BotController:
         for name in sorted(manager.landmarks_owed):
             manager.place_landmark(name)
         manager.end_phase()
+
+    def _give_back(self, phase):
+        """An event wants countries given back to the mouse (Woke: or lose a
+        turn): as the turn's one move, empty the least valuable country
+        into a neighbour of its own over land. True if it did."""
+        engine, player = self.engine, self.player
+        event = self.manager.current_event
+        owned = self._owned()
+        if event is None or event.bot_give_back(engine, player) <= 0 or len(owned) < 3:
+            return False
+        options = []
+        for country in owned:
+            if country.immigrants:
+                continue  # they'd stay: it can't be emptied
+            homes = [engine.countries[n] for n, kind in self._links(country.name).items()
+                     if kind == "land" and engine.countries[n].owner is player]
+            if homes:
+                options.append((self._hold_value(country), country.units, country.name, country, homes))
+        if not options:
+            return False
+        _, _, _, country, homes = min(options, key=lambda o: o[:3])
+        target = max(homes, key=lambda c: (self._frontier(c.name), c.units, c.name))
+        n = country.units
+        target.units += n
+        country.units = 0
+        target.tanks += country.tanks
+        country.tanks = 0
+        engine.log_action(player, Msg(" moved: {}", Join([Msg("{:+d} {}{}", -n, "", country.name),
+                                                          Msg("{:+d} {}{}", n, "", target.name)])))
+        phase.abandon(country)
+        player.repositioned_this_turn = True
+        self._say("gives {} back to the mouse".format(country.name))
+        return True
 
     def _develop_choice(self, phase):
         """The country most worth developing, or None. Developing costs one
@@ -2276,6 +2362,8 @@ class BotController:
         if best is None or best[0] <= self.params["buffer_min_gain"]:
             return False
         gain, country, target, troops = best
+        if country.immigrants:
+            return False  # they never move
         target.units += troops
         country.units = 0
         self._vacated[country.name] = self.manager.turn_num
@@ -2311,7 +2399,7 @@ class BotController:
 
         best_gain, best = self.params["reposition_min_gain"], None
         for origin in self._owned():
-            spare = origin.units - 1
+            spare = origin.free
             if spare <= 0 and not origin.planes:
                 continue
             reach = self._own_reach(origin.name) - {origin.name}
@@ -2325,7 +2413,7 @@ class BotController:
             ships = (0, 1) if origin.ships else (0,)
             for n in sorted({spare, spare // 2, min(spare, 3), 0}):
                 # The stack's tanks go along when about half of it does.
-                tk = origin.tanks if n and 2 * n >= origin.units - 1 else 0
+                tk = origin.tanks if n and 2 * n >= origin.free else 0
                 for plane in planes:
                     for ship in ships:
                         if (n, plane, ship) == (0, 0, 0) or (ship and not n):
@@ -2354,7 +2442,7 @@ class BotController:
                     continue
                 by_sea = phase._sea_flood_fill(origin.name)
                 now = value(origin, origin.units, origin.ships, origin.planes, origin.tanks)
-                for ship in ((0, 1) if origin.ships and origin.units >= 2 else (0,)):
+                for ship in ((0, 1) if origin.ships and origin.free >= 1 else (0,)):
                     for tk in ((0, origin.tanks) if origin.tanks else (0,)):
                         for plane in ((0, 1) if origin.planes and player.oil >= 1 else (0,)):
                             if not (ship or tk or plane):
@@ -2417,11 +2505,12 @@ class BotController:
         best = None
         for kind, origin, network in networks:
             names = sorted(network)
-            pool = sum(engine.countries[n].units - 1 for n in names)
+            pool = sum(engine.countries[n].free for n in names)
             if pool <= 0:
                 continue
-            plan = self._deploy_plan(pool, names, {n: 1 for n in names}, weight)
-            gain = sum(self._position_value(engine.countries[n], 1 + plan.get(n, 0), weight)
+            keep = {n: engine.countries[n].keep for n in names}
+            plan = self._deploy_plan(pool, names, keep, weight)
+            gain = sum(self._position_value(engine.countries[n], keep[n] + plan.get(n, 0), weight)
                        - self._position_value(engine.countries[n], engine.countries[n].units, weight)
                        for n in names)
             if best is None or gain > best[0]:
@@ -2450,7 +2539,7 @@ class BotController:
         phase._enter_redistribute(set(names), kind)
         tanks = sum(engine.countries[n].tanks for n in names)
         for n in names:
-            engine.countries[n].units = 1 + plan.get(n, 0)
+            engine.countries[n].units = engine.countries[n].keep + plan.get(n, 0)
             engine.countries[n].tanks = 0
         engine.countries[max(names, key=lambda n: engine.countries[n].units)].tanks = tanks
         phase._finish_redistribute()

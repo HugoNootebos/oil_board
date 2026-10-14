@@ -165,6 +165,7 @@ def _country_to_dict(country, default_player):
         "bombed_by": None if country.bombed_by is None else country.bombed_by.name,
         "landmark_owner": None if country.landmark_owner is None else country.landmark_owner.name,
         "voc_weakened": country.voc_weakened,
+        "immigrants": country.immigrants,
     }
 
 
@@ -212,6 +213,7 @@ def save_game(engine, manager, path=AUTOSAVE_PATH, event_schedule_pending=False,
             "event_pending_players": [p.name for p in manager.event_pending_players],
             "reveal_pool": [p.name for p in manager.reveal_pool],
             "awaiting_gap": manager.awaiting_gap,
+            "skip_turns": sorted(manager.skip_turns),
             "event_schedule_pending": event_schedule_pending,
         },
         "action_log": [[[text.to_json() if isinstance(text, Msg) else text, list(color)] for text, color in line]
@@ -320,6 +322,7 @@ def load_game(path, engine, manager):
         placer = cdata.get("landmark_owner")
         country.landmark_owner = players_by_name.get(placer) if placer else None
         country.voc_weakened = cdata.get("voc_weakened", False)
+        country.immigrants = min(cdata.get("immigrants", 0), country.units)
 
     # --- connections ------------------------------------------------------
     for cdata in data["connections"]:
@@ -399,6 +402,7 @@ def load_game(path, engine, manager):
         players_by_name[n] for n in mdata.get("reveal_pool", []) if n in players_by_name
     }
     manager.awaiting_gap = mdata.get("awaiting_gap", False)
+    manager.skip_turns = {n for n in mdata.get("skip_turns", []) if n in players_by_name}
 
     # Loading mid-selection could otherwise leave a phase highlighting (and
     # referencing) countries the now-active player never actually picked.
@@ -416,3 +420,4 @@ def load_game(path, engine, manager):
     manager.event_notice = None
     if mdata.get("event_schedule_pending", False):
         manager._update_event_schedule()
+        manager._skip_cancelled()

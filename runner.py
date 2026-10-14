@@ -163,8 +163,9 @@ def _play(app):
         # sound, Start for the settings menu, LB/RB for zooming.
         if any(pad.tapped(controls.A) for pad in pads.clickers):
             sounds.click_pressed()
-        if any(pad.tapped(controls.START) for pad in pads.clickers) and not app.turn_manager.dialog_active:
-            app.toggle_settings()
+        if any(pad.tapped(controls.START) for pad in pads.clickers) and not app.turn_manager.dialog_active \
+                and app.online is None:
+            app.toggle_settings()  # (online every device's Start opens its own: Engine.own_menus)
         wheel += [step for pad in pads.clickers for step in pad.zoom_steps]
         app.bystander_clicks()  # the other players' controllers (online: mice too) say a country's name
         if not app.modal_open and pads.needs_pairing(app.local_players()) and any(

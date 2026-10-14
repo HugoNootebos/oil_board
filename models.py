@@ -169,6 +169,32 @@ class Kaertske:
 
 class Country:
 
+    # Troops here that can never move or attack ("Immigratie"): part of
+    # `units` (they defend, eat and count like any troop), the last to die.
+    # Setting `units` below it takes it down with them, so a country that
+    # falls or empties loses them for good.
+    immigrants = 0
+
+    @property
+    def units(self):
+        return self._units
+
+    @units.setter
+    def units(self, value):
+        self._units = value
+        if self.immigrants > value:
+            self.immigrants = max(value, 0)
+
+    @property
+    def keep(self):
+        """Troops that stay when an army leaves: one, or the immigrants."""
+        return max(1, self.immigrants)
+
+    @property
+    def free(self):
+        """Troops that can leave while `keep` stay behind."""
+        return self._units - max(1, self.immigrants)
+
     def __init__(
             self,
             name,
@@ -1047,6 +1073,7 @@ class Gui:
             asset_cells.append((images["spr_plane"], "x{}".format(country.planes)))
         assets_grid_h = 26 * -(-len(asset_cells) // 3) if asset_cells else 0  # ceil div, 3 per row
         radioactive_h = 22 if country.radioactive else 0
+        immigrants_h = 40 if country.immigrants else 0
 
         # Normal: 40px sprites, 3 per row, up to 3 rows. More than that
         # (developed China, Outback...) -> smaller sprites, 5 per row.
@@ -1054,7 +1081,7 @@ class Gui:
         per_row, cell = (5, 28) if compact else (3, 46)
         y_status = 30 + -(-len(image_list) // per_row) * cell
         y_assets = y_status + status_h
-        base_h = y_assets + assets_grid_h + radioactive_h + 6
+        base_h = y_assets + assets_grid_h + radioactive_h + immigrants_h + 6
         panel_h = base_h
         if owner_stats:
             panel_h = max(panel_h, self.OWNER_MIN_H)  # room for the owner box beside it
@@ -1099,7 +1126,7 @@ class Gui:
                 cache[(id(image), small)] = pg.transform.smoothscale(image.image, small)
             sprite = cache[(id(image), small)]
             view.screen.blit(sprite, (px + (26 - small[0]) // 2, py + (26 - small[1]) // 2))
-        if (status_items or asset_cells or country.radioactive) and not hasattr(self, "small_font"):
+        if (status_items or asset_cells or country.radioactive or country.immigrants)                 and not hasattr(self, "small_font"):
             self.small_font = game_font(15)
         sx = x0 + 8
         for icon, text in status_items:
@@ -1124,6 +1151,12 @@ class Gui:
             icon.draw(view.screen, Position(x0 + 8 + (20 - iw) // 2, ry + (22 - ih) // 2))
             text = t("{} turn left" if country.radioactive == 1 else "{} turns left").format(country.radioactive)
             view.screen.blit(self.small_font.render(text, True, self.outline_color), (x0 + 34, ry + 3))
+        if country.immigrants:
+            ry = y_assets + assets_grid_h + radioactive_h
+            lines = (t("{} immigrant" if country.immigrants == 1 else "{} immigrants").format(country.immigrants),
+                     t("never moves" if country.immigrants == 1 else "never move"))
+            for k, text in enumerate(lines):
+                view.screen.blit(self.small_font.render(text, True, self.outline_color), (x0 + 8, ry + 3 + 18 * k))
 
         # Dark outline round the panel below the band. With the owner box
         # beside it, the left side runs on from the box's right line as one

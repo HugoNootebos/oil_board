@@ -197,8 +197,10 @@ class Engine:
         self.save_as_open = False
         self.save_as_slot = None
         self.save_as_name = ""
-        # "Exit game?" (Yes/No), asked when a joined device presses Exit Game.
-        self.exit_confirm_open = False
+        self.save_as_names = []
+        # Online, while a device's own menus run (device_context): that
+        # device (online.Device); None otherwise.
+        self._device = None
         # Where the autosave at the start of each turn goes.
         self.save_path = AUTOSAVE_PATH
 
@@ -420,6 +422,8 @@ class Engine:
     def draw_world(self, background_color=(200, 200, 255)):
         view = self.view
         self.ui.fill((0, 0, 0, 0))
+        if self.online is not None:
+            self.online.new_frame()
         # The (expensive) antialiased map is cached. While the view is
         # panning/zooming a fast unsmoothed version is shown, and the smooth
         # one replaces it as soon as it settles. A change to the board
@@ -469,6 +473,7 @@ class Engine:
             # the info panel of the country this computer's pointer is over
             # (theirs get theirs) and this computer's chat.
             self.online.show_hovers(view.window, view.scale, (view.ox, view.oy))
+            self.online.show_menus(view.window, view.scale, (view.ox, view.oy))
             self.online.draw_chat(view.window, view.scale, (view.ox, view.oy))
         if self.controls is not None and self.controls.pads:
             self.controls.draw(view.window, view.scale, (view.ox, view.oy), self._pad_looks())
@@ -654,16 +659,21 @@ class Engine:
         )
         self.gui.draw_player_outline(self.view)
 
+        # Online every device opens these menus for itself (own_menus);
+        # only the shop and cards of the player whose turn it is are the
+        # game's, and those only for their own device.
+        local = self.online is None
         # Settings sits top-left on its own.
         settings_button = self._settings_button()
         settings_button.draw(self.view, self.io)
-        if not self.turn_manager.dialog_active:
+        if not self.turn_manager.dialog_active and local:
             # Gated on the dialog only (not modal_open), so this stays
             # clickable even while its own menu is what's blocking
             # everything else -- otherwise there'd be no way to close it.
             settings_button.release_button(self.toggle_settings, self.io)
         # On a bot's turn the shop and cards are the bot's business.
-        blocked = self.modal_open or self.bot_turn
+        blocked = self.modal_open or self.bot_turn or not (
+            local or self.online.device_of_pointer(self.io.source) == self.online.current_device())
 
         # Shop and cards sit top-left too, to the right of settings.
         card_menu_button = self._card_button()
@@ -678,12 +688,12 @@ class Engine:
         # Event info sits top-left too, after the cards button.
         event_button = self._event_button()
         event_button.draw(self.view, self.io)
-        if not self.turn_manager.dialog_active and not self.settings_open and not self.pairing_open:
+        if not self.turn_manager.dialog_active and not self.settings_open and not self.pairing_open and local:
             event_button.release_button(self.toggle_event_info, self.io)
 
-        if self.settings_open:
+        if self.settings_open and local:
             self._draw_settings_menu()
-        elif self.event_info_open:
+        elif self.event_info_open and local:
             self._draw_event_info()
         elif self.pairing_open:
             self._draw_pairing()
@@ -727,9 +737,8 @@ class Engine:
         """The country a device's pointer at `position` (logical) is over,
         for that device's info panel: None through the buttons on screen,
         the chat (its button is every device's; `chat` the host's own, panel
-        and all), the shop menu or a dialog."""
-        current = self.players[self.turn]
-        if self.modal_open or (current.attack == 3 and current.subattack < 8):
+        and all) or a dialog."""
+        if self.modal_open:
             return None
         point = (int(position[0]), int(position[1]))
         if online_chat.BUTTON.collidepoint(point) or (chat is not None and chat.covers(point)):
@@ -747,8 +756,8 @@ class Engine:
     def modal_open(self):
         """Whether some full-screen-ish overlay (an elimination/win dialog
         or the settings menu) should freeze everything else."""
-        return self.turn_manager.dialog_active or self.settings_open or self.event_info_open \
-            or self.pairing_open
+        own = self.online is None and (self.settings_open or self.event_info_open)  # online: one device's own
+        return self.turn_manager.dialog_active or own or self.pairing_open
 
     def local_players(self):
         """The players on this computer: all of them, except in an online
@@ -770,16 +779,7 @@ class Engine:
         self.pairing_open = False
         self.settings_open = not self.settings_open
         self.dragging_landmark = None
-        self.exit_confirm_open = False
         self._close_save_as()
-
-    @property
-    def host_decides(self):
-        """Online, the "Exit game?" question and the Save As panel are the
-        host's: a joined device may open them, but only the host's own mouse
-        (and controllers) click in them (controls.Controls.frame)."""
-        return self.online is not None and self.settings_open \
-            and (self.exit_confirm_open or self.save_as_open)
 
     SAVE_NAME_MAX = 24
 
@@ -875,22 +875,6 @@ class Engine:
         if self._menu_button(back_rect, t("Back"), (220, 220, 220), mouse):
             self._close_save_as()
 
-    def _draw_exit_confirm(self, x, y, w, h, mouse):
-        """"Exit game?" with Yes/No, for a joined device's Exit Game: the
-        game ends for everyone, so the host answers it."""
-        screen = self.view.screen
-        screen.blit(self.font.render(t("Exit game?"), True, (0, 0, 0)), (x + 15, y + 10))
-        screen.blit(self.font.render(t("The host decides"), True, (90, 90, 90)), (x + 15, y + 45))
-        bw = (w - 60) // 2
-        yes_rect = pg.Rect(x + 20, y + h - 70, bw, 40)
-        no_rect = pg.Rect(x + 40 + bw, y + h - 70, bw, 40)
-        if self._menu_button(yes_rect, t("Yes"), (245, 150, 150), mouse):
-            self.exit_confirm_open = False
-            self.pending_quit = True
-        elif self._menu_button(no_rect, t("No"), (220, 220, 220), mouse):
-            self.exit_confirm_open = False
-        self.io.left_pressed = 0
-
     def _draw_settings_menu(self):
         view = self.view
         screen = view.screen
@@ -901,14 +885,10 @@ class Engine:
             self._drag_landmark()
             return
 
-        dim = pg.Surface((view.WIDTH, view.HEIGHT), pg.SRCALPHA)
-        dim.fill((0, 0, 0, 140))
-        screen.blit(dim, (0, 0))
+        self._dim()
 
         # Two columns; the Save As name picker keeps the narrow tall panel.
-        if self.exit_confirm_open:
-            w, h = 340, 190
-        elif self.save_as_open:
+        if self.save_as_open:
             w, h = 340, 562
         else:
             w, h = 600, 440
@@ -925,9 +905,6 @@ class Engine:
             io.left_pressed = 0
             return
 
-        if self.exit_confirm_open:
-            self._draw_exit_confirm(x, y, w, h, mouse)
-            return
         if self.save_as_open:
             self._draw_save_as(x, y, w, h, mouse)
             return
@@ -937,20 +914,16 @@ class Engine:
         col_w = (w - 60) // 2
         col_x = (x + 20, x + 40 + col_w)
 
-        # In an online game a joined device can ask to end or save the game,
-        # but the host answers "Exit game?" and names the save (host_decides);
-        # it can't pair the host's controllers.
-        remote = self.online is not None and self.online.is_remote(io.source)
+        # Online a joined device's settings only look: the game, its saves,
+        # the display and the controllers are the host's.
+        remote = self._device is not None and self._device.id != 0
 
         quit_rect = pg.Rect(col_x[0], y + 45, col_w, 40)
-        if self._menu_button(quit_rect, t("Exit Game"), (245, 150, 150), mouse):
-            if remote:
-                self.exit_confirm_open = True
-            else:
-                self.pending_quit = True
+        if self._menu_button(quit_rect, t("Exit Game"), (245, 150, 150), mouse, enabled=not remote):
+            self.pending_quit = True
 
         save_as_rect = pg.Rect(col_x[1], y + 45, col_w, 40)
-        if self._menu_button(save_as_rect, t("Save As"), (150, 200, 245), mouse):
+        if self._menu_button(save_as_rect, t("Save As"), (150, 200, 245), mouse, enabled=not remote):
             self.save_as_open = True
             self.save_as_slot = None
             self.save_as_names = [read_save_name(slot_path(i)) for i in range(SAVE_SLOT_COUNT)]
@@ -964,7 +937,7 @@ class Engine:
         for c, toggles in enumerate(columns):
             for i, (key, text) in enumerate(toggles):
                 row = pg.Rect(col_x[c], save_as_rect.bottom + 25 + i * 46, col_w, 34)
-                if self._toggle_switch(row, text, self.settings[key], mouse):
+                if self._toggle_switch(row, text, self.settings[key], mouse, enabled=not remote):
                     self.settings[key] = not self.settings[key]
 
         if self.controls is not None and self.controls.pads:
@@ -976,7 +949,9 @@ class Engine:
         # country without one, who drags it from here onto the map. Once
         # placed it's gone from here, until the country loses it again
         # (back to the mouse, or conquered by someone else).
-        owed = self.turn_manager.landmarks_owed
+        # (Online only on the device of the player whose turn it is.)
+        mine = self.online is None or self.online.current_device() == (self._device.id if self._device else 0)
+        owed = self.turn_manager.landmarks_owed if mine else {}
         size = 90
         gap = 30
         lx = x + w * 0.5 - size - gap * 0.5
@@ -994,11 +969,12 @@ class Engine:
         if io.left_pressed:
             io.left_pressed = 0
 
-    def _toggle_switch(self, row, text, on, mouse):
-        """A labelled on/off switch filling `row`; returns True when clicked."""
+    def _toggle_switch(self, row, text, on, mouse, enabled=True):
+        """A labelled on/off switch filling `row`; returns True when clicked
+        (never when not `enabled`: then the error sound)."""
         screen = self.view.screen
         track = pg.Rect(row.x, row.centery - 12, 46, 24)
-        hovered = row.collidepoint(mouse)
+        hovered = enabled and row.collidepoint(mouse)
         color = (60, 180, 80) if on else (170, 170, 170)
         if hovered:
             color = tuple(min(255, c + 20) for c in color)
@@ -1007,9 +983,12 @@ class Engine:
         knob_x = track.right - 12 if on else track.x + 12
         pg.draw.circle(screen, (255, 255, 255), (knob_x, track.centery), 9)
         pg.draw.circle(screen, (0, 0, 0), (knob_x, track.centery), 9, 2)
-        label = self.font.render(t(text), True, (0, 0, 0))
+        label = self.font.render(t(text), True, (0, 0, 0) if enabled else (110, 110, 110))
         screen.blit(label, (track.right + 12, row.centery - label.get_height() // 2))
-        return self.io.button(("r", row.x, row.y, row.w, row.h))
+        clicked = self.io.button(("r", row.x, row.y, row.w, row.h))
+        if clicked and not enabled:
+            sounds.play("error")
+        return bool(enabled and clicked)
 
     def _drag_landmark(self):
         """A pagoda/torii follows the mouse over the (undimmed) map;
@@ -1037,6 +1016,16 @@ class Engine:
             io.left_pressed = 0
 
     SETTINGS_COLOR = (255, 240, 170)  # light yellow, for the button and its menu
+
+    def _dim(self):
+        """Darken everything behind a menu. A joined device's own menu
+        (device_context) leaves that to the device: it dims its picture."""
+        if self._device is not None and self._device.id != 0:
+            self._device.dim = True
+            return
+        dim = pg.Surface((self.view.WIDTH, self.view.HEIGHT), pg.SRCALPHA)
+        dim.fill((0, 0, 0, 140))
+        self.view.screen.blit(dim, (0, 0))
 
     def _settings_button(self):
         return Button(
@@ -1090,9 +1079,7 @@ class Engine:
         manager = self.turn_manager
         event = manager.current_event
 
-        dim = pg.Surface((view.WIDTH, view.HEIGHT), pg.SRCALPHA)
-        dim.fill((0, 0, 0, 140))
-        screen.blit(dim, (0, 0))
+        self._dim()
 
         name_font = game_font(28, bold=True)
         desc_font = game_font(19)
@@ -1100,6 +1087,7 @@ class Engine:
         text_w = w - 80
         name = t(event.name) if event is not None else t("No active event card")
         lines = manager._wrap_text(t(event.description), desc_font, text_w) if event is not None else []
+        extra = event.panel_lines(self) if event is not None else []  # e.g. a scoreboard
 
         upcoming = manager.turns_until_next_event()
         if upcoming is None:
@@ -1118,7 +1106,7 @@ class Engine:
         hint_font = game_font(14)
         top_pad, gap1, gap2, gap3, bottom_pad = 24, 16, 16, 18, 20
         h = (top_pad + ih + gap1 + name_h + gap2 + line_h * len(lines) + gap3 + line_h + gap3
-             + 4 + hint_font.get_height() + bottom_pad)
+             + 4 + hint_font.get_height() + bottom_pad + ((gap3 + line_h * len(extra)) if extra else 0))
         x, y = view.WIDTH * 0.5 - w * 0.5, view.HEIGHT * 0.5 - h * 0.5
         pg.draw.rect(screen, self.EVENT_COLOR, pg.Rect(x, y, w, h))
         pg.draw.rect(screen, (0, 0, 0), pg.Rect(x, y, w, h), 3)
@@ -1133,6 +1121,12 @@ class Engine:
             line_surf = desc_font.render(line, True, (0, 0, 0))
             screen.blit(line_surf, (x + w * 0.5 - line_surf.get_width() * 0.5, cy))
             cy += line_h
+        if extra:
+            cy += gap3
+            for line in extra:
+                line_surf = desc_font.render(line, True, (0, 0, 0))
+                screen.blit(line_surf, (x + w * 0.5 - line_surf.get_width() * 0.5, cy))
+                cy += line_h
 
         cy += gap3
         pg.draw.line(screen, (0, 0, 0), (x + 40, cy - gap3 * 0.5), (x + w - 40, cy - gap3 * 0.5), 1)
@@ -1239,7 +1233,7 @@ class Engine:
 
     def update_turn(self):
         self.hint_rows = 0  # stacked hint boxes drawn so far this frame
-        if self.settings_open or self.event_info_open or self.pairing_open:
+        if (self.online is None and (self.settings_open or self.event_info_open)) or self.pairing_open:
             return  # frozen: drawing already happened in draw_gui
         if not self.turn_manager.dialog_active and not self.bot_turn:
             player = self.players[self.turn]
@@ -1250,20 +1244,177 @@ class Engine:
             self.card_menu.sync_forced(self.turn_manager.must_trade(player))
             self.card_menu.handle_input(self.io)
         self.turn_manager.update()
-        if self.players[self.turn].attack == 3:
+        shopper = self.players[self.turn]
+        if shopper.attack == 3:
             # The shop's own browse panel is drawn over all three icons;
             # put them back in front so they all stay visible and clickable.
-            self._settings_button().draw(self.view, self.io)
-            self._shop_button(outline_width=4).draw(self.view, self.io)
-            self._card_button().draw(self.view, self.io)
-            self._event_button().draw(self.view, self.io)
+            with self.private_layer(shopper.subattack < 8):
+                self._hud_buttons(shop_open=True)
+
+    def _hud_buttons(self, shop_open=False):
+        self._settings_button().draw(self.view, self.io)
+        self._shop_button(outline_width=4 if shop_open else 2).draw(self.view, self.io)
+        self._card_button().draw(self.view, self.io)
+        self._event_button().draw(self.view, self.io)
 
     def control_card_menu(self):
         if self.modal_open or self.bot_turn:
             self.card_menu.show = False
             self.card_menu.trade_mode = False
+        else:
+            with self.private_layer():
+                self.card_menu.draw(self.io, self.font)
+        self.own_menus()
+
+    # --- online: each device's own menus -------------------------------------------------
+
+    @contextmanager
+    def private_layer(self, active=True):
+        """Online, what's drawn in here is the current player's alone (the
+        game's shop and cards): it goes on their device's own layer."""
+        session = self.online
+        number = session.current_device() if active and session is not None and session.state == "game" else None
+        if number is None or number not in session.devices:
+            yield
             return
-        self.card_menu.draw(self.io, self.font)
+        screen, self.view.screen = self.view.screen, session.layer(session.devices[number])
+        try:
+            yield
+        finally:
+            self.view.screen = screen
+
+    # A device's menu state: the engine's own for the host, swapped in from
+    # its online.Device for a joined one.
+    OWN_FIELDS = ("settings_open", "event_info_open", "dragging_landmark",
+                  "save_as_open", "save_as_slot", "save_as_name", "save_as_names")
+
+    @contextmanager
+    def device_context(self, device):
+        """Run a device's own menus: its pointer (device.io), its layer, its
+        menu state and (for a joined device) its sounds alone."""
+        session, view = self.online, self.view
+        joined = device.id != 0
+        saved = {name: getattr(self, name) for name in self.OWN_FIELDS} if joined else None
+        if joined:
+            for name, value in device.fields.items():
+                setattr(self, name, value)
+        old = self.io, view.screen, self._device
+        self.io, view.screen, self._device = device.io, session.layer(device), device
+        target = (lambda kind, name: session.send_sound(device.id, kind, name)) if joined else None
+        try:
+            with sounds.private(target):
+                yield
+        finally:
+            self.io, view.screen, self._device = old
+            if joined:
+                device.fields = {name: getattr(self, name) for name in self.OWN_FIELDS}
+                for name, value in saved.items():
+                    setattr(self, name, value)
+
+    OWN_MENUS = ("settings", "shop", "cards", "event")
+
+    def own_menus(self):
+        """Online: every device opens the settings, the shop, the cards and
+        the event card for itself, at any time, on its own screen only
+        (drawn on its layer: online.HostSession.show_menus). The shop and
+        cards of the player whose turn it is are the game's (draw_gui) and
+        only theirs; anyone else gets a look (`device.look`): the shop all
+        red, the cards of their player whose turn comes soonest. While a
+        device has one open its pointers don't click in the game
+        (controls.Controls.frame)."""
+        session = self.online
+        if session is None or session.state != "game":
+            return
+        for device in list(session.devices.values()):
+            source = session.device_pointer(device)
+            if source is False:
+                continue  # a device without a pointer (yet)
+            device.io.update(self.view, self.countries.values(), source,
+                             source.fresh if source is not None else
+                             (self.controls.mouse_fresh if self.controls is not None else None))
+            with self.device_context(device):
+                self._own_menu(device, session.started_settings(device))
+
+    def _own_menu(self, device, start_pressed):
+        io = self.io
+        mouse = (io.mouse_position.x, io.mouse_position.y)
+        session = self.online
+        open_now = self._own_open(device)
+        clicked = None
+        if io.left_pressed and not self.turn_manager.dialog_active:
+            buttons = (self._settings_button(), self._shop_button(), self._card_button(), self._event_button())
+            clicked = next((kind for kind, b in zip(self.OWN_MENUS, buttons)
+                            if pg.Rect(b.pos.x, b.pos.y, b.width, b.height).collidepoint(mouse)), None)
+        if start_pressed and not self.turn_manager.dialog_active:
+            clicked = "settings"
+        if clicked is not None:
+            game_own = clicked in ("shop", "cards") and session.current_device() == device.id
+            if not game_own or open_now is not None:
+                io.left_pressed = 0
+                self._close_own(device)
+                if clicked != open_now and not game_own:
+                    self._open_own(device, clicked)
+                    sounds.play("click")
+        if self.settings_open:
+            self._draw_settings_menu()
+        elif self.event_info_open:
+            self._draw_event_info()
+        elif device.look == "shop":
+            if self.turn_manager.phases[3].draw_look():
+                device.look = None
+            else:
+                self._hud_buttons(shop_open=True)
+        elif device.look == "cards":
+            self._draw_card_look(device)
+
+    def _own_open(self, device):
+        """Which of its own menus a device has open (in its device_context)."""
+        if self.settings_open:
+            return "settings"
+        if self.event_info_open:
+            return "event"
+        return device.look
+
+    def _close_own(self, device):
+        if self.settings_open:
+            self.toggle_settings()
+        self.event_info_open = False
+        device.look = None
+
+    def _open_own(self, device, kind):
+        if kind == "settings":
+            self.toggle_settings()
+        elif kind == "event":
+            self.event_info_open = True
+        elif kind == "shop":
+            device.look = "shop"
+        else:
+            player = self.online.soonest_player(device.id)
+            if player is None or not player.cards:
+                sounds.play("error")  # nothing to show
+                return
+            device.cards = CardMenu(self.view, player)
+            device.cards.engine = self
+            device.look = "cards"
+
+    def _draw_card_look(self, device):
+        """A look at the cards of a device's player whose turn comes soonest:
+        only to see; a click outside them closes it."""
+        menu = device.cards
+        io = self.io
+        if not menu.player.cards:
+            device.look = None
+            return
+        menu.show, menu.trade_mode = True, False
+        menu.organize_cards()  # (also takes the trade selection off: there's no trading here)
+        pos = (io.mouse_position.x, io.mouse_position.y)
+        if io.left_pressed and not menu._panel_rect().collidepoint(pos):
+            device.look = None
+            io.left_pressed = 0
+            return
+        menu.draw(io, self.font)
+        io.button(("r",) + tuple(menu._panel_rect()))
+        io.left_pressed = 0
 
     def io_handle(self):
         source = None if self.controls is None else self.controls.frame(self)
@@ -1317,7 +1468,7 @@ class Engine:
 
         bot_acting = self.turn_manager.acting_player().is_bot  # then every paired controller clicks
         for pad in pads.pads:
-            if not pad.tapped(controls.A) or (pad in pads.clickers and not bot_acting):
+            if not pad.tapped(controls.A) or (pad in pads.clickers and not bot_acting)                     or (self.online is not None and self.online.own_menu_open(0)):
                 continue
             player = pads.player_of(pad, self.players)
             if player is None or player is current:
@@ -1327,7 +1478,7 @@ class Engine:
             return
         # Online: the pointers of the devices that joined, the same way.
         for pointer in self.online.pointers():
-            if not pointer.tapped(controls.A) or (pointer in pads.clickers and not bot_acting):
+            if not pointer.tapped(controls.A) or (pointer in pads.clickers and not bot_acting)                     or self.online.menu_blocks(pointer):  # (a click in its own menu)
                 continue
             names = self.online.names_of(pointer)
             if not names or current.name in names:
@@ -1335,7 +1486,7 @@ class Engine:
             say(pointer.pos)
         # And the host's own mouse, which doesn't click while a joined
         # device's player decides: for the players on this computer.
-        if not pads.mouse_ok and pads.mouse_fresh[0]:
+        if not pads.mouse_ok and pads.mouse_fresh[0] and not self.online.own_menu_open(0):
             names = [seat.name for seat in self.online.seats if seat.kind == "host"]
             if names and current.name not in names:
                 x, y = pg.mouse.get_pos()

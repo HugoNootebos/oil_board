@@ -37,7 +37,7 @@ import uuid
 from relay import (BEACON_EVERY, BEACON_PORT, BINARY, HEADER, JSON, MAX_MESSAGE, MEMBER, PORT,
                    RELAY_PROTOCOL, SILENT_LIMIT, pack, pack_json)
 
-PROTOCOL = 3  # host <-> devices (online.py, viewer.py, chat.py); 2: the chat, 3: hover panels
+PROTOCOL = 4  # host <-> devices (online.py, viewer.py, chat.py); 2: the chat, 3: hover panels, 4: own menus
 
 # The main relay's address ("name:port"), once the home relay is set up
 # (packaging/relay/README.md). OIL_SERVER or "online_server" in

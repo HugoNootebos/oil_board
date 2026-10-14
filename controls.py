@@ -273,10 +273,9 @@ class Controls:
         `mouse_ok` (not while a joined device's player decides)."""
         online = getattr(engine, "online", None)
         self.mouse_ok = True
-        if engine.pairing_open or getattr(engine, "host_decides", False):
-            # The Controllers panel, and online "Exit game?" / Save As
-            # (even when a joined device opened them): this computer's mouse
-            # and controllers click, no joined device does.
+        if engine.pairing_open:
+            # The Controllers panel: this computer's mouse and controllers
+            # click, no joined device does.
             self.clickers = list(self.pads)
         else:
             acting = engine.turn_manager.acting_player()
@@ -288,6 +287,11 @@ class Controls:
             if online is not None:
                 self.clickers += online.remote_clickers(acting)
                 self.mouse_ok = online.mouse_allowed(acting)
+        if online is not None and online.state == "game":
+            # A device with a menu of its own open (Engine.own_menus): its
+            # clicks are that menu's, not the game's.
+            self.clickers = [pad for pad in self.clickers if not online.menu_blocks(pad)]
+            self.mouse_ok = self.mouse_ok and not online.own_menu_open(0)
         source = self._latest(self.clickers, self.mouse_ok, engine.io)
         self._show_cursor(not isinstance(source, Pad))  # a joined device's pointer: the mouse is still here
         return source

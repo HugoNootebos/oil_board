@@ -9,8 +9,9 @@ Esc (or a controller's Back button) opens a small menu of this device's
 own: back to the game, fullscreen or windowed, leave the game. The chat
 (chat.py) is this device's own too: drawn over the host's picture, its
 clicks and keys stay here; only a message sent goes to the host. And so is
-the info panel of the country under this device's pointer, which the host
-makes for it (online.HostSession.show_hovers) and it draws over the picture.
+the info panel of the country under this device's pointer and its own
+menus (settings, shop, cards, event card), which the host makes for it
+(online.HostSession.show_hovers / show_menus) and it draws over the picture.
 """
 
 import base64
@@ -69,8 +70,10 @@ class Viewer:
         self._drawn = None
         self._swallowed = set()  # mouse buttons pressed on the chat: not sent as held
         self.hover = None        # (image, logical rect): the country info panel for this device's pointer
-        self.hover_version = 0
-        self._hover_scaled = None
+        self.menu = None         # (image, logical rect): its own menu
+        self.dim = False         # and whether that dims the picture
+        self.overlay_version = 0
+        self._hover_scaled = self._menu_scaled = None
         self.chat = chat.Chat(lambda text: self.conn.send({"type": "chat", "text": text}), me)
         self._layout()
 
@@ -81,7 +84,7 @@ class Viewer:
         w, h = round(WIDTH * self.scale), round(HEIGHT * self.scale)
         self.area = pg.Rect((sw - w) // 2, (sh - h) // 2, w, h)
         self.scaled = None
-        self._hover_scaled = None
+        self._hover_scaled = self._menu_scaled = None
         self._drawn = None
 
     def _logical(self, pos):
@@ -203,7 +206,12 @@ class Viewer:
             elif kind == "chat":
                 self.chat.add(message.get("lines"), old=bool(message.get("old")))
             elif kind == "hover":
-                self._hover(message)
+                self.hover, self._hover_scaled = _overlay(message), None
+                self.overlay_version += 1
+            elif kind == "menu":
+                self.menu, self._menu_scaled = _overlay(message), None
+                self.dim = bool(message.get("dim"))
+                self.overlay_version += 1
             elif kind == "seats" and isinstance(message.get("seats"), list):
                 self.seats = message["seats"]
             elif kind == "end":
@@ -213,23 +221,6 @@ class Viewer:
             elif kind == "kicked":
                 return "kicked"
         return "lost" if self.conn.closed else None
-
-    def _hover(self, message):
-        """The info panel of the country this device's pointer is over, as
-        the host made it (no rect: none)."""
-        self.hover = self._hover_scaled = None
-        self.hover_version += 1
-        rect, data = message.get("rect"), message.get("png")
-        if not (isinstance(rect, list) and len(rect) == 4 and isinstance(data, str)
-                and all(isinstance(v, int) and not isinstance(v, bool) for v in rect)):
-            return
-        rect = pg.Rect(rect)
-        try:
-            image = pg.image.load(io.BytesIO(base64.b64decode(data)), "panel.png")
-        except (ValueError, binascii.Error, pg.error):
-            return
-        if image.get_size() == rect.size and pg.Rect(0, 0, WIDTH, HEIGHT).contains(rect):
-            self.hover = (image, rect)
 
     def _leave(self):
         self.conn.send({"type": "leave"})
@@ -242,7 +233,7 @@ class Viewer:
         pads = [(pad.number, pad.pos) for pad in self.pads.pads]
         on_chat = self.chat.covers(mouse)  # reading the chat: no country info
         key = (self.seq, self.window.get_size(), str(self.cursors), pads, self.menu_open,
-               mouse if self.menu_open else None, hint, self.chat.key(mouse), self.hover_version, on_chat)
+               mouse if self.menu_open else None, hint, self.chat.key(mouse), self.overlay_version, on_chat)
         if key == self._drawn:
             return  # nothing new to show
         self._drawn = key
@@ -252,11 +243,13 @@ class Viewer:
         window.fill((0, 0, 0))
         window.blit(self.scaled, area.topleft)
         if self.hover is not None and not on_chat:
-            image, rect = self.hover
-            if self._hover_scaled is None:
-                self._hover_scaled = pg.transform.smoothscale(
-                    image, (max(1, round(rect.w * scale)), max(1, round(rect.h * scale))))
-            window.blit(self._hover_scaled, (area.x + round(rect.x * scale), area.y + round(rect.y * scale)))
+            self._hover_scaled = self._blit_overlay(self.hover, self._hover_scaled)
+        if self.dim:
+            dim = pg.Surface(area.size, pg.SRCALPHA)
+            dim.fill((0, 0, 0, 140))
+            window.blit(dim, area.topleft)
+        if self.menu is not None:
+            self._menu_scaled = self._blit_overlay(self.menu, self._menu_scaled)
         self.chat.draw(window, scale, area.topleft, mouse)
         own = {}  # this device's controllers: how the host says they look
         for x, y, r, g, b, faded, member, number in self.cursors:
@@ -278,6 +271,16 @@ class Viewer:
                 canvas.blit(text, text.get_rect(center=box.center))
             window.blit(pg.transform.smoothscale(canvas, area.size), area.topleft)
         pg.display.flip()
+
+    def _blit_overlay(self, overlay, scaled):
+        """Draw an (image, logical rect) the host made for this device;
+        returns it scaled to the window (kept until it changes)."""
+        image, rect = overlay
+        if scaled is None:
+            scaled = pg.transform.smoothscale(image, (max(1, round(rect.w * self.scale)),
+                                                      max(1, round(rect.h * self.scale))))
+        self.window.blit(scaled, (self.area.x + round(rect.x * self.scale), self.area.y + round(rect.y * self.scale)))
+        return scaled
 
     def _cursor(self, color, faded, x, y):
         sprite, margin = controls.cursor_sprite(color, faded, self.scale)
@@ -320,6 +323,23 @@ class Viewer:
         colors = [(150, 245, 150), (150, 200, 245), (240, 100, 100)]
         for rect, label, color in zip(rects, self._menu_labels(), colors):
             _draw_button(canvas, self.font, rect, label, color, hovered=rect.collidepoint(mouse))
+
+
+def _overlay(message):
+    """(image, logical rect) of a hover/menu message from the host; None
+    for none, or anything broken or out of place."""
+    rect, data = message.get("rect"), message.get("png")
+    if not (isinstance(rect, list) and len(rect) == 4 and isinstance(data, str)
+            and all(isinstance(v, int) and not isinstance(v, bool) for v in rect)):
+        return None
+    rect = pg.Rect(rect)
+    try:
+        image = pg.image.load(io.BytesIO(base64.b64decode(data)), "overlay.png")
+    except (ValueError, binascii.Error, pg.error):
+        return None
+    if image.get_size() != rect.size or not pg.Rect(0, 0, WIDTH, HEIGHT).contains(rect):
+        return None
+    return image, rect
 
 
 def _valid_cursor(entry):

@@ -254,6 +254,8 @@ def _(ev):
     fight("Londen", "Spanje", [6, 6, 6], [1])
     check("only conquests from other players are counted (not the mouse's)",
           ev.conquest_counts == {"A": 2}, ev.conquest_counts)
+    check("leaderboard in the event panel", ev.panel_lines(app)[1:] == ["A: 2", "B: 0", "C: 0"],
+          ev.panel_lines(app))
     finish()
     check("most conquests claims every country around Japan",
           all(country(n).owner is a and country(n).units == 1 for n in targets))
@@ -520,6 +522,26 @@ def _(ev):
     finish()
 
 
+@test("PutinsWar")
+def _(ev):
+    a, b, c = reset()
+    oil = richest([n for n, c_ in app.countries.items() if c_.oil > 0 and n not in ev.COUNTRIES], "oil")
+    food = richest([n for n, c_ in app.countries.items()
+                    if c_.food > 0 and n not in ev.COUNTRIES and n != oil], "food")
+    own(a, "Spanje", 2)
+    own(a, oil, 2)
+    own(b, food, 2)
+    activate(ev)
+    gained = income(a)
+    check("owner of an EU country: no food (troops still eat), no oil",
+          gained["food"] == -4 and gained["oil"] == 0, gained)
+    check("... other resources still arrive",
+          gained["wood"] == country("Spanje").wood + country(oil).wood, gained)
+    gained = income(b)
+    check("no EU country: income as usual", gained["food"] > 0, gained)
+    finish()
+
+
 @test("ChildLabor")
 def _(ev):
     a, b, c = reset()
@@ -711,6 +733,497 @@ def _(ev):
     check("mouse never gets the penalty", country("Argentinië").units == 9)
     check("dice_penalty for mouse is 0", ev.dice_penalty(app, app.default_player) == 0)
     finish()
+
+
+@test("GasInRoubles")
+def _(ev):
+    a, b, c = reset()
+    own(a, "Londen", 5)
+    own(b, "Sovjet-Rusland", 5)
+    own(c, "Canada", 5)
+    a.attack, a.subattack = 1, 0
+    activate(ev)
+    check("owner gets 5 oil", b.oil == 25, b.oil)
+    check("the others' oil goes into the pool", a.oil == 0 and c.oil == 0 and ev.pool == 40, (a.oil, c.oil, ev.pool))
+    check("a notice says so", len(m().notices) == 1)
+    m().notices.clear()
+    check("human owner is sent to the share screen", a.attack == 7 and m().acting_player() is b)
+    phase = m().phases[7]
+    phase.update()
+    check("share screen draws, nothing shared yet", phase.shares == {a: 0, c: 0} and a.attack == 7, phase.shares)
+    check("shop and cards blocked meanwhile", m().attack_in_progress())
+    a, b, c = save_and_load()
+    check("save/load mid-share keeps the pool and chooser", ev.pool == 40 and ev.chooser is b and a.attack == 7)
+    phase.update()
+    phase.shares = {a: 10, c: 25}
+    phase.update()
+    check("Confirm only once the pool is empty", a.attack == 7 and a.oil == 0)
+    phase.shares = {a: 10, c: 30}
+    phase._finish(ev, dict(phase.shares))
+    check("oil handed out as chosen", a.oil == 10 and c.oil == 30 and b.oil == 25, (a.oil, b.oil, c.oil))
+    check("player back where they were", (a.attack, a.subattack) == (1, 0))
+    check("only once", not ev.check_pending(app, a))
+    finish()
+
+    a, b, c = reset()
+    a.is_bot = True
+    own(a, "Sovjet-Rusland", 5)
+    own(b, "Londen", 30)
+    own(c, "Canada", 2)
+    activate(ev)
+    check("bot owner shares at once, all to the weakest", a.oil == 25 and b.oil == 0 and c.oil == 40
+          and a.attack == 0 and ev.pool == 0, (a.oil, b.oil, c.oil))
+    finish()
+
+    a, b, c = reset()
+    own(a, "Londen", 5)
+    own(b, "Canada", 5)
+    activate(ev)
+    check("mouse's Sovjet-Rusland: nothing yet", a.oil == 20 and not ev.triggered)
+    own(c, "Sovjet-Rusland", 2)
+    a.attack, a.subattack = 1, 0
+    check("taking it during the event triggers", ev.check_pending(app, a) and a.attack == 7 and ev.chooser is c)
+    finish()
+    check("never shared out: evenly at the end", a.oil == 20 and b.oil == 20 and c.oil == 25,
+          (a.oil, b.oil, c.oil))
+
+    a, b, c = reset()
+    own(a, "Sovjet-Rusland", 5)
+    own(b, "Londen", 5)
+    own(c, "Canada", 5)
+    b.oil = c.oil = 0
+    activate(ev)
+    check("nobody else has oil: only the 5, no share screen", a.oil == 25 and a.attack == 0)
+    finish()
+
+
+@test("GreenlandNotForSale")
+def _(ev):
+    a, b, c = reset()
+    own(a, "Londen", 5)
+    own(b, "Groenland", 6, tanks=1, fort_lvl=1, planes=1)
+    own(b, "Canada", 5)
+    own(c, "Mexico", 5)
+    a.attack, a.subattack = 1, 0
+    activate(ev)
+    check("auction screen, the current player bids first",
+          a.attack == 8 and ev.bidder(app) is a and m().acting_player() is a)
+    check("the owner doesn't bid", ev.bidders == ["A", "C"], ev.bidders)
+    phase = m().phases[8]
+    phase.update()
+    phase.amount = 7
+    check("shop and cards blocked meanwhile", m().attack_in_progress())
+    ev.bid(app, a, 7)
+    check("next bidder's turn, from 0", ev.bidder(app) is c and m().acting_player() is c)
+    phase.update()
+    check("... their bid starts at 0", phase.amount == 0)
+    a, b, c = save_and_load()
+    check("save/load mid-auction keeps the bids", ev.bids == {"A": 7} and ev.bidder(app) is c and a.attack == 8)
+    ev.bid(app, c, 5)
+    phase.update()
+    g = country("Groenland")
+    check("highest bidder gets it with everything on it",
+          g.owner is a and g.units == 6 and g.tanks == 1 and g.fort_lvl == 1 and g.planes == 1)
+    check("... and pays the previous owner", a.oil == 13 and b.oil == 27 and c.oil == 20, (a.oil, b.oil, c.oil))
+    check("player back where they were", (a.attack, a.subattack) == (1, 0))
+    check("bids shown afterwards", any("7" in n[1] and "5" in n[1] for n in m().notices), m().notices)
+    finish()
+
+    a, b, c = reset()
+    own(a, "Londen", 5)
+    own(b, "Groenland", 6)
+    own(c, "Mexico", 5)
+    activate(ev)
+    ev.bid(app, a, 5)
+    ev.bid(app, c, 5)
+    check("tie for the highest bid: nothing happens",
+          country("Groenland").owner is b and a.oil == c.oil == 20 and b.oil == 20)
+    finish()
+
+    a, b, c = reset()
+    own(a, "Londen", 5)
+    own(b, "Canada", 5)
+    own(c, "Mexico", 5)
+    b.oil = 0
+    activate(ev)
+    check("mouse's Groenland: everyone bids", ev.bidders == ["A", "B", "C"], ev.bidders)
+    ev.bid(app, a, 3)
+    check("no oil: bids 0 without a screen", ev.bids == {"A": 3, "B": 0} and ev.bidder(app) is c, dict(ev.bids))
+    ev.bid(app, c, 20)
+    check("bought from the mouse: the oil is gone", country("Groenland").owner is c and c.oil == 0 and a.oil == 20)
+    finish()
+
+    a, b, c = reset()
+    a.is_bot = c.is_bot = True
+    own(a, "Londen", 5)
+    own(b, "Groenland", 6, tanks=2)
+    own(b, "Canada", 5)
+    own(c, "Mexico", 5)
+    c.oil = 10
+    activate(ev)
+    check("bots bid at once, no screen", a.attack == 0 and not ev.bidders and country("Groenland").owner is not b
+          and a.oil + c.oil < 30, (a.oil, c.oil, country("Groenland").owner.name))
+    finish()
+
+    a, b, c = reset()
+    own(a, "Londen", 5)
+    own(b, "Groenland", 6)
+    own(c, "Mexico", 5)
+    c.oil = 0
+    activate(ev)
+    ev.bid(app, a, 4)
+    check("buying someone's last country eliminates them, with their loot",
+          country("Groenland").owner is a and b in m().elimination_loot and a.oil == 20 - 4 + 24, a.oil)
+    finish()
+
+
+@test("IsraelVictim")
+def _(ev):
+    from models import Position
+    a, b, c = reset()
+    own(a, "Londen", 5)
+    own(b, "Ottomaanse Rijk", 5)
+    own(c, "Mexico", 5)
+    a.attack, a.subattack = 1, 0
+    activate(ev)
+    m().notices.clear()
+    check("human owner gets the turn-order screen", a.attack == 9 and m().acting_player() is b)
+    phase = m().phases[9]
+    io = app.io
+    phase.update()
+    check("starts from the current order", phase.order == [a, b, c], [p.name for p in phase.order])
+    # Drag A (row 1) to the bottom.
+    phase.dragging, phase.grab_dy = 0, 0
+    io.mouse_state, io.mouse_position = (1, 0, 0), Position(400, 10000)
+    phase.update()
+    check("dragging moves the row", phase.order == [b, c, a] and phase.dragging == 2,
+          [p.name for p in phase.order])
+    io.mouse_state = (0, 0, 0)
+    phase.update()
+    check("letting go drops it", phase.dragging is None and phase.order == [b, c, a])
+    check("shop and cards blocked meanwhile", m().attack_in_progress())
+    phase._finish(ev, [p.name for p in phase.order])
+    check("new turn order kept", app.players == [b, c, a], [p.name for p in app.players])
+    check("current player keeps the turn", app.players[app.turn] is a and (a.attack, a.subattack) == (1, 0))
+    check("... then it goes on in the new order", app.players[(app.turn + 1) % 3] is b)
+    a, b, c = save_and_load()
+    check("save/load keeps the order", [p.name for p in app.players] == ["B", "C", "A"]
+          and app.players[app.turn].name == "A")
+    check("only once", not ev.check_pending(app, a))
+    finish()
+
+    a, b, c = reset()
+    a.is_bot = True
+    own(a, "Ottomaanse Rijk", 5)
+    own(b, "Londen", 30)
+    own(c, "Mexico", 2)
+    app.turn = 1
+    activate(ev, current=1)
+    check("bot owner sets it at once: itself, then weakest first",
+          app.players == [a, c, b] and app.players[app.turn] is b and b.attack == 0,
+          [p.name for p in app.players])
+    finish()
+
+    a, b, c = reset()
+    own(a, "Londen", 5)
+    own(b, "Canada", 5)
+    activate(ev)
+    check("mouse's Ottomaanse Rijk: nothing yet", a.attack == 0 and not ev.triggered)
+    own(c, "Ottomaanse Rijk", 2)
+    a.attack, a.subattack = 1, 0
+    check("taking it during the event: the new owner sets the order",
+          ev.check_pending(app, a) and a.attack == 9 and ev.chooser is c)
+    country("Canada").owner = app.default_player  # B is out
+    check("the screen lists only players still in", ev.in_play(app) == [a, c])
+    ev.reorder(app, ["C", "A"])
+    check("players out of the game go last", app.players == [c, a, b],
+          [p.name for p in app.players])
+    finish()
+
+
+@test("EvilSpirits")
+def _(ev):
+    a, b, c = reset()
+    own(a, "Londen", 5)
+    own(b, "Maleisië", 3, developed=True, dormant_owner=b)
+    b.food = 15
+    a.attack, a.subattack = 1, 0
+    activate(ev)
+    g = country("Maleisië")
+    check("developed: the owner is asked (also outside their turn)",
+          a.attack == 10 and m().acting_player() is b and b.food == 15)
+    check("shop and cards blocked meanwhile", m().attack_in_progress())
+    m().phases[10].update()
+    check("the question screen draws, nothing decided yet", a.attack == 10 and g.developed)
+    a, b, c = save_and_load()
+    check("save/load keeps the question", ev.chooser is b and a.attack == 10)
+    ev.choose(app, b, True)
+    a.attack, a.subattack = ev.return_to
+    g = country("Maleisië")
+    check("yes: pays 10 food, stays developed", b.food == 5 and g.developed, b.food)
+    check("... with a notice", len(m().notices) == 1)
+    check("only once", not ev.check_pending(app, a) and b.food == 5)
+    finish()
+
+    a, b, c = reset()
+    own(b, "Maleisië", 3, developed=True, dormant_owner=b)
+    activate(ev)
+    ev.choose(app, b, False)
+    g = country("Maleisië")
+    check("no: development undone, food kept", not g.developed and g.dormant_owner is None and b.food == 1000)
+    finish()
+
+    a, b, c = reset()
+    own(b, "Maleisië", 3, developed=True)
+    b.food = 9
+    activate(ev)
+    g = country("Maleisië")
+    check("not enough food: no question, development undone",
+          a.attack == 0 and not g.developed and b.food == 9)
+    finish()
+
+    a, b, c = reset()
+    b.is_bot = True
+    own(b, "Maleisië", 3, developed=True)
+    activate(ev)
+    check("bot owner decides at once", a.attack == 0 and ev.triggered and ev.chooser is None
+          and (b.food == 990) == country("Maleisië").developed)
+    finish()
+
+    a, b, c = reset()
+    own(a, "Maleisië", 3)
+    activate(ev)
+    check("not developed: nothing yet", a.attack == 0 and not ev.triggered)
+    country("Maleisië").developed = True
+    a.attack, a.subattack = 1, 0
+    check("developed during the event: asked then", ev.check_pending(app, a) and a.attack == 10)
+    finish()
+
+    a, b, c = reset()
+    country("Maleisië").developed = True  # the mouse's
+    activate(ev)
+    check("the mouse's: nothing until a player holds it", not ev.triggered)
+    own(c, "Maleisië", 2)
+    check("... then they're asked", ev.check_pending(app, a) and ev.chooser is c)
+    finish()
+
+@test("Inflation")
+def _(ev):
+    a, b, c = reset()
+    own(a, "Londen", 5)
+    own(b, "Belarus", 5)
+    own(b, "Canada", 5)
+    own(c, "Mexico", 5)
+    own(c, "Sovjet-Rusland", 5)
+    activate(ev)
+    shop = m().phases[3]
+    price = {"wood": 15, "steel": 1}
+    app.turn = 0
+    check("a Western country: double", shop._cost(price) == {"wood": 30, "steel": 2}, shop._cost(price))
+    app.turn = 1
+    check("Belarus: half (rounded up), also with a Western country",
+          shop._cost(price) == {"wood": 8, "steel": 1}, shop._cost(price))
+    app.turn = 2
+    check("Mexico and Sovjet-Rusland aren't Western: as usual", shop._cost(price) == price, shop._cost(price))
+    check("Western countries", set(ev.WESTERN) == {
+        "Alaska", "New York", "Los Angeles", "Canada", "Groenland", "Pearl Harbor", "Redneck",
+        "IJsland", "Viking", "Nazi-Duitsland", "Romeinse Rijk", "Spanje", "Londen"})
+    finish()
+    app.turn = 0
+    check("after the event: as usual", shop._cost(price) == price)
+
+
+@test("Immigration")
+def _(ev):
+    a, b, c = reset()
+    own(a, "Londen", 5)
+    own(b, "Spanje", 2)
+    activate(ev)
+    londen, ijsland = country("Londen"), country("IJsland")
+    check("Western Europe +3 troops each, also the mouse's",
+          londen.units == 8 and londen.immigrants == 3 and ijsland.immigrants == 3
+          and country("Belarus").immigrants == 0 and country("Sovjet-Rusland").immigrants == 0)
+    finish()
+    check("they stay after the event", londen.immigrants == 3)
+
+    phase = m().phases[1]
+    app.turn = 0
+    a.attack, a.subattack = 1, 1
+    phase.attack_from = "Londen"
+    target = sorted(neighbours("Londen") - set(ev.COUNTRIES))[0] if neighbours("Londen") - set(ev.COUNTRIES) \
+        else sorted(neighbours("Londen"))[0]
+    phase._start_attack(target, phase.connected("Londen", target, "land"))
+    check("attack dice: only the 5 others (3), all thrown", list(phase.attack_dice) == [0, 0, 0],
+          list(phase.attack_dice))
+    londen.units = 4
+    phase._start_attack(target, phase.connected("Londen", target, "land"))
+    check("1 besides the immigrants: it may throw", list(phase.attack_dice) == [0], list(phase.attack_dice))
+    londen.units = 3
+    phase.defence_country, phase.attack_dice = None, []
+    phase._start_attack(target, True)
+    check("only immigrants: no attack", phase.defence_country is None)
+
+    own(a, "Londen", 8)
+    londen.immigrants = 3
+    country("Spanje").units = 2
+    fight("Spanje", "Londen", [6, 6, 6], [1, 1])
+    check("defending: they fight, and die last", londen.units == 6 and londen.immigrants == 3)
+    fight("Spanje", "Londen", [6, 6, 6], [1, 1])
+    fight("Spanje", "Londen", [6, 6, 6], [1, 1])
+    check("... down to 2: 2 immigrants left", londen.units == 2 and londen.immigrants == 2,
+          (londen.units, londen.immigrants))
+
+    a, b, c = reset()
+    own(a, "Londen", 6)
+    londen = country("Londen")
+    londen.immigrants = 3
+    victim = sorted(n for n in neighbours("Londen") if phase.connected("Londen", n, "land")) \
+        or sorted(neighbours("Londen"))
+    victim = victim[0]
+    country(victim).units = 1
+    fight("Londen", victim, [6, 6, 6], [1], land=phase.connected("Londen", victim, "land"))
+    check("conquest: everything but the immigrants moves in",
+          country(victim).owner is a and country(victim).units == 3 and londen.units == 3
+          and londen.immigrants == 3, (country(victim).units, londen.units))
+    check("... and the move-in can't take them", londen.units - londen.immigrants == 0)
+    phase.reset()
+
+    a, b, c = reset()
+    own(a, "Londen", 5)
+    own(a, "Spanje", 1)
+    londen = country("Londen")
+    londen.immigrants = 3
+    move = m().phases[2]
+    move.move_resource, move.troops_require_sea, move.ships_via_sea = "units", False, False
+    for _ in range(5):
+        move._shift_resource(londen, country("Spanje"), towards_origin=False)
+    check("moving: the immigrants stay", londen.units == 3 and country("Spanje").units == 3,
+          (londen.units, country("Spanje").units))
+    country("Spanje").units, country("Spanje").immigrants = 3, 2
+    for _ in range(5):
+        move._shift_resource(londen, country("Spanje"), towards_origin=True)
+    check("... also the target's own", country("Spanje").units == 2 and londen.units == 4)
+    a, b, c = save_and_load()
+    check("save/load keeps them", country("Londen").immigrants == 3 and country("Spanje").immigrants == 2)
+
+    bot = m().bot
+    londen = country("Londen")
+    with bot._what_if((londen, "units", 0)):
+        inside = londen.immigrants
+    check("the bot's what-ifs put them back", inside == 0 and londen.immigrants == 3 and londen.units == 4)
+    check("bot sees only the others as free", londen.free == 1 and londen.keep == 3)
+
+    # Starvation: immigrants only go once no other troop is left.
+    a, b, c = reset()
+    own(a, "Londen", 5)
+    own(a, "Spanje", 1)
+    londen, spanje = country("Londen"), country("Spanje")
+    londen.immigrants = 3
+    app.turn = 0
+    rp = m().phases[0]
+    rp.starved = 4
+    rp.starve_pool = -4
+    rp.starve_initial = {n: x.units for n, x in app.countries.items()}
+    rp.starve_immigrants = {n: x.immigrants for n, x in app.countries.items()}
+    a.attack, a.subattack = 0, 4
+    io = app.io
+
+    def click(name, right=True):
+        io.hover_country, io.right_clicked, io.left_pressed = name, right, 0 if right else 1
+        rp._starvation_pool()
+        io.right_clicked, io.left_pressed = False, 0
+
+    for _ in range(3):
+        click("Londen")
+    check("starving: not the immigrants while others are left", londen.units == 3 and londen.immigrants == 3
+          and rp.starve_pool == -2, (londen.units, rp.starve_pool))
+    click("Spanje")
+    click("Londen")
+    check("... only immigrants left: then they starve", londen.units == 2 and londen.immigrants == 2
+          and spanje.units == 0 and rp.starve_pool == 0)
+    click("Londen", right=False)
+    check("put back: the immigrant comes back", londen.units == 3 and londen.immigrants == 3)
+    click("Spanje", right=False)
+    check("a regular troop put back instead", spanje.units == 1 and rp.starve_pool == -2)
+    click("Londen")
+    check("... then the immigrants are safe again", londen.units == 3 and rp.starve_pool == -2)
+
+    a, b, c = reset()
+    a.is_bot = True
+    own(a, "Londen", 5)
+    own(a, "Spanje", 2)
+    country("Londen").immigrants = 4
+    app.turn = 0
+    m().phases[0].starved = 3
+    m().bot._starve()
+    check("bot starves the other troops, not the immigrants",
+          country("Londen").units == 4 and country("Londen").immigrants == 4
+          and country("Spanje").owner is app.default_player, (country("Londen").units, country("Spanje").owner.name))
+    m().phases[0].starved = 1
+    m().bot._starve()
+    check("... only immigrants left: then one of them", country("Londen").units == 3
+          and country("Londen").immigrants == 3)
+
+    a, b, c = reset()
+    own(a, "Arabië", 2)
+    own(a, "Londen", 5)
+    own(a, "Spanje", 4)
+    country("Londen").immigrants = 3
+    EVENT["Pilgrimage"]._apply(app)
+    check("bedevaart: the immigrants stay home",
+          country("Londen").owner is a and country("Londen").units == 3 and country("Arabië").units == 2 + 2 + 4 + 5
+          and country("Spanje").owner is app.default_player, country("Arabië").units)
+
+
+@test("Woke")
+def _(ev):
+    a, b, c = reset()
+    own(a, "Londen", 1)
+    own(a, "Spanje", 5)
+    own(b, "Canada", 5)
+    own(b, "Mexico", 1)
+    own(c, "Peru", 5)
+    activate(ev)
+    abandon = m().phases[0].abandon
+    app.turn = 0
+    abandon(country("Londen"))
+    own(a, "Londen", 1)
+    abandon(country("Londen"))
+    check("a country given back scores once", ev.returned == {"A": ["Londen"]}, ev.returned)
+    abandon(country("Mexico"))
+    check("someone else's country emptied on A's turn (a nuke) doesn't count", "B" not in ev.returned)
+    check("scoreboard in the event panel", ev.panel_lines(app)[1:] == ["A: 1", "B: 0", "C: 0"],
+          ev.panel_lines(app))
+    a, b, c = save_and_load()
+    check("save/load keeps the score", ev.returned == {"A": ["Londen"]})
+    m().notices.clear()
+    finish()
+    check("lowest score (a tie: all of them) is cancelled", m().skip_turns == {"B", "C"}, m().skip_turns)
+    check("... with a notice", len(m().notices) == 1)
+    a, b, c = save_and_load()
+    check("save/load keeps who is cancelled", m().skip_turns == {"B", "C"})
+    app.turn = 0
+    m().next_turn()
+    check("their turns are skipped: back to A", app.turn == 0 and not m().skip_turns,
+          (app.players[app.turn].name, m().skip_turns))
+    m().next_turn()
+    check("... once", app.turn == 1)
+
+    a, b, c = reset()
+    a.is_bot = True
+    own(a, "Londen", 1)
+    own(a, "Spanje", 6)
+    own(a, "Nazi-Duitsland", 6)
+    own(b, "Canada", 5)
+    own(c, "Peru", 5)
+    activate(ev)
+    app.turn = 0
+    a.attack, a.subattack = 2, 0
+    check("bot behind: gives a country back as its move", m().bot._give_back(m().phases[2])
+          and len(ev.returned.get("A", [])) == 1 and a.repositioned_this_turn, ev.returned)
+    check("... and stops once ahead", ev.bot_give_back(app, a) == 0)
+    finish()
+    check("then only the others are cancelled", m().skip_turns == {"B", "C"})
 
 
 def generic(ev):

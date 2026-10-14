@@ -5,6 +5,7 @@ just don't play. The background music is kept very soft and is never
 muted: effects play on top of it."""
 import os
 import unicodedata
+from contextlib import contextmanager
 
 import pygame as pg
 
@@ -18,6 +19,10 @@ _ok = None
 # an online game's host passes them on to the devices that joined
 # (online.HostSession), so everyone hears the same.
 listener = None
+# Online, while a device's own menu runs (Engine.device_context): False
+# normally; None for this computer's own (played here, not passed on); a
+# function(kind, name) for a joined device's (passed to it alone).
+_private = False
 _last_mouse_ms = -10000
 _click_pending = False  # a click this frame, sounded by frame_end unless it was invalid
 _error_played = False
@@ -65,10 +70,26 @@ def start_background():
         pass
 
 
+@contextmanager
+def private(target=None):
+    """Sounds made in here are one device's own (see `_private`)."""
+    global _private
+    saved, _private = _private, target
+    try:
+        yield
+    finally:
+        _private = saved
+
+
 def play(name, shared=True):
     """Play sounds/<name>.mp3 over the background music. Online the joined
     devices hear it too, unless not `shared` (e.g. this computer's chat)."""
     global _last_mouse_ms, _error_played
+    if _private is not False:
+        if _private is not None:
+            _private("sound", name)  # a joined device's own menu: its sound alone
+            return
+        shared = False
     if name == "error":
         _error_played = True
     if listener is not None and shared:

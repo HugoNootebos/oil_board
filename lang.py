@@ -386,6 +386,46 @@ NL = {
     " moved {} from {} to {}": " verplaatste {} van {} naar {}",
 
     # Event notices
+    "{}: {} gets {} oil": "{}: {} krijgt {} olie",
+    "{}: {} gets {} oil and shares out the others' oil: {}":
+        "{}: {} krijgt {} olie en verdeelt de olie van de anderen: {}",
+    "{}: {} gets {} oil and shares out the others' {} oil":
+        "{}: {} krijgt {} olie en verdeelt de {} olie van de anderen",
+    "{}: share out the other players' oil": "{}: verdeel de olie van de andere spelers",
+    "{}: your blind bid in oil": "{}: je blinde bod in olie",
+    "{}: {} sets the new turn order: {}": "{}: {} bepaalt de nieuwe speelvolgorde: {}",
+    "{}: {} sets the new turn order": "{}: {} bepaalt de nieuwe speelvolgorde",
+    "{}: drag the names into the new turn order": "{}: sleep de namen in de nieuwe speelvolgorde",
+    "{} finishes this turn first": "{} maakt eerst deze beurt af",
+    "now": "nu",
+    "Immigrants only starve when no other troops are left": "Immigranten verhongeren pas als er geen andere troepen meer zijn",
+    "Given back to the mouse:": "Teruggegeven aan de mouse:",
+    "Taken from other players:": "Veroverd op andere spelers:",
+    "{} cancelled for 1 round": "{} gecancelled voor 1 ronde",
+    "Woke: {} cancelled for 1 round": "Woke: {} gecancelled voor 1 ronde",
+    "{} is cancelled: they skip this turn": "{} is gecancelled: slaat deze beurt over",
+    " is cancelled and skips this turn": " is gecancelled en slaat deze beurt over",
+    "{} immigrant": "{} immigrant",
+    "{} immigrants": "{} immigranten",
+    "never moves": "beweegt nooit",
+    "never move": "bewegen nooit",
+    "{} pays {} food to keep {} developed": "{} betaalt {} voedsel om {} ontwikkeld te houden",
+    "{} can't pay {} food: {} is no longer developed": "{} kan geen {} voedsel betalen: {} is niet meer ontwikkeld",
+    " pays {} food to keep {} developed": " betaalt {} voedsel om {} ontwikkeld te houden",
+    "{}: pay {} food to keep {} developed?": "{}: {} voedsel betalen om {} ontwikkeld te houden?",
+    "{} doesn't pay: {} is no longer developed": "{} betaalt niet: {} is niet meer ontwikkeld",
+    " lost the development of {}": " verloor de ontwikkeling van {}",
+    "New turn order: {}": "Nieuwe speelvolgorde: {}",
+    "(the others look away)": "(de anderen kijken weg)",
+    "All": "Alles",
+    "Bids: {}. No single highest bid: {} stays where it is":
+        "Biedingen: {}. Geen enkel hoogste bod: {} blijft waar het is",
+    "Bids: {}. {} buys {} for {} oil": "Biedingen: {}. {} koopt {} voor {} olie",
+    "Nobody buys {}": "Niemand koopt {}",
+    " buys {} for {} oil from ": " koopt {} voor {} olie van ",
+    "Rest": "Rest",
+    " takes {} oil from the other players (+{} oil)": " neemt {} olie van de andere spelers (+{} olie)",
+    " gets {} oil": " krijgt {} olie",
     "{} took Japan: +5 troops there": "{} veroverde Japan: +5 troepen daar",
     "{} took {}: the natives attack it with {} troops": "{} veroverde {}: de inboorlingen vallen het aan met {} troepen",
     "{} controls {}": "{} bezit {}",
@@ -473,6 +513,14 @@ EN = {
     "covid": "Covid",
     "drugs": "Drugs",
     "de nazi's breiden uit": "The Nazis expand",
+    "gas wordt betaald in roebels": "Gas is paid in roubles",
+    "Groenland is niet te koop!": "Greenland is not for sale!",
+    "Poetin's oorlog in Oekraïne": "Putin's war in Ukraine",
+    "Israël is het slachtoffer": "Israel is the victim",
+    "Boze geesten in Lara's huis": "Evil spirits in Lara's house",
+    "inflatie (door Poetin)": "Inflation (by Putin)",
+    "Immigratie": "Immigration",
+    "Woke": "Woke",
 
     # Events: descriptions
     "Japan krijgt 5 extra troepen en er ontstaan landroutes tussen Japan en elk ander land.":
@@ -516,6 +564,29 @@ EN = {
         "You can't travel between the US and Mexico.",
     "De olieproducerende landen krijgen 1 extra olie per land.":
         "Oil-producing countries get 1 extra oil each.",
+    "De speler die Sovjet-Unie bezit neemt alle oil van de andere spelers en herverdeeld dit onder hen. "
+    "Die speler krijgt zelf 5 oil erbij.":
+        "The player who owns the Soviet Union takes all the oil of the other players and shares it out "
+        "among them. That player gets 5 oil on top.",
+    "De spelers die niet Groenland bezitten bieden blind met oil. De hoogste bieder betaald zijn bod aan de "
+    "vorige bezitter van Groenland en krijgt het land met alles wat daar staat (troepen, tanks, etc.)":
+        "The players who don't own Greenland bid blind with oil. The highest bidder pays their bid to "
+        "Greenland's previous owner and gets the country with everything on it (troops, tanks, etc.)",
+    "De speler(s) die de minste landen aan Maus teruggeeft deze ronde wordt gecancelled voor 1 ronde":
+        "The player(s) who give the fewest countries back to Mouse this round get cancelled for 1 round",
+    "Alle West-Europese landen krijgen 3 troepen erbij die nooit kunnen bewegen of aanvallen.":
+        "Every Western European country gets 3 extra troops that can never move or attack.",
+    "Als je een Westers land bezit betaal je 2x zo veel in de sop. Belarus betaalt de helft, ook als je "
+    "daarnaast een Westers land bezit.":
+        "If you own a Western country you pay twice as much in the shop. Belarus pays half, even if you "
+        "also own a Western country.",
+    "Als Maleisië ontwikkeld is moet de speler die het bezit 10 voedsel betalen, anders word de ontwikkeling "
+    "ongedaan gemaakt":
+        "If Malaysia is developed, the player who owns it has to pay 10 food, or the development is undone",
+    "De bezitter van het Ottomaanse Rijk bepaalt de nieuwe speelvolgorde":
+        "The owner of the Ottoman Empire decides the new turn order",
+    "Elke speler met een EU land ontvangt deze ronde geen voedsel en geen oil":
+        "Every player with an EU country gets no food and no oil this round",
     "Spelers die sovjet, VS of Brazilië bezitten krijgen géén troepen.":
         "Players who own Soviet Russia, the US or Brazil get no troops.",
     "Als je de landen Venezuela, Mexico, Los Angeles, Siberië of Cuba bezit, "

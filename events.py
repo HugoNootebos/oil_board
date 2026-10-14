@@ -123,6 +123,18 @@ class Event:
         default leaves it unchanged."""
         return reinforcements
 
+    def on_abandon(self, engine, country, previous_owner):
+        """Called when `country` is about to fall back to
+        engine.default_player (Phase.abandon: emptied, nuked empty, ...),
+        `previous_owner` still holding it, while this event is the active
+        one. The default does nothing."""
+
+    def panel_lines(self, engine):
+        """Extra lines for the event panel (the event button), under the
+        description, while this event is the active one: e.g. a scoreboard.
+        Already translated. The default is none."""
+        return []
+
     def abandoned_units(self, engine, country, units):
         """Called when `country` falls back to engine.default_player
         (Phase.abandon), with `units` the garrison it would normally reset
@@ -167,6 +179,11 @@ class Event:
     def bot_country_value(self, engine, player, target):
         """Extra worth (in troops) to `player` of conquering `target`, while
         this event is the active one."""
+        return 0
+
+    def bot_give_back(self, engine, player):
+        """How many more of its countries `player` should give back to the
+        mouse this turn, while this event is the active one (Woke)."""
         return 0
 
     def bot_sea_attack_loss(self, engine):
@@ -365,6 +382,11 @@ class EmperorsHonor(Event):
             return  # only countries taken from other players count
         self.conquest_counts[player.name] = self.conquest_counts.get(player.name, 0) + 1
 
+    def panel_lines(self, engine):
+        players = [p for p in engine.players if not engine.turn_manager._is_out(p)]
+        scores = sorted(((p.name, self.conquest_counts.get(p.name, 0)) for p in players), key=lambda s: -s[1])
+        return [t("Taken from other players:")] + ["{}: {}".format(name, n) for name, n in scores]
+
     def on_end(self, engine):
         if not self.conquest_counts:
             return  # nobody conquered anything this round
@@ -472,7 +494,7 @@ class WrongButton(Event):
         current.attack, current.subattack = 5, 0
 
 
-# Filled in one at a time as they're described -- 23 total once complete.
+# Filled in one at a time as they're described -- 31 now.
 class JapaneseAggression(Event):
     def __init__(self):
         super().__init__(
@@ -830,8 +852,12 @@ class Pilgrimage(Event):
         total = 0
         for country in list(engine.countries.values()):
             if country.owner is owner and country is not arabia:
-                total += country.units
-                abandon(country)  # goes to default_player as usual
+                # Immigrants never move: a country with any stays theirs.
+                total += country.units - country.immigrants
+                if country.immigrants:
+                    country.units = country.immigrants
+                else:
+                    abandon(country)  # goes to default_player as usual
         arabia.units += total + 5
 
 
@@ -967,6 +993,501 @@ class NaziExpansion(Event):
         return 1 if attack_from.name == "Nazi-Duitsland" else 0
 
 
+class GasInRoubles(Event):
+    # "Sovjet-Unie" in the description is this board's "Sovjet-Rusland".
+    COUNTRY = "Sovjet-Rusland"
+    BONUS = 5
+
+    def __init__(self):
+        super().__init__(
+            name="gas wordt betaald in roebels",
+            description="De speler die Sovjet-Unie bezit neemt alle oil van de andere spelers en "
+                        "herverdeeld dit onder hen. Die speler krijgt zelf 5 oil erbij.",
+        )
+
+    # Whoever holds Sovjet-Rusland acts the moment the event starts -- even
+    # outside their own turn -- or, if mouse holds it, whoever takes it
+    # while the event lasts (check_pending); once per event. The oil taken
+    # is kept here (`pool`, saved) until the chooser has shared it out:
+    # a bot straight away, a human on the share screen
+    # (phases.OilSharePhase, attack == 7), which takes over the current
+    # turn for a moment and goes back to `return_to` after.
+    triggered = False
+    pool = 0
+    chooser = None
+    return_to = (0, 0)
+
+    def on_start(self, engine):
+        self.triggered, self.pool, self.chooser = False, 0, None
+        owner = engine.countries[self.COUNTRY].owner
+        if owner is not engine.default_player:
+            current = engine.players[engine.turn]
+            self._launch(engine, owner, (current.attack, current.subattack),
+                         t("{} controls {}").format(owner.name, t(self.COUNTRY)))
+
+    def check_pending(self, engine, player):
+        owner = engine.countries[self.COUNTRY].owner
+        if self.triggered or owner is engine.default_player:
+            return False
+        return_to = (player.attack, player.subattack if player.attack == 0 else 0)
+        self._launch(engine, owner, return_to, t("{} took {}").format(owner.name, t(self.COUNTRY)))
+        return True
+
+    def recipients(self, engine):
+        """The players the oil is shared among: everyone still in the game
+        but the chooser."""
+        manager = engine.turn_manager
+        return [p for p in engine.players if p is not self.chooser and not manager._is_out(p)]
+
+    def _launch(self, engine, chooser, return_to, why):
+        manager = engine.turn_manager
+        self.triggered = True
+        self.chooser = chooser
+        chooser.oil += self.BONUS
+        others = self.recipients(engine)
+        self.pool = sum(p.oil for p in others)
+        for p in others:
+            p.oil = 0
+        engine.log_action(chooser, Msg(" takes {} oil from the other players (+{} oil)", self.pool, self.BONUS))
+        if len(others) <= 1 or self.pool == 0:
+            # Nothing to choose: it all goes back where it came from.
+            if others:
+                others[0].oil += self.pool
+            self.pool, self.chooser = 0, None
+            manager.notices.append([self.name, t("{}: {} gets {} oil").format(why, chooser.name, self.BONUS)])
+            return
+        if chooser.is_bot:
+            shares = manager.bot.share_oil(chooser, others, self.pool)
+            self.share(engine, shares)
+            manager.notices.append([self.name, t("{}: {} gets {} oil and shares out the others' oil: {}").format(
+                why, chooser.name, self.BONUS,
+                ", ".join("{} {}".format(p.name, shares.get(p, 0)) for p in others))])
+            return
+        manager.notices.append([self.name, t("{}: {} gets {} oil and shares out the others' {} oil").format(
+            why, chooser.name, self.BONUS, self.pool)])
+        self.return_to = return_to
+        current = engine.players[engine.turn]
+        current.attack, current.subattack = 7, 0
+
+    def share(self, engine, shares):
+        """Hand the pool out: {player: amount}, adding up to the pool."""
+        for p, amount in shares.items():
+            p.oil += amount
+            if amount:
+                engine.log_action(p, Msg(" gets {} oil", amount))
+        self.pool, self.chooser = 0, None
+
+    def on_end(self, engine):
+        if self.pool and self.chooser is not None:
+            # Never shared out (shouldn't happen): evenly, the rest to the first.
+            others = self.recipients(engine)
+            if others:
+                each, rest = divmod(self.pool, len(others))
+                self.share(engine, {p: each + (rest if i == 0 else 0) for i, p in enumerate(others)})
+        self.pool, self.chooser = 0, None
+
+    def save_state(self, engine):
+        return {"triggered": self.triggered, "pool": self.pool,
+                "chooser": self.chooser.name if self.chooser is not None else None,
+                "return_to": list(self.return_to)}
+
+    def load_state(self, engine, data):
+        self.triggered = data.get("triggered", False)
+        self.pool = data.get("pool", 0)
+        self.chooser = next((p for p in engine.players if p.name == data.get("chooser")), None)
+        self.return_to = tuple(data.get("return_to", (0, 0)))
+
+
+class GreenlandNotForSale(Event):
+    COUNTRY = "Groenland"
+
+    def __init__(self):
+        super().__init__(
+            name="Groenland is niet te koop!",
+            description="De spelers die niet Groenland bezitten bieden blind met oil. De hoogste bieder "
+                        "betaald zijn bod aan de vorige bezitter van Groenland en krijgt het land met "
+                        "alles wat daar staat (troepen, tanks, etc.)",
+        )
+
+    # Right as the event starts, everyone still in the game but Groenland's
+    # owner (also when that's the mouse) bids, in turn order from the
+    # current player: a bot and a player without oil at once, a human on
+    # the bid screen (phases.BidPhase, attack == 8), one after the other;
+    # then back to `return_to`. The highest bid wins (a tie for it: nobody
+    # does), paid to the owner (to the mouse: it's gone), and the country
+    # changes hands with everything on it. `bidders` (names, in order) and
+    # `bids` ({name: oil}) are saved, so a save loaded mid-auction asks
+    # whoever hadn't bid yet.
+    bidders = ()
+    bids = {}
+    return_to = (0, 0)
+
+    def on_start(self, engine):
+        manager = engine.turn_manager
+        owner = engine.countries[self.COUNTRY].owner
+        n = len(engine.players)
+        order = [engine.players[(engine.turn + i) % n] for i in range(n)]
+        self.bidders = [p.name for p in order if p is not owner and not manager._is_out(p)]
+        self.bids = {}
+        current = engine.players[engine.turn]
+        self.return_to = (current.attack, current.subattack)
+        self.advance(engine)
+        if self.bidder(engine) is not None:
+            current.attack, current.subattack = 8, 0
+
+    def bidder(self, engine):
+        """The player whose bid is awaited (a human), or None."""
+        name = next((b for b in self.bidders if b not in self.bids), None)
+        return next((p for p in engine.players if p.name == name), None)
+
+    def bid(self, engine, player, amount):
+        self.bids[player.name] = max(0, min(int(amount), player.oil))
+        self.advance(engine)
+
+    def advance(self, engine):
+        """Take the bids that need no screen (bots, no oil) up to the next
+        human's; once everyone has bid, settle it."""
+        while True:
+            player = self.bidder(engine)
+            if player is None:
+                break
+            if player.oil > 0 and not player.is_bot:
+                return
+            amount = engine.turn_manager.bot.bid_for(player, engine.countries[self.COUNTRY]) \
+                if player.is_bot else 0
+            self.bids[player.name] = max(0, min(int(amount), player.oil))
+        if self.bidders:
+            self._settle(engine)
+
+    def _settle(self, engine):
+        manager = engine.turn_manager
+        country = engine.countries[self.COUNTRY]
+        players = {p.name: p for p in engine.players}
+        listed = ", ".join("{} {}".format(name, self.bids.get(name, 0)) for name in self.bidders)
+        self.bidders, bids, self.bids = [], dict(self.bids), {}
+        best = max(bids.values(), default=0)
+        leaders = [name for name, amount in bids.items() if amount == best]
+        if best <= 0 or len(leaders) != 1 or players.get(leaders[0]) is None:
+            manager.notices.append([self.name, t("Bids: {}. No single highest bid: {} stays where it is").format(
+                listed, t(self.COUNTRY))])
+            engine.log_action(Msg("Nobody buys {}", self.COUNTRY))
+            return
+        winner, owner = players[leaders[0]], country.owner
+        winner.oil -= best
+        if owner is not engine.default_player:
+            owner.oil += best
+        manager.phases[0].take_last_country(winner, country)  # their last country: eliminated
+        country.owner = winner
+        if country.dormant_owner is owner:
+            country.dormant_owner = winner
+        manager.landmark_conquered(country)
+        manager.notices.append([self.name, t("Bids: {}. {} buys {} for {} oil").format(
+            listed, winner.name, t(self.COUNTRY), best)])
+        engine.log_action(winner, Msg(" buys {} for {} oil from ", self.COUNTRY, best), owner)
+
+    def on_end(self, engine):
+        self.bidders, self.bids = [], {}
+
+    def save_state(self, engine):
+        return {"bidders": list(self.bidders), "bids": dict(self.bids), "return_to": list(self.return_to)}
+
+    def load_state(self, engine, data):
+        names = {p.name for p in engine.players}
+        self.bidders = [n for n in data.get("bidders", []) if n in names]
+        self.bids = {n: a for n, a in data.get("bids", {}).items() if n in names}
+        self.return_to = tuple(data.get("return_to", (0, 0)))
+
+
+class PutinsWar(Event):
+    # The board's EU countries.
+    COUNTRIES = ("Viking", "Nazi-Duitsland", "Romeinse Rijk", "Spanje")
+
+    def __init__(self):
+        super().__init__(
+            name="Poetin's oorlog in Oekraïne",
+            description="Elke speler met een EU land ontvangt deze ronde geen voedsel en geen oil",
+        )
+
+    def modify_income(self, engine, country, player, amounts):
+        if any(engine.countries[name].owner is player for name in self.COUNTRIES):
+            amounts["food"] = amounts["oil"] = 0
+        return player, amounts
+
+
+class IsraelVictim(Event):
+    COUNTRY = "Ottomaanse Rijk"
+
+    def __init__(self):
+        super().__init__(
+            name="Israël is het slachtoffer",
+            description="De bezitter van het Ottomaanse Rijk bepaalt de nieuwe speelvolgorde",
+        )
+
+    # Whoever holds Ottomaanse Rijk sets the order the moment the event
+    # starts (once its pop-up is clicked away) -- even outside their own
+    # turn -- or, if mouse holds it, whoever takes it while the event lasts
+    # (check_pending); once per event. A bot at once, a human on the
+    # turn-order screen (phases.TurnOrderPhase, attack == 9), which takes
+    # over the current turn for a moment and goes back to `return_to`. The
+    # current player finishes their turn; then the turn goes to whoever
+    # follows them in the new order.
+    triggered = False
+    chooser = None
+    return_to = (0, 0)
+
+    def on_start(self, engine):
+        self.triggered, self.chooser = False, None
+        owner = engine.countries[self.COUNTRY].owner
+        if owner is not engine.default_player:
+            current = engine.players[engine.turn]
+            self._launch(engine, owner, (current.attack, current.subattack),
+                         t("{} controls {}").format(owner.name, t(self.COUNTRY)))
+
+    def check_pending(self, engine, player):
+        owner = engine.countries[self.COUNTRY].owner
+        if self.triggered or owner is engine.default_player:
+            return False
+        return_to = (player.attack, player.subattack if player.attack == 0 else 0)
+        self._launch(engine, owner, return_to, t("{} took {}").format(owner.name, t(self.COUNTRY)))
+        return True
+
+    def _launch(self, engine, chooser, return_to, why):
+        manager = engine.turn_manager
+        self.triggered = True
+        if chooser.is_bot:
+            self.reorder(engine, [p.name for p in manager.bot.turn_order(chooser)])
+            manager.notices.append([self.name, t("{}: {} sets the new turn order: {}").format(
+                why, chooser.name, ", ".join(p.name for p in self.in_play(engine)))])
+            return
+        manager.notices.append([self.name, t("{}: {} sets the new turn order").format(why, chooser.name)])
+        self.chooser, self.return_to = chooser, return_to
+        current = engine.players[engine.turn]
+        current.attack, current.subattack = 9, 0
+
+    @staticmethod
+    def in_play(engine):
+        """The players still in the game, in turn order."""
+        return [p for p in engine.players if not engine.turn_manager._is_out(p)]
+
+    def reorder(self, engine, names):
+        """The new turn order: `names`, the players still in the game (the
+        eliminated ones go last). The current player keeps the turn."""
+        current = engine.players[engine.turn]
+        by_name = {p.name: p for p in engine.players}
+        order = [by_name[n] for n in names if n in by_name]
+        order += [p for p in engine.players if p not in order]
+        engine.players[:] = order
+        engine.turn = order.index(current)
+        self.chooser = None
+        engine.log_action(Msg("New turn order: {}", ", ".join(p.name for p in self.in_play(engine))))
+
+    def on_end(self, engine):
+        self.chooser = None
+
+    def save_state(self, engine):
+        return {"triggered": self.triggered, "return_to": list(self.return_to),
+                "chooser": self.chooser.name if self.chooser is not None else None}
+
+    def load_state(self, engine, data):
+        self.triggered = data.get("triggered", False)
+        self.chooser = next((p for p in engine.players if p.name == data.get("chooser")), None)
+        self.return_to = tuple(data.get("return_to", (0, 0)))
+
+
+class EvilSpirits(Event):
+    COUNTRY = "Maleisië"
+    PRICE = 10
+
+    def __init__(self):
+        super().__init__(
+            name="Boze geesten in Lara's huis",
+            description="Als Maleisië ontwikkeld is moet de speler die het bezit 10 voedsel betalen, "
+                        "anders word de ontwikkeling ongedaan gemaakt",
+        )
+
+    # The moment the event starts (once its pop-up is clicked away), a
+    # player holding Maleisië developed (or still developing) chooses: pay
+    # 10 food to keep the development, or lose it -- even outside their own
+    # turn. A bot at once, a human on the yes/no screen
+    # (phases.EventChoicePhase, attack == 10), which takes over the current
+    # turn for a moment and goes back to `return_to`; without the food
+    # there's no choice. If nobody holds it developed yet, that happens the
+    # moment that changes while the event lasts (check_pending); once per
+    # event.
+    triggered = False
+    chooser = None
+    return_to = (0, 0)
+
+    def on_start(self, engine):
+        self.triggered, self.chooser = False, None
+        current = engine.players[engine.turn]
+        self._launch(engine, (current.attack, current.subattack))
+
+    def check_pending(self, engine, player):
+        return self._launch(engine, (player.attack, player.subattack if player.attack == 0 else 0))
+
+    def _launch(self, engine, return_to):
+        country = engine.countries[self.COUNTRY]
+        owner = country.owner
+        if self.triggered or not country.developed or owner is engine.default_player:
+            return False
+        self.triggered = True
+        if owner.food < self.PRICE:
+            self.choose(engine, owner, False)
+        elif owner.is_bot:
+            self.choose(engine, owner, engine.turn_manager.bot.keep_development(owner, country, self.PRICE))
+        else:
+            self.chooser, self.return_to = owner, return_to
+            current = engine.players[engine.turn]
+            current.attack, current.subattack = 10, 0
+        return True
+
+    def question(self):
+        """The yes/no screen's question (EventChoicePhase)."""
+        return t("{}: pay {} food to keep {} developed?").format(self.chooser.name, self.PRICE, t(self.COUNTRY))
+
+    def choose(self, engine, owner, pay):
+        """`owner` pays the food (`pay`) or loses the development."""
+        country = engine.countries[self.COUNTRY]
+        self.chooser = None
+        if pay and owner.food >= self.PRICE:
+            owner.food -= self.PRICE
+            text = t("{} pays {} food to keep {} developed").format(owner.name, self.PRICE, t(self.COUNTRY))
+            engine.log_action(owner, Msg(" pays {} food to keep {} developed", self.PRICE, self.COUNTRY))
+        else:
+            country.developed = False
+            country.dormant_owner = None
+            if owner.food < self.PRICE:
+                text = t("{} can't pay {} food: {} is no longer developed").format(
+                    owner.name, self.PRICE, t(self.COUNTRY))
+            else:
+                text = t("{} doesn't pay: {} is no longer developed").format(owner.name, t(self.COUNTRY))
+            engine.log_action(owner, Msg(" lost the development of {}", self.COUNTRY))
+        engine.turn_manager.notices.append([self.name, text])
+
+    def on_end(self, engine):
+        self.chooser = None
+
+    def save_state(self, engine):
+        return {"triggered": self.triggered, "return_to": list(self.return_to),
+                "chooser": self.chooser.name if self.chooser is not None else None}
+
+    def load_state(self, engine, data):
+        self.triggered = data.get("triggered", False)
+        self.chooser = next((p for p in engine.players if p.name == data.get("chooser")), None)
+        self.return_to = tuple(data.get("return_to", (0, 0)))
+
+class Inflation(Event):
+    # The West: North America but Cuba and Mexico, Europe but Belarus and
+    # Sovjet-Rusland.
+    WESTERN = tuple(n for n in CONTINENTS["North America"] if n not in ("Cuba", "Mexico"))         + tuple(n for n in CONTINENTS["Europe"] if n not in ("Belarus", "Sovjet-Rusland"))
+    HALF = "Belarus"
+
+    def __init__(self):
+        super().__init__(
+            name="inflatie (door Poetin)",
+            description="Als je een Westers land bezit betaal je 2x zo veel in de sop. Belarus betaalt de "
+                        "helft, ook als je daarnaast een Westers land bezit.",
+        )
+
+    def discount_shop_cost(self, engine, cost):
+        # Only the current player shops. Half rounded up, as plunderingen.
+        player = engine.players[engine.turn]
+        if engine.countries[self.HALF].owner is player:
+            return {resource: (amount + 1) // 2 for resource, amount in cost.items()}
+        if any(engine.countries[name].owner is player for name in self.WESTERN):
+            return {resource: 2 * amount for resource, amount in cost.items()}
+        return cost
+
+
+class Immigration(Event):
+    # Western Europe: Europe but Belarus and Sovjet-Rusland (as Inflation).
+    COUNTRIES = tuple(n for n in CONTINENTS["Europe"] if n not in ("Belarus", "Sovjet-Rusland"))
+    TROOPS = 3
+
+    def __init__(self):
+        super().__init__(
+            name="Immigratie",
+            description="Alle West-Europese landen krijgen 3 troepen erbij die nooit kunnen bewegen of aanvallen.",
+        )
+
+    # The troops stay for good (Country.immigrants, saved with the country):
+    # they defend and eat like any troop, die last, and every move, attack,
+    # move-in and rail/air screen leaves them where they are. The mouse's
+    # countries get them too.
+
+    def on_start(self, engine):
+        for name in self.COUNTRIES:
+            country = engine.countries[name]
+            country.units += self.TROOPS
+            country.immigrants += self.TROOPS
+
+
+class Woke(Event):
+    def __init__(self):
+        super().__init__(
+            name="Woke",
+            description="De speler(s) die de minste landen aan Maus teruggeeft deze ronde wordt gecancelled "
+                        "voor 1 ronde",
+        )
+
+    # The round's score: every country of their own a player gives back to
+    # the mouse during their own turn by leaving it at 0 troops (moving,
+    # attacking or starving it empty; Phase.abandon) -- each country once
+    # per player. Shown in the event panel. When the round is over, whoever
+    # scored least (all of them, on a tie) has their next turn cancelled
+    # (TurnManager.skip_turns).
+    returned = {}  # player name -> [country names]
+
+    def on_start(self, engine):
+        self.returned = {}
+
+    def on_abandon(self, engine, country, previous_owner):
+        if engine.players[engine.turn] is not previous_owner:
+            return  # someone else's doing (a nuke, an event)
+        names = self.returned.setdefault(previous_owner.name, [])
+        if country.name not in names:
+            names.append(country.name)
+
+    def scores(self, engine):
+        """[(player, countries given back)] of everyone still in the game,
+        most first."""
+        players = [p for p in engine.players if not engine.turn_manager._is_out(p)]
+        return sorted(((p, len(self.returned.get(p.name, []))) for p in players), key=lambda s: -s[1])
+
+    def bot_give_back(self, engine, player):
+        # Enough to beat whoever has given back least so far (whoever is
+        # still to play has 0 now): one more than them.
+        scores = self.scores(engine)
+        own = next((n for p, n in scores if p is player), 0)
+        others = [n for p, n in scores if p is not player]
+        return max(0, min(others, default=0) + 1 - own)
+
+    def panel_lines(self, engine):
+        return [t("Given back to the mouse:")] + [
+            "{}: {}".format(p.name, n) for p, n in self.scores(engine)]
+
+    def on_end(self, engine):
+        manager = engine.turn_manager
+        scores = self.scores(engine)
+        self.returned = {}
+        if not scores:
+            return
+        least = min(n for _, n in scores)
+        cancelled = [p for p, n in scores if n == least]
+        manager.skip_turns |= {p.name for p in cancelled}
+        manager.notices.append([self.name] + ["{}: {}".format(p.name, n) for p, n in scores] + [
+            t("{} cancelled for 1 round").format(", ".join(p.name for p in cancelled))])
+        engine.log_action(Msg("Woke: {} cancelled for 1 round", ", ".join(p.name for p in cancelled)))
+
+    def save_state(self, engine):
+        return {"returned": {name: list(names) for name, names in self.returned.items()}}
+
+    def load_state(self, engine, data):
+        names = {p.name for p in engine.players}
+        self.returned = {n: list(c) for n, c in data.get("returned", {}).items() if n in names}
+
+
 EVENTS = [
     JapanGoesCrazy(),
     NativesFightBack(),
@@ -991,4 +1512,12 @@ EVENTS = [
     Covid(),
     Drugs(),
     NaziExpansion(),
+    GasInRoubles(),
+    GreenlandNotForSale(),
+    PutinsWar(),
+    IsraelVictim(),
+    EvilSpirits(),
+    Inflation(),
+    Immigration(),
+    Woke(),
 ]

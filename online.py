@@ -13,13 +13,15 @@ own mouse doesn't click (`mouse_allowed`). What the devices see is the
 host's screen (`FrameStream`), with everyone's cursor drawn on top by each
 device itself, and they hear the host's sounds (sounds.listener). What is
 each device's own is left out of that picture and drawn by the device: its
-chat (chat.py) and the info panel of the country its pointer is over
-(`show_hovers`: the host makes it, the device shows it).
+chat (chat.py), the info panel of the country its pointer is over
+(`show_hovers`) and its own menus (settings, shop, cards, event card:
+Engine.own_menus, `show_menus`); the host makes those, the device shows
+them.
 
 Messages from the host to its devices (through the relay, "to" a member
 or all): seats{state, title, seats}, start, cursors{c}, sound{kind, name},
-chat{lines, old}, hover{rect, png} (no rect: none), end{reason}, and the
-screen as BINARY
+chat{lines, old}, hover{rect, png} and menu{rect, png, dim} (no rect: none),
+end{reason}, and the screen as BINARY
 (`FrameStream.update_since`). From a device: take/release/name{seat, text}
 (its seats), pads{bind}, ready (it shows the game now), ack (an update
 arrived), mouse/pad (its input), chat{text} (see chat.py).
@@ -41,6 +43,7 @@ import net
 import relay
 import sounds
 from lang import t
+from models import Io
 
 # Posted (by the network threads) to wake a game loop waiting for events.
 NET_EVENT = pg.event.custom_type()
@@ -327,6 +330,27 @@ class Member:
         self.hover_at = -HOVER_MS
 
 
+class Device:
+    """A device's own menus in the game (Engine.own_menus): this computer's
+    (id 0) or a joined device's (its member number). Its pointer reads
+    clicks for them (`io`), they're drawn on its `layer` and its menu state
+    is kept in `fields` (the host's own is the engine's)."""
+
+    def __init__(self, number):
+        self.id = number
+        self.io = Io()
+        self.layer = None
+        self.drawn = False     # its layer has been used this frame
+        self.dim = False       # a joined device's menu wants its picture dimmed
+        self.look = None       # "shop" / "cards": a look at them (not the game's own)
+        self.cards = None      # the models.CardMenu its cards look shows
+        self.fields = {"settings_open": False, "event_info_open": False, "dragging_landmark": None,
+                       "save_as_open": False, "save_as_slot": None, "save_as_name": "", "save_as_names": []}
+        self.start_seen = False
+        self.sent = None       # the menu picture it has
+        self.sent_at = -HOVER_MS
+
+
 class HostSession:
     """A hosted online game: from the lobby (lobby.py's host screen) to its
     end. Opening the room happens in the background: `status` goes from
@@ -348,6 +372,8 @@ class HostSession:
         self._cursor_due = False
         self._picture_due = False
         self._hover_due = False
+        self._menu_due = False
+        self.devices = {0: Device(0)}  # their own menus, by device (0: this computer)
         self.chat = chat.Chat(self.say)  # this computer's chat (the host's messages go out from `say`)
         if connect:  # (online_checks.py tries a session without a network)
             threading.Thread(target=self._open, name="oil-host", daemon=True).start()
@@ -479,6 +505,8 @@ class HostSession:
                 elif kind == "ready":
                     member.viewing, member.base, member.in_flight = True, -1, 0
                     member.hover = None
+                    if member.id in self.devices:
+                        self.devices[member.id].sent = None
                     self._cursors = None  # it needs them all
                     if self.chat.lines:
                         self._send({"type": "chat", "lines": self.chat.lines, "old": True}, to=member.id)
@@ -503,12 +531,14 @@ class HostSession:
             return False
         device = str(message.get("device", ""))
         self.members[number] = Member(number, device)
+        self.devices[number] = Device(number)
         for seat in self.seats:
             if device and seat.kind == "open" and seat.device == device:
                 seat.kind, seat.member = "remote", number  # back after dropping out
         return True
 
     def _member_left(self, number):
+        self.devices.pop(number, None)
         if self.members.pop(number, None) is None:
             return False
         for seat in self.seats:
@@ -635,7 +665,7 @@ class HostSession:
     @property
     def busy(self):
         """Something still has to go out: keep drawing frames."""
-        return self.stream.pending or self._cursor_due or self._picture_due or self._hover_due
+        return self.stream.pending or self._cursor_due or self._picture_due or self._hover_due or self._menu_due
 
     def capture(self, window, rect):
         """Engine.present: the game's area of the window, before any cursor."""
@@ -774,10 +804,15 @@ class HostSession:
             entries.append(((pointer.x, pointer.y), stands_for, pointer.last_active))
         return entries
 
-    def _hovered(self, entries, chat_here=None):
-        """The country a device's info panel shows: of its pointers over a
-        country, the one whose player decides soonest; between equals the
-        one used last."""
+    def _hovered(self, number, entries, chat_here=None):
+        """The country device `number`'s info panel shows: of its pointers
+        over a country, the one whose player decides soonest; between equals
+        the one used last. None while it has a menu of its own open, or the
+        game's shop (its player's turn)."""
+        shopper = self.app.players[self.app.turn]
+        if self.own_menu_open(number) or (
+                shopper.attack == 3 and shopper.subattack < 8 and self.current_device() == number):
+            return None
         best = None
         for position, names, used in entries:
             name = self.app.device_country_at(position, chat_here)
@@ -802,7 +837,7 @@ class HostSession:
                 panels[name] = [image, rect, (name, tuple(rect), hash(pg.image.tobytes(image, "RGBA"))), None]
             return panels[name]
 
-        name = self._hovered(self._pointers_here(), self.chat)
+        name = self._hovered(0, self._pointers_here(), self.chat)
         if name is not None:
             image, rect = panel(name)[:2]
             size = (max(1, round(rect.w * scale)), max(1, round(rect.h * scale)))
@@ -813,7 +848,7 @@ class HostSession:
         for member in self.members.values():
             if not member.viewing:
                 continue
-            name = self._hovered(self._pointers_of(member))
+            name = self._hovered(member.id, self._pointers_of(member))
             shown = panel(name) if name is not None else None
             key = shown[2] if shown is not None else None
             if key == member.hover:
@@ -830,6 +865,132 @@ class HostSession:
                 message.update(rect=list(shown[1]), png=shown[3])
             self._send(message, to=member.id)
             member.hover, member.hover_at = key, now
+
+    # --- in the game: each device's own menus (Engine.own_menus) --------------------------
+
+    def device_of(self, name):
+        """The device the player called `name` plays on: a joined one's
+        number, else 0 (this computer: its own players, and those of a device
+        that dropped out)."""
+        seat = self._seat_of(name)
+        if seat is not None and seat.kind == "remote" and seat.member in self.members:
+            return seat.member
+        return 0
+
+    def current_device(self):
+        """The device of the player whose turn it is; None on a bot's turn."""
+        player = self.app.players[self.app.turn]
+        return None if player.is_bot else self.device_of(player.name)
+
+    def device_of_pointer(self, pointer):
+        """A pointer's device: a joined one's, 0 for this computer's mouse
+        (None) or controllers, None for nobody's (the parked pointer)."""
+        if isinstance(pointer, RemotePointer):
+            return pointer.member
+        return 0 if pointer is None or isinstance(pointer, controls.Pad) else None
+
+    def soonest_player(self, number):
+        """Of the (human) players on device `number`, the one whose turn
+        comes soonest; None for a device that only watches."""
+        players = [p for p in self.app.players if not p.is_bot and self.device_of(p.name) == number
+                   and not getattr(p, "eliminated", False)]
+        return min(players, key=lambda p: self._turn_rank([p.name]), default=None)
+
+    def own_menu_open(self, number):
+        """Whether device `number` has a menu of its own open."""
+        device = self.devices.get(number)
+        if device is None:
+            return False
+        if device.look is not None:
+            return True
+        state = (self.app.settings_open, self.app.event_info_open) if number == 0 else \
+            (device.fields["settings_open"], device.fields["event_info_open"])
+        return any(state)
+
+    def menu_blocks(self, pointer):
+        """Whether `pointer`'s device has a menu of its own open: then its
+        clicks are the menu's, not the game's (controls.Controls.frame)."""
+        number = self.device_of_pointer(pointer)
+        return number is not None and self.own_menu_open(number)
+
+    def device_pointer(self, device):
+        """The pointer a device's own menus follow: the one it used last
+        (None: this computer's mouse); False when it has none yet."""
+        if device.id == 0:
+            pads = self.app.controls
+            if pads is None:
+                return None
+            used = [pad for pad in pads.pads if pad.last_active >= 0]
+            latest = max(used, key=lambda pad: pad.last_active, default=None)
+            return latest if latest is not None and latest.last_active > pads.mouse_active else None
+        member = self.members.get(device.id)
+        if member is None or not member.viewing:
+            return False
+        latest = max(member.pointers.values(), key=lambda p: p.last_active)
+        return latest if latest.last_active >= 0 else False
+
+    def started_settings(self, device):
+        """Whether one of the device's controllers pressed Start (its settings)."""
+        if device.id == 0:
+            pads = self.app.controls.pads if self.app.controls is not None else []
+        else:
+            member = self.members.get(device.id)
+            pads = member.pointers.values() if member is not None else []
+        return any(pad.tapped(controls.START) for pad in pads)
+
+    def new_frame(self):
+        """Every device's layer starts empty (Engine.draw_world)."""
+        for device in self.devices.values():
+            device.drawn = device.dim = False
+
+    def layer(self, device):
+        """The device's own layer (960x640), emptied when first used in a frame."""
+        if device.layer is None:
+            device.layer = pg.Surface((controls.WIDTH, controls.HEIGHT), pg.SRCALPHA)
+        if not device.drawn:
+            device.layer.fill((0, 0, 0, 0))
+            device.drawn = True
+        return device.layer
+
+    def send_sound(self, number, kind, name):
+        """A sound of one joined device's own menu: for it alone."""
+        self._send({"type": "sound", "kind": kind, "name": name}, to=number)
+
+    def show_menus(self, window, scale, offset):
+        """Every device's own layer (its menus, Engine.own_menus, and the
+        game's shop and cards on its player's turn): this computer's drawn
+        here, a joined device's sent to it as a picture when it changes (at
+        most every HOVER_MS), with whether it dims its picture."""
+        if self.state != "game":
+            return
+        now = pg.time.get_ticks()
+        self._menu_due = False
+        for device in self.devices.values():
+            rect = device.layer.get_bounding_rect() if device.drawn else None
+            image = device.layer.subsurface(rect) if rect else None
+            if device.id == 0:
+                if image is not None:
+                    size = (max(1, round(rect.w * scale)), max(1, round(rect.h * scale)))
+                    window.blit(image if scale == 1 else pg.transform.smoothscale(image, size),
+                                (round(offset[0] + rect.x * scale), round(offset[1] + rect.y * scale)))
+                continue
+            member = self.members.get(device.id)
+            if member is None or not member.viewing:
+                continue
+            key = (tuple(rect), device.dim, hash(pg.image.tobytes(image, "RGBA"))) if image is not None else \
+                (None, device.dim)
+            if key == device.sent:
+                continue
+            if 0 <= now - device.sent_at < HOVER_MS:
+                self._menu_due = True
+                continue
+            message = {"type": "menu", "dim": device.dim}
+            if image is not None:
+                data = io.BytesIO()
+                pg.image.save(image, data, "menu.png")
+                message.update(rect=list(rect), png=base64.b64encode(data.getvalue()).decode("ascii"))
+            self._send(message, to=device.id)
+            device.sent, device.sent_at = key, now
 
     # --- in the game: the chat (chat.py) ---------------------------------------------
 

@@ -233,6 +233,8 @@ class Sandbox:
             manager.phases[5].predicate = None
         elif player.attack == 6:
             player.attack, player.subattack = getattr(event, "return_to", (1, 0))
+        elif player.attack in (7, 8, 9, 10):
+            player.attack, player.subattack = getattr(event, "return_to", (0, 0))
         before = snapshot(app)
         event.on_end(app)
         manager.current_event = None

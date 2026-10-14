@@ -29,6 +29,7 @@ import pygame as pg  # noqa: E402
 import chat  # noqa: E402
 import controls  # noqa: E402
 import lobby  # noqa: E402
+import models  # noqa: E402
 import net  # noqa: E402
 import online  # noqa: E402
 import relay  # noqa: E402
@@ -393,44 +394,35 @@ def test_clicks():
     _frame(app)
     check("a joined player decides: their device clicks, the host's mouse doesn't",
           not pads.mouse_ok and mouse in pads.clickers and app.io.source is mouse)
+    def own():
+        return s.devices[1].fields
     mouse.feed({"x": 50, "y": 50, "held": [controls.A], "down": [controls.A]}, pg.time.get_ticks())
     _frame(app)
-    check("their click reaches the game (the settings button)", app.settings_open)
-    mouse.feed({"x": 300, "y": 165, "held": [], "down": []}, pg.time.get_ticks())
+    check("their click on settings opens their own settings, not the host's",
+          own()["settings_open"] and not app.settings_open)
     _frame(app)
-    mouse.feed({"x": 300, "y": 165, "held": [controls.A], "down": [controls.A]}, pg.time.get_ticks())
-    _frame(app)
-    check("a joined device's Exit Game asks \"Exit game?\"",
-          not app.pending_quit and app.settings_open and app.exit_confirm_open)
-    mouse.feed({"x": 400, "y": 365, "held": [], "down": []}, pg.time.get_ticks())
-    _frame(app)
-    check("the host answers it: the host's mouse clicks, the device doesn't",
-          pads.mouse_ok and mouse not in pads.clickers)
-    mouse.feed({"x": 400, "y": 365, "held": [controls.A], "down": [controls.A]}, pg.time.get_ticks())
-    _frame(app)
-    check("the device's click on Yes doesn't end the game", not app.pending_quit and app.exit_confirm_open)
-    app.exit_confirm_open = False  # the host's No
-    mouse.feed({"x": 600, "y": 165, "held": [], "down": []}, pg.time.get_ticks())
-    _frame(app)
-    mouse.feed({"x": 600, "y": 165, "held": [controls.A], "down": [controls.A]}, pg.time.get_ticks())
-    _frame(app)
-    mouse.feed({"x": 600, "y": 165, "held": [], "down": []}, pg.time.get_ticks())
-    _frame(app)
-    check("a joined device's Save As opens the panel, and the host names the save",
-          app.save_as_open and pads.mouse_ok and mouse not in pads.clickers)
-    app._close_save_as()  # the host's Back
-    mouse.feed({"x": 300, "y": 165, "held": [], "down": []}, pg.time.get_ticks())
-    _frame(app)
+    check("while it's open their clicks are its, not the game's", mouse not in pads.clickers)
+    for x, y in ((300, 165), (600, 165), (220, 227)):  # Exit Game, Save As, the first toggle
+        mouse.feed({"x": x, "y": y, "held": [], "down": []}, pg.time.get_ticks())
+        _frame(app)
+        mouse.feed({"x": x, "y": y, "held": [controls.A], "down": [controls.A]}, pg.time.get_ticks())
+        _frame(app)
+        mouse.feed({"x": x, "y": y, "held": [], "down": []}, pg.time.get_ticks())
+        _frame(app)
+    check("a joined device can't exit, save or change the settings",
+          not app.pending_quit and not own()["save_as_open"] and not app.settings["assets"] and own()["settings_open"])
     mouse.feed({"x": 5, "y": 630, "held": [], "down": [controls.A]}, pg.time.get_ticks())
     _frame(app)
-    check("a click and release within one frame still clicks (closing the menu)", not app.settings_open)
+    check("a click and release within one frame still clicks (closing the menu)", not own()["settings_open"])
     _frame(app)
     mouse.feed({"x": 50, "y": 50, "held": [], "down": [controls.A, controls.A]}, pg.time.get_ticks())
     _frame(app)
-    opened = app.settings_open
+    opened = own()["settings_open"]
     _frame(app)
     _frame(app)
-    check("two clicks arriving together are two clicks (opened, then closed)", opened and not app.settings_open)
+    check("two clicks arriving together are two clicks (opened, then closed)", opened and not own()["settings_open"])
+    _frame(app)
+    check("and then the game gets their clicks again", mouse in pads.clickers)
 
     app.turn = 2
     _frame(app)
@@ -748,6 +740,114 @@ def test_hover():
     check("a broken or misplaced panel isn't shown", v.hover is None)
 
 
+def test_menus():
+    app = _game()
+    seats = [online.Seat("A", kind="host"), online.Seat("B"), online.Seat("C")]
+    s = _session(seats)
+    sent = []
+    s._send = lambda message, to=0: sent.append((to, message))
+    s._member_joined({"member": 1, "device": "dev"})
+    s._member_joined({"member": 2, "device": "watcher"})
+    for i in (1, 2):
+        s._seat_request(s.members[1], "take", {"seat": i})
+    s.members[1].viewing = s.members[2].viewing = True
+    s.start_game(app)
+    app.turn = 0
+    _frame(app)
+    one, watcher = s.devices[1], s.devices[2]
+    mouse, eyes = s.members[1].pointers["m"], s.members[2].pointers["m"]
+
+    def click(pointer, x, y):
+        pointer.feed({"x": x, "y": y, "held": [controls.A], "down": [controls.A]}, pg.time.get_ticks())
+        _frame(app)
+        pointer.feed({"x": x, "y": y, "held": [], "down": []}, pg.time.get_ticks())
+        _frame(app)
+
+    def menu_to(number):
+        return [m for to, m in sent if to == number and m["type"] == "menu"]
+
+    shop = app._shop_button()
+    shop_at = (shop.pos.x + 30, shop.pos.y + 30)
+    click(mouse, *shop_at)
+    check("anyone may open the shop: someone else's turn, a look of their own",
+          one.look == "shop" and app.players[0].attack != 3)
+    check("it's drawn for them (sent as a picture)", menu_to(1) and menu_to(1)[-1].get("png"))
+    check("and not in the game's picture", app.ui.get_at((400, 588))[3] == 0)
+    del sent[:]
+    time.sleep(online.HOVER_MS / 1000 + 0.02)
+    click(mouse, 225, 150)  # the bridge
+    errors = [(to, m) for to, m in sent if m["type"] == "sound" and m["name"] == "error"]
+    check("everything in it is out of reach (the error sound, for that device alone)",
+          errors and all(to == 1 for to, _ in errors) and app.players[1].subattack == 0, errors)
+    click(mouse, 5, 630)
+    check("a click outside closes it", one.look is None)
+    time.sleep(online.HOVER_MS / 1000 + 0.02)
+    _frame(app)
+    check("(and the device is told)", menu_to(1)[-1].get("png") is None)
+
+    click(mouse, app._card_button().pos.x + 30, 50)
+    check("cards: nothing to show when their player has none", one.look is None)
+    app.players[1].cards = [models.Kaertske(t, images=app.images) for t in (0, 1, 2)]
+    app.players[2].cards = [models.Kaertske(0, images=app.images)]
+    click(mouse, app._card_button().pos.x + 30, 50)
+    check("cards: those of their player whose turn comes soonest (B, then C)",
+          one.look == "cards" and one.cards.player is app.players[1])
+    check("only to look at: nothing picked for a trade", not any(card.use for card in app.players[1].cards))
+    click(mouse, 5, 630)
+    app.turn = 1
+    _frame(app)
+    click(mouse, app._card_button().pos.x + 30, 50)
+    check("on B's turn their cards button is the game's own (with trading)",
+          one.look is None and app.card_menu.show and app.card_menu.player is app.players[1])
+    check("drawn on their screen only", one.drawn and app.ui.get_at((480, 330))[3] == 0)
+    click(mouse, 5, 630)
+    app.turn = 0
+    _frame(app)
+
+    click(eyes, app._card_button().pos.x + 30, 50)
+    check("someone watching has no cards to show", watcher.look is None)
+    click(eyes, app._event_button().pos.x + 30, 50)
+    check("the event card: on their screen", watcher.fields["event_info_open"] and not app.event_info_open)
+    time.sleep(online.HOVER_MS / 1000 + 0.02)
+    _frame(app)
+    check("(dimming their picture)", menu_to(2)[-1].get("dim"))
+    click(eyes, 400, 400)
+    check("a click closes it", not watcher.fields["event_info_open"])
+
+    app.turn_manager.toggle_shop()
+    _frame(app)
+    host_layer = s.devices[0].layer
+    check("the host's turn: its shop is the game's, on its screen alone",
+          app.players[0].attack == 3 and s.devices[0].drawn
+          and tuple(host_layer.get_at((400, 588)))[:3] == app.SHOP_COLOR and app.ui.get_at((400, 588))[3] == 0)
+    click(mouse, *shop_at)
+    check("meanwhile others look at theirs", one.look == "shop" and app.players[0].attack == 3)
+    click(mouse, 5, 630)
+    app.turn_manager.toggle_shop()
+    _frame(app)
+
+    s._input(s.members[1], {"type": "pad", "n": 4, "x": 100, "y": 100, "held": [], "down": [controls.START]})
+    _frame(app)
+    check("a joined device's Start opens its own settings", one.fields["settings_open"] and not app.settings_open)
+    s._input(s.members[1], {"type": "pad", "n": 4, "x": 100, "y": 100, "held": [], "down": [controls.START]})
+    _frame(app)
+    _frame(app)  # (the same button twice in a row: a frame apart)
+    check("(and closes them)", not one.fields["settings_open"])
+    app.toggle_settings()
+    _frame(app)
+    check("the host's own settings: on its screen, the game goes on",
+          s.devices[0].drawn and app.ui.get_at((480, 320))[3] == 0 and not app.modal_open)
+    app.toggle_settings()
+    s.close()
+
+    conn = FakeConn([{"type": "menu", "dim": True, "rect": [100, 100, 20, 20], "png": "x"},
+                     {"type": "menu", "dim": True}])
+    v = viewer.Viewer(conn, 1, [])
+    v._receive()
+    check("a device takes in its menu (none, or a broken one: none)", v.menu is None and v.dim)
+    v._draw((500, 300))
+
+
 def test_game():
     real = net.find_main_relay
     net.find_main_relay = lambda stop=None: None  # no main relay: the host starts its own
@@ -819,10 +919,10 @@ def _game_through_relay():
     device.conn.send({"type": "mouse", "x": 50, "y": 50, "held": [], "down": []})
     for _ in range(60):
         _frame(app)
-        if app.settings_open:
+        if s.devices[me].fields["settings_open"]:
             break
         time.sleep(0.02)
-    check("the device's click works in the host's game", app.settings_open)
+    check("the device's click works: its own settings open", s.devices[me].fields["settings_open"])
     sounds.play("click")
     sound = device.wait("sound")
     check("the device hears the host's sounds", sound is not None and sound["name"] == "click")
@@ -857,7 +957,7 @@ def _game_through_relay():
 
 
 TESTS = [test_relay, test_discovery, test_stream, test_seats, test_clicks, test_names, test_chat, test_hover,
-         test_game]
+         test_menus, test_game]
 
 
 def main():
