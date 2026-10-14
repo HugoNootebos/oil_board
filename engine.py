@@ -196,6 +196,8 @@ class Engine:
         self.save_as_open = False
         self.save_as_slot = None
         self.save_as_name = ""
+        # "Exit game?" (Yes/No), asked when a joined device presses Exit Game.
+        self.exit_confirm_open = False
         # Where the autosave at the start of each turn goes.
         self.save_path = AUTOSAVE_PATH
 
@@ -727,7 +729,16 @@ class Engine:
         self.pairing_open = False
         self.settings_open = not self.settings_open
         self.dragging_landmark = None
+        self.exit_confirm_open = False
         self._close_save_as()
+
+    @property
+    def host_decides(self):
+        """Online, the "Exit game?" question and the Save As panel are the
+        host's: a joined device may open them, but only the host's own mouse
+        (and controllers) click in them (controls.Controls.frame)."""
+        return self.online is not None and self.settings_open \
+            and (self.exit_confirm_open or self.save_as_open)
 
     SAVE_NAME_MAX = 24
 
@@ -823,6 +834,22 @@ class Engine:
         if self._menu_button(back_rect, t("Back"), (220, 220, 220), mouse):
             self._close_save_as()
 
+    def _draw_exit_confirm(self, x, y, w, h, mouse):
+        """"Exit game?" with Yes/No, for a joined device's Exit Game: the
+        game ends for everyone, so the host answers it."""
+        screen = self.view.screen
+        screen.blit(self.font.render(t("Exit game?"), True, (0, 0, 0)), (x + 15, y + 10))
+        screen.blit(self.font.render(t("The host decides"), True, (90, 90, 90)), (x + 15, y + 45))
+        bw = (w - 60) // 2
+        yes_rect = pg.Rect(x + 20, y + h - 70, bw, 40)
+        no_rect = pg.Rect(x + 40 + bw, y + h - 70, bw, 40)
+        if self._menu_button(yes_rect, t("Yes"), (245, 150, 150), mouse):
+            self.exit_confirm_open = False
+            self.pending_quit = True
+        elif self._menu_button(no_rect, t("No"), (220, 220, 220), mouse):
+            self.exit_confirm_open = False
+        self.io.left_pressed = 0
+
     def _draw_settings_menu(self):
         view = self.view
         screen = view.screen
@@ -838,7 +865,12 @@ class Engine:
         screen.blit(dim, (0, 0))
 
         # Two columns; the Save As name picker keeps the narrow tall panel.
-        w, h = (340, 562) if self.save_as_open else (600, 440)
+        if self.exit_confirm_open:
+            w, h = 340, 190
+        elif self.save_as_open:
+            w, h = 340, 562
+        else:
+            w, h = 600, 440
         x, y = view.WIDTH * 0.5 - w * 0.5, view.HEIGHT * 0.5 - h * 0.5
         pg.draw.rect(screen, self.SETTINGS_COLOR, pg.Rect(x, y, w, h))
         pg.draw.rect(screen, (0, 0, 0), pg.Rect(x, y, w, h), 3)
@@ -852,6 +884,9 @@ class Engine:
             io.left_pressed = 0
             return
 
+        if self.exit_confirm_open:
+            self._draw_exit_confirm(x, y, w, h, mouse)
+            return
         if self.save_as_open:
             self._draw_save_as(x, y, w, h, mouse)
             return
@@ -861,16 +896,20 @@ class Engine:
         col_w = (w - 60) // 2
         col_x = (x + 20, x + 40 + col_w)
 
-        # In an online game a joined device can't end or save the host's game
-        # (nor pair its controllers): it leaves through its own menu (viewer.py).
+        # In an online game a joined device can ask to end or save the game,
+        # but the host answers "Exit game?" and names the save (host_decides);
+        # it can't pair the host's controllers.
         remote = self.online is not None and self.online.is_remote(io.source)
 
         quit_rect = pg.Rect(col_x[0], y + 45, col_w, 40)
-        if self._menu_button(quit_rect, t("Exit Game"), (245, 150, 150), mouse, enabled=not remote):
-            self.pending_quit = True
+        if self._menu_button(quit_rect, t("Exit Game"), (245, 150, 150), mouse):
+            if remote:
+                self.exit_confirm_open = True
+            else:
+                self.pending_quit = True
 
         save_as_rect = pg.Rect(col_x[1], y + 45, col_w, 40)
-        if self._menu_button(save_as_rect, t("Save As"), (150, 200, 245), mouse, enabled=not remote):
+        if self._menu_button(save_as_rect, t("Save As"), (150, 200, 245), mouse):
             self.save_as_open = True
             self.save_as_slot = None
             self.save_as_names = [read_save_name(slot_path(i)) for i in range(SAVE_SLOT_COUNT)]

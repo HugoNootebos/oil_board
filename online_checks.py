@@ -396,7 +396,25 @@ def test_clicks():
     _frame(app)
     mouse.feed({"x": 300, "y": 165, "held": [controls.A], "down": [controls.A]}, pg.time.get_ticks())
     _frame(app)
-    check("but a joined device can't end the host's game", not app.pending_quit and app.settings_open)
+    check("a joined device's Exit Game asks \"Exit game?\"",
+          not app.pending_quit and app.settings_open and app.exit_confirm_open)
+    mouse.feed({"x": 400, "y": 365, "held": [], "down": []}, pg.time.get_ticks())
+    _frame(app)
+    check("the host answers it: the host's mouse clicks, the device doesn't",
+          pads.mouse_ok and mouse not in pads.clickers)
+    mouse.feed({"x": 400, "y": 365, "held": [controls.A], "down": [controls.A]}, pg.time.get_ticks())
+    _frame(app)
+    check("the device's click on Yes doesn't end the game", not app.pending_quit and app.exit_confirm_open)
+    app.exit_confirm_open = False  # the host's No
+    mouse.feed({"x": 600, "y": 165, "held": [], "down": []}, pg.time.get_ticks())
+    _frame(app)
+    mouse.feed({"x": 600, "y": 165, "held": [controls.A], "down": [controls.A]}, pg.time.get_ticks())
+    _frame(app)
+    mouse.feed({"x": 600, "y": 165, "held": [], "down": []}, pg.time.get_ticks())
+    _frame(app)
+    check("a joined device's Save As opens the panel, and the host names the save",
+          app.save_as_open and pads.mouse_ok and mouse not in pads.clickers)
+    app._close_save_as()  # the host's Back
     mouse.feed({"x": 300, "y": 165, "held": [], "down": []}, pg.time.get_ticks())
     _frame(app)
     mouse.feed({"x": 5, "y": 630, "held": [], "down": [controls.A]}, pg.time.get_ticks())
