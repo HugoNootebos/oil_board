@@ -65,12 +65,13 @@ def start_background():
         pass
 
 
-def play(name):
-    """Play sounds/<name>.mp3 over the background music."""
+def play(name, shared=True):
+    """Play sounds/<name>.mp3 over the background music. Online the joined
+    devices hear it too, unless not `shared` (e.g. this computer's chat)."""
     global _last_mouse_ms, _error_played
     if name == "error":
         _error_played = True
-    if listener is not None:
+    if listener is not None and shared:
         listener("sound", name)
     if not _ready():
         return

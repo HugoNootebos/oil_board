@@ -15,9 +15,10 @@ device itself, and they hear the host's sounds (sounds.listener).
 
 Messages from the host to its devices (through the relay, "to" a member
 or all): seats{state, title, seats}, start, cursors{c}, sound{kind, name},
-end{reason}, and the screen as BINARY (`FrameStream.update_since`). From a
-device: take/release/name{seat, text} (its seats), pads{bind}, ready (it
-shows the game now), ack (an update arrived), mouse/pad (its input).
+chat{lines, old}, end{reason}, and the screen as BINARY
+(`FrameStream.update_since`). From a device: take/release/name{seat, text}
+(its seats), pads{bind}, ready (it shows the game now), ack (an update
+arrived), mouse/pad (its input), chat{text} (see chat.py).
 """
 
 import io
@@ -29,6 +30,7 @@ import time
 import numpy as np
 import pygame as pg
 
+import chat
 import controls
 import net
 import relay
@@ -337,6 +339,7 @@ class HostSession:
         self._cursors_at = 0
         self._cursor_due = False
         self._picture_due = False
+        self.chat = chat.Chat(self.say)  # this computer's chat (the host's messages go out from `say`)
         if connect:  # (online_checks.py tries a session without a network)
             threading.Thread(target=self._open, name="oil-host", daemon=True).start()
 
@@ -467,8 +470,13 @@ class HostSession:
                 elif kind == "ready":
                     member.viewing, member.base, member.in_flight = True, -1, 0
                     self._cursors = None  # it needs them all
+                    if self.chat.lines:
+                        self._send({"type": "chat", "lines": self.chat.lines, "old": True}, to=member.id)
                 elif kind == "pads":
                     self._pads(member, message.get("bind"))
+                elif kind == "chat":
+                    if member.viewing:
+                        self.say(message.get("text", ""), member)
                 else:
                     changed = self._seat_request(member, kind, message) or changed
         if changed:
@@ -706,6 +714,38 @@ class HostSession:
         """sounds.listener: the devices hear what the host hears."""
         if self.viewers:
             self._send({"type": "sound", "kind": kind, "name": name})
+
+    # --- in the game: the chat (chat.py) ---------------------------------------------
+
+    def say(self, text, member=None):
+        """A chat message typed here (`member` None) or on a joined device:
+        stamped with who said it (their players' names, the colour of the
+        first) and sent to every device in the game."""
+        text = chat.clean_text(text)
+        if not text or self.state != "game":
+            return
+        if member is None:
+            number, names = 0, [seat.name for seat in self.seats if seat.kind == "host"]
+        else:
+            number, names = member.id, self._names(member.id)
+        player = next((p for p in self.app.players if names and p.name == names[0]), None)
+        color = player.color if player is not None else chat.NO_COLOR
+        line = [number, " & ".join(names)[:chat.NAME_MAX], [int(c) for c in color], text]
+        self.chat.add([line])
+        for other in self.members.values():
+            if other.viewing:
+                self._send({"type": "chat", "lines": [line]}, to=other.id)
+
+    def draw_chat(self, window, scale, offset):
+        """This computer's chat, over the game (Engine.present: after the
+        picture for the devices is taken, so it's the host's alone)."""
+        if self.state != "game":
+            return
+        mouse = None
+        if pg.mouse.get_focused():
+            x, y = pg.mouse.get_pos()
+            mouse = ((x - offset[0]) / scale, (y - offset[1]) / scale)
+        self.chat.draw(window, scale, offset, mouse)
 
     # --- the end ------------------------------------------------------------------
 

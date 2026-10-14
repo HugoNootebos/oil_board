@@ -1,8 +1,9 @@
 """
 Automated checks for online play (net.py, relay.py, online.py, viewer.py,
-lobby.py): the relay's routing, finding relays, the screen stream, the
-lobby's seats, who may click in the game, and a whole hosted game with a
-device joining it through a real (local) relay. PASS/FAIL per check.
+lobby.py, chat.py): the relay's routing, finding relays, the screen stream,
+the lobby's seats, who may click in the game, the chat, and a whole hosted
+game with a device joining it through a real (local) relay. PASS/FAIL per
+check.
 
     python3 online_checks.py [name filter]
 
@@ -25,12 +26,14 @@ os.environ["OIL_SAVES_DIR"] = tempfile.mkdtemp(prefix="oil_online_checks_")
 import numpy as np  # noqa: E402
 import pygame as pg  # noqa: E402
 
+import chat  # noqa: E402
 import controls  # noqa: E402
 import lobby  # noqa: E402
 import net  # noqa: E402
 import online  # noqa: E402
 import relay  # noqa: E402
 import sounds  # noqa: E402
+import viewer  # noqa: E402
 from engine import Engine  # noqa: E402
 from models import Position  # noqa: E402
 
@@ -533,6 +536,127 @@ def test_names():
 
 # --- a whole hosted game, through a local relay -----------------------------------
 
+class FakeConn:
+    """A viewer's connection without a network: what it sent, what comes in."""
+
+    def __init__(self, incoming=()):
+        self.sent = []
+        self.incoming = list(incoming)
+        self.closed = False
+        self.wake = None
+
+    def send(self, message):
+        self.sent.append(message)
+
+    def poll(self):
+        incoming, self.incoming = self.incoming, []
+        return incoming
+
+    def close(self):
+        self.closed = True
+
+
+def _window_pos(view, x, y):
+    """Logical (x, y) in the host's window."""
+    return int(view.ox + x * view.scale), int(view.oy + y * view.scale)
+
+
+def _event(kind, **attributes):
+    return pg.event.Event(kind, **attributes)
+
+
+def _key(key):
+    return _event(pg.KEYDOWN, key=key, mod=0, unicode="")
+
+
+def test_chat():
+    spot = (chat.BUTTON.x + 4, chat.BUTTON.y + 4)  # on the button, beside the sprite
+    app = _game()
+    _frame(app)
+    check("a local game has no chat button",
+          tuple(pg.display.get_surface().get_at(_window_pos(app.view, *spot)))[:3] != chat.COLOR)
+
+    app = _game()
+    seats = [online.Seat("A", kind="host"), online.Seat("B"), online.Seat("C")]
+    s = _session(seats)
+    s._member_joined({"member": 1, "device": "dev"})
+    s._member_joined({"member": 2, "device": "watcher"})
+    for i in (1, 2):
+        s._seat_request(s.members[1], "take", {"seat": i})
+    s.members[1].viewing = s.members[2].viewing = True
+    s.start_game(app)
+    app.turn = 0
+    _frame(app)
+    view = app.view
+    check("online the host has the chat button (under the settings button)",
+          tuple(pg.display.get_surface().get_at(_window_pos(view, *spot)))[:3] == chat.COLOR)
+    scale = online.STREAM_SIZE[0] / controls.WIDTH
+    streamed = tuple(s.stream.frame.get_at((int(spot[0] * scale), int(spot[1] * scale))))[:3]
+    check("but the devices don't see it in the picture (they have their own)", streamed != chat.COLOR, streamed)
+
+    def to_logical(pos):
+        return (pos[0] - view.ox) / view.scale, (pos[1] - view.oy) / view.scale
+
+    button = _window_pos(view, chat.BUTTON.centerx, chat.BUTTON.centery)
+    real_pos, real_pressed, real_focused = pg.mouse.get_pos, pg.mouse.get_pressed, pg.mouse.get_focused
+    try:
+        pg.mouse.get_pos = lambda: button
+        pg.mouse.get_focused = lambda: True
+        pg.mouse.get_pressed = lambda num_buttons=3: (False, False, False)
+        app.io_handle()
+        pg.mouse.get_pressed = lambda num_buttons=3: (True, False, False)
+        app.io_handle()
+        check("the host's mouse pressing the chat button: the game doesn't get the click",
+              not app.io.left_pressed and app.io.hover_country is None
+              and app.io.top_button == chat.Chat(None).shapes()[0])
+    finally:
+        pg.mouse.get_pos, pg.mouse.get_pressed, pg.mouse.get_focused = real_pos, real_pressed, real_focused
+
+    took = s.chat.handle(_event(pg.MOUSEBUTTONDOWN, button=1, pos=button), to_logical)
+    check("a click on the button opens the chat", took and s.chat.open)
+    took = [s.chat.handle(e, to_logical) for e in (_event(pg.TEXTINPUT, text="hello  world"),
+                                                    _key(pg.K_F5), _key(pg.K_RETURN))]
+    line = s.chat.lines[-1] if s.chat.lines else None
+    check("while it's open every key is the chat's; Enter sends", all(took) and s.chat.draft == "")
+    check("the host's message goes under its player's name and colour",
+          line == [0, "A", list(app.players[0].color), "hello world"], line)
+    check("Esc closes the chat", s.chat.handle(_key(pg.K_ESCAPE), to_logical) and not s.chat.open)
+    check("closed, the keys are the game's again",
+          not s.chat.handle(_key(pg.K_ESCAPE), to_logical)
+          and not s.chat.handle(_event(pg.TEXTINPUT, text="x"), to_logical))
+    s.say("hi", s.members[1])
+    s.say("watching", s.members[2])
+    check("a device's message: its players' names, the first one's colour",
+          s.chat.lines[-2] == [1, "B & C", list(app.players[1].color), "hi"], s.chat.lines[-2])
+    check("someone without a player is a spectator", s.chat.name(s.chat.lines[-1]) == online.t("Spectator"))
+    check("messages that came in while it was closed are counted", s.chat.unread == 2)
+    _frame(app)
+    s.close()
+
+    conn = FakeConn([{"type": "chat", "lines": [[0, "A", [60, 110, 230], "earlier"]], "old": True},
+                     {"type": "chat", "lines": [[1, "B", [40, 160, 70], "mine"], "junk", [0, "A", [1, 2], "bad"]]},
+                     {"type": "chat", "lines": [[0, "A", [60, 110, 230], "new"]]}])
+    v = viewer.Viewer(conn, 1, [])
+    v._receive()
+    check("a device takes in the messages (the bad ones left out)",
+          [line[3] for line in v.chat.lines] == ["earlier", "mine", "new"])
+    check("only new ones from others count as unread (not the history, not its own)", v.chat.unread == 1)
+    at = (round(v.area.x + chat.BUTTON.centerx * v.scale), round(v.area.y + chat.BUTTON.centery * v.scale))
+    v._events([_event(pg.MOUSEBUTTONDOWN, button=1, pos=at)])
+    check("a device's click on its chat button opens its chat, and isn't sent to the host",
+          v.chat.open and v._down == [] and v._swallowed == {controls.A} and v.chat.unread == 0)
+    v._events([_event(pg.MOUSEBUTTONUP, button=1, pos=at), _event(pg.TEXTINPUT, text="gg"), _key(pg.K_RETURN)])
+    check("its message goes to the host", {"type": "chat", "text": "gg"} in conn.sent and not v._swallowed)
+    v._events([_key(pg.K_ESCAPE)])
+    check("Esc closes its chat first, then opens its menu", not v.chat.open and not v.menu_open)
+    v._events([_key(pg.K_ESCAPE)])
+    check("(its menu)", v.menu_open)
+    v.menu_open = False
+    v._events([_event(pg.MOUSEBUTTONDOWN, button=1, pos=(at[0] + 400, at[1] + 200))])
+    check("a click elsewhere is the host's", v._down == [controls.A])
+    v._draw((500, 300))
+
+
 def test_game():
     real = net.find_main_relay
     net.find_main_relay = lambda stop=None: None  # no main relay: the host starts its own
@@ -611,6 +735,16 @@ def _game_through_relay():
     sounds.play("click")
     sound = device.wait("sound")
     check("the device hears the host's sounds", sound is not None and sound["name"] == "click")
+    device.conn.send({"type": "chat", "text": "good luck"})
+    check("the device's chat message reaches the host",
+          until(lambda: [line[3] for line in s.chat.lines] == ["good luck"]))
+    said = device.wait("chat")
+    check("and comes back to it under its player's name",
+          said is not None and said["lines"] == [[me, "Bea", list(app.players[1].color), "good luck"]], said)
+    s.say("thanks")
+    said = device.wait("chat")
+    check("the host's message reaches the device",
+          said is not None and said["lines"][0][1:] == ["Ann", list(app.players[0].color), "thanks"], said)
 
     device.conn.send({"type": "leave"})
     check("a device leaving frees its seat, kept for it", until(lambda: seats[1].kind == "open")
@@ -619,6 +753,11 @@ def _game_through_relay():
     back.conn.send({"type": "join", "room": room["room"]})
     back.wait("joined")
     check("coming back, the same device has it again", until(lambda: seats[1].kind == "remote"))
+    back.conn.send({"type": "ready"})
+    until(lambda: any(member.viewing for member in s.members.values()))
+    history = back.wait("chat")
+    check("and gets the chat so far (as read)", history is not None and history.get("old")
+          and [line[3] for line in history["lines"]] == ["good luck", "thanks"], history)
     s.close("ended")
     end = back.wait("end")
     check("the host ending the game tells the devices", end is not None and end.get("reason") == "ended")
@@ -626,7 +765,7 @@ def _game_through_relay():
         conn.close()
 
 
-TESTS = [test_relay, test_discovery, test_stream, test_seats, test_clicks, test_names, test_game]
+TESTS = [test_relay, test_discovery, test_stream, test_seats, test_clicks, test_names, test_chat, test_game]
 
 
 def main():

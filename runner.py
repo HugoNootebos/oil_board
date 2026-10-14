@@ -119,6 +119,13 @@ def _play(app):
                 or (app.bot_turn and not app.turn_manager.game_over):
             frames_left = SETTLE_FRAMES
 
+        if session is not None and session.state == "game" and not app.typing_save_name:
+            # Online: this computer's chat (chat.py) takes its clicks, and
+            # every key while it's open, before the game sees them.
+            view = app.view
+            events = [e for e in events if not session.chat.handle(
+                e, lambda pos: ((pos[0] - view.ox) / view.scale, (pos[1] - view.oy) / view.scale))]
+
         wheel = []  # +1 per wheel-up notch, -1 per wheel-down
         mouse_clicked = False
         # While a save name is being typed, keys belong to the name box (Escape

@@ -464,6 +464,8 @@ class Engine:
             # What the devices that joined see: before any cursor (they draw
             # everyone's cursors themselves).
             self.online.capture(view.window, self._logical_clip())
+            # Then this computer's own chat (online only), which they don't see.
+            self.online.draw_chat(view.window, view.scale, (view.ox, view.oy))
         if self.controls is not None and self.controls.pads:
             self.controls.draw(view.window, view.scale, (view.ox, view.oy), self._pad_looks())
         if self.online is not None:
@@ -1225,11 +1227,21 @@ class Engine:
         self.card_menu.draw(self.io, self.font)
 
     def io_handle(self):
+        source = None if self.controls is None else self.controls.frame(self)
+        chat = self.online.chat if self.online is not None and self.online.state == "game" else None
+        if chat is not None and source is None:
+            # This computer's chat lies over everything (it's drawn last, see
+            # present): the buttons and map under it are out of the mouse's
+            # reach. A joined device's pointer has a chat of its own.
+            self.io.buttons += chat.shapes()
         if self.controls is None:
             self.io.update(self.view, self.countries.values())
         else:
-            source = self.controls.frame(self)
             self.io.update(self.view, self.countries.values(), source, self.controls.fresh(source))
+        if chat is not None and source is None and chat.covers((self.io.mouse_position.x, self.io.mouse_position.y)):
+            # (runner.play gave the click to the chat already)
+            self.io.left_pressed = 0
+            self.io.right_clicked = False
         shopper = self.players[self.turn]
         if shopper.attack == 3 and shopper.subattack < 8:
             # Shop menu open: the map behind it is inert (no hover panels,

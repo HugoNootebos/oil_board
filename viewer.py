@@ -6,11 +6,14 @@ itself runs on the host's computer only; this device's pointers click
 there when one of its players decides (online.HostSession.remote_clickers).
 
 Esc (or a controller's Back button) opens a small menu of this device's
-own: back to the game, fullscreen or windowed, leave the game.
+own: back to the game, fullscreen or windowed, leave the game. The chat
+(chat.py) is this device's own too: drawn over the host's picture, its
+clicks and keys stay here; only a message sent goes to the host.
 """
 
 import pygame as pg
 
+import chat
 import controls
 import online
 import sounds
@@ -58,6 +61,8 @@ class Viewer:
         self._pads_sent = {}
         self._bind_sent = None
         self._drawn = None
+        self._swallowed = set()  # mouse buttons pressed on the chat: not sent as held
+        self.chat = chat.Chat(lambda text: self.conn.send({"type": "chat", "text": text}), me)
         self._layout()
 
     def _layout(self):
@@ -84,23 +89,11 @@ class Viewer:
         clock = pg.time.Clock()
         while True:
             events = pg.event.get()
-            clicks = []
-            for event in events:
-                if event.type == pg.QUIT:
-                    self._leave()
-                    pg.quit()
-                    raise SystemExit
-                if event.type == pg.KEYDOWN and event.key == pg.K_ESCAPE:
-                    self.menu_open = not self.menu_open
-                elif event.type == pg.MOUSEBUTTONDOWN:
-                    if event.button == 1:
-                        clicks.append(self._logical(event.pos))
-                    if event.button in MOUSE_BUTTONS:
-                        self._down.append(MOUSE_BUTTONS[event.button])
-                    elif event.button in (4, 5):
-                        self._wheel += 1 if event.button == 4 else -1
-                elif event.type in (pg.VIDEORESIZE, pg.WINDOWSIZECHANGED):
-                    self._layout()
+            if any(event.type == pg.QUIT for event in events):
+                self._leave()
+                pg.quit()
+                raise SystemExit
+            clicks = self._events(events)
             self.pads.handle_events(events)
             if any(pad.tapped(BACK) for pad in self.pads.pads):
                 self.menu_open = not self.menu_open
@@ -119,12 +112,38 @@ class Viewer:
             self._draw(mouse)
             clock.tick(60)
 
+    def _events(self, events):
+        """This frame's mouse and keys: the chat's go to the chat, Esc
+        toggles the menu, the rest is for the host. Returns the left clicks
+        (logical), for the menu."""
+        clicks = []
+        for event in events:
+            if not self.menu_open and self.chat.handle(event, self._logical):
+                if event.type == pg.MOUSEBUTTONDOWN and event.button in MOUSE_BUTTONS:
+                    self._swallowed.add(MOUSE_BUTTONS[event.button])
+                continue
+            if event.type == pg.MOUSEBUTTONUP and event.button in MOUSE_BUTTONS:
+                self._swallowed.discard(MOUSE_BUTTONS[event.button])
+            if event.type == pg.KEYDOWN and event.key == pg.K_ESCAPE:
+                self.menu_open = not self.menu_open
+            elif event.type == pg.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    clicks.append(self._logical(event.pos))
+                if event.button in MOUSE_BUTTONS:
+                    self._down.append(MOUSE_BUTTONS[event.button])
+                elif event.button in (4, 5):
+                    self._wheel += 1 if event.button == 4 else -1
+            elif event.type in (pg.VIDEORESIZE, pg.WINDOWSIZECHANGED):
+                self._layout()
+        return clicks
+
     # --- the network -------------------------------------------------------
 
     def _send_input(self, mouse):
         conn = self.conn
         now = pg.time.get_ticks()
-        held = [b for b, on in zip((controls.A, online.MIDDLE, controls.B), pg.mouse.get_pressed()) if on]
+        held = [b for b, on in zip((controls.A, online.MIDDLE, controls.B), pg.mouse.get_pressed())
+                if on and b not in self._swallowed]  # (a press on the chat isn't the host's)
         state = (mouse, held)
         if self._down or self._wheel or (state != self._mouse_sent and (
                 self._mouse_sent is None or held != self._mouse_sent[1] or now - self._mouse_sent_at >= MOTION_MS)):
@@ -171,6 +190,8 @@ class Viewer:
                     sounds.play_country(name)
                 elif name.replace("_", "").isalnum():
                     sounds.play(name)
+            elif kind == "chat":
+                self.chat.add(message.get("lines"), old=bool(message.get("old")))
             elif kind == "seats" and isinstance(message.get("seats"), list):
                 self.seats = message["seats"]
             elif kind == "end":
@@ -191,7 +212,7 @@ class Viewer:
         hint = pg.time.get_ticks() < self.hint_until
         pads = [(pad.number, pad.pos) for pad in self.pads.pads]
         key = (self.seq, self.window.get_size(), str(self.cursors), pads, self.menu_open,
-               mouse if self.menu_open else None, hint)
+               mouse if self.menu_open else None, hint, self.chat.key(mouse))
         if key == self._drawn:
             return  # nothing new to show
         self._drawn = key
@@ -200,6 +221,7 @@ class Viewer:
             self.scaled = pg.transform.smoothscale(self.frame, area.size)
         window.fill((0, 0, 0))
         window.blit(self.scaled, area.topleft)
+        self.chat.draw(window, scale, area.topleft, mouse)
         own = {}  # this device's controllers: how the host says they look
         for x, y, r, g, b, faded, member, number in self.cursors:
             if member == self.me:
