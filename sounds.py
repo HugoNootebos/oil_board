@@ -28,10 +28,13 @@ def init_pygame():
     """What the menus and the game need of pygame (window, fonts,
     controllers): pg.init() without the mixer, which _ready() opens itself,
     once. pg.init() tries the mixer again on every call, and on a Windows PC
-    without an audio output each try waits ~8 s before it fails."""
+    without an audio output each try waits ~8 s before it fails.
+    pg.init() also starts SDL's timer; without it pg.time.get_ticks() stays
+    0 until a Clock is made (the headless checks make none), so make one."""
     pg.display.init()
     pg.font.init()
     pg.joystick.init()
+    pg.time.Clock()
 
 
 def _ready():

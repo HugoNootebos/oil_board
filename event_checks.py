@@ -546,7 +546,8 @@ def _(ev):
     check("... with its starting garrison", bc.units == app.initial_country_units["Belgisch Congo"])
     check("the other stays", country("Nigeria").owner is c)
     line = "".join(str(part) for part, _ in app.action_log[-2])
-    check("logged as the owner's loss", line == b.name + " lost 6 troops in " + lang.t("Belgisch Congo") + " due to ebola", line)
+    expected = b.name + lang.t(" lost {} troops in {} due to ebola").format(6, lang.t("Belgisch Congo"))
+    check("logged as the owner's loss", line == expected, line)
     finish()
 
     a, b, c = reset()
