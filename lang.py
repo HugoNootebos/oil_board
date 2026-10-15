@@ -614,10 +614,10 @@ NL = {
         "links. De soldaat toont je nieuwe troepen.",
     "Turn order": "Beurtvolgorde",
     "The square at the bottom right shows the turn order: a band per player, whose turn it is "
-    "on top. Click it any time to see every player's stock and who draws the next world event; "
+    "on top. Click it any time to see the other players' stock and who draws the next world event; "
     "click it again to close it.":
         "Het vierkantje rechtsonder toont de beurtvolgorde: een band per speler, met wie aan de "
-        "beurt is bovenaan. Klik er wanneer je wilt op om ieders voorraad te zien en wie de "
+        "beurt is bovenaan. Klik er wanneer je wilt op om de voorraad van de anderen te zien en wie de "
         "volgende wereldgebeurtenis trekt; klik nog eens om het te sluiten.",
     "skips": "slaat over",
     "World events": "Wereldgebeurtenissen",

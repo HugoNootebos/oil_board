@@ -642,6 +642,7 @@ class Engine:
     # --- the turn order (bottom right, over the phase box) ------------------------------
 
     TURN_ORDER_GAP = 4
+    TURN_ORDER_LIFT = 14  # the opened boxes end this far above the square's bottom
 
     def _turn_order_players(self):
         """The players still in the game in turn order, whose turn it is first."""
@@ -650,16 +651,24 @@ class Engine:
         players = [self.players[(self.turn + k) % n] for k in range(n)]
         return [p for p in players if p is current or not self.turn_manager._is_out(p)]
 
+    def _turn_order_opened(self):
+        """The players in the opened turn order, or None while it's the
+        square: the others only (the current player's stock is on the left)."""
+        others = self._turn_order_players()[1:]
+        return others if self.turn_order_open and others else None
+
     def _turn_order_rect(self):
-        """Where the turn order is (logical): the square, or opened its boxes,
-        right above the phase box."""
+        """Where the turn order is (logical): the square right above the
+        phase box, or opened its boxes, flush with the right edge."""
         view, gui = self.view, self.gui
-        bottom = view.HEIGHT - gui.PHASE_BOX_H
-        if not self.turn_order_open:
-            size = self.BUTTON_SIZE
-            return pg.Rect(view.WIDTH - self.BUTTON_MARGIN - size, bottom - self.BUTTON_MARGIN - size, size, size)
-        height = len(self._turn_order_players()) * (gui.TURN_BOX_H + self.TURN_ORDER_GAP)
-        return pg.Rect(view.WIDTH - gui.width, bottom - height, gui.width, height - self.TURN_ORDER_GAP)
+        size = self.BUTTON_SIZE
+        bottom = view.HEIGHT - gui.PHASE_BOX_H - self.BUTTON_MARGIN
+        others = self._turn_order_opened()
+        if others is None:
+            return pg.Rect(view.WIDTH - self.BUTTON_MARGIN - size, bottom - size, size, size)
+        height = len(others) * (gui.TURN_BOX_H + self.TURN_ORDER_GAP) - self.TURN_ORDER_GAP
+        bottom -= self.TURN_ORDER_LIFT
+        return pg.Rect(view.WIDTH - gui.TURN_BOX_W, bottom - height, gui.TURN_BOX_W, height)
 
     def _turn_order_hidden(self):
         """Whether the turn order is left out: under a dialog or a menu of
@@ -691,16 +700,17 @@ class Engine:
 
     def _draw_turn_order(self, hidden=False):
         """The turn order: closed, a square with a band in each player's
-        colour, whose turn it is on top; opened, a box per player with their
-        stock (Gui.draw_turn_box) and the event card on whoever draws the
-        next one. Each device's own (drawn after the game's layer is taken),
-        under the action log."""
+        colour, whose turn it is on top; opened, a box per other player with
+        their stock (Gui.draw_turn_box), the next player on top and the event
+        tag on whoever draws the next event card. Each device's own (drawn
+        after the game's layer is taken), under the action log."""
         if hidden or self._turn_order_hidden():
             return
         view, gui, manager = self.view, self.gui, self.turn_manager
-        players = self._turn_order_players()
         rect = self._turn_order_rect()
-        if not self.turn_order_open:
+        others = self._turn_order_opened()
+        if others is None:
+            players = self._turn_order_players()
             inner = rect.inflate(-4, -4)
             top = inner.y
             for i, player in enumerate(players):
@@ -714,13 +724,12 @@ class Engine:
         if self.tutorial is not None and self.tutorial.active:
             upcoming = None  # (the tutorial holds the events back)
         y = rect.y
-        for player in players:
+        for player in others:
             amounts = {r: getattr(player, r) for r in ("food", "wood", "steel", "oil", "nuclear")}
             amounts["helmets"] = self.production(player)["helmets"]
             amounts["cards"] = len(player.cards)
-            turns = upcoming[0] if upcoming is not None and upcoming[1] is player else None
             gui.draw_turn_box(view, player, amounts, pg.Rect(rect.x, y, rect.w, gui.TURN_BOX_H),
-                              current=player is self.players[self.turn], event_turns=turns,
+                              event=upcoming is not None and upcoming[1] is player,
                               skips=player.name in manager.skip_turns)
             y += gui.TURN_BOX_H + self.TURN_ORDER_GAP
 
@@ -803,22 +812,8 @@ class Engine:
 
     def _draw_country_info(self, name):
         """The info panel (top right) of the country called `name`, on view.screen."""
-        hovered = self.countries[name]
-        owner_stats = None
-        owner = hovered.owner
-        # What the owner holds, only when it's another real player.
-        if owner is not self.default_player and owner is not self.players[self.turn]:
-            amounts = {r: getattr(owner, r) for r in ("food", "wood", "steel", "oil", "nuclear")}
-            amounts["helmets"] = self.production(owner)["helmets"]
-            amounts["cards"] = len(owner.cards)
-            owner_stats = (owner, amounts, self.mini_images)
-        self.gui.draw_country_stats(
-            view=self.view,
-            country=hovered,
-            font=self.font,
-            images=self.hud_images,
-            owner_stats=owner_stats,
-        )
+        self.gui.draw_country_stats(view=self.view, country=self.countries[name], font=self.font,
+                                    images=self.hud_images)
 
     def country_panel(self, name):
         """The info panel of the country called `name` on its own (online,
@@ -856,7 +851,7 @@ class Engine:
     BUTTON_MARGIN = 10
     BUTTON_SIZE = 44
     BUTTON_STEP = 50  # 44 wide + 6 gap
-    STATS_POS = (BUTTON_MARGIN, BUTTON_MARGIN + 2 * BUTTON_STEP)
+    STATS_POS = (0, BUTTON_MARGIN + 2 * BUTTON_STEP)  # (flush with the left edge)
 
     @property
     def bot_turn(self):

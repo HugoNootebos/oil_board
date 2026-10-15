@@ -1009,15 +1009,10 @@ class Gui:
         self.player_rect = None
         self.player_rows = []
 
-    # Owner mini-stats under the country info: icon + amount, 3 per row.
-    OWNER_CELLS = [("spr_food", "food"), ("spr_wood", "wood"), ("spr_steel", "steel"),
-                   ("spr_oil", "oil"), ("spr_nuclear", "nuclear"), ("spr_troops", "helmets"),
-                   ("spr_cards", "cards")]
-
-    def draw_country_stats(self, view, country, font, images, owner_stats=None):
-        """`owner_stats` = (player, {food, wood, steel, oil, nuclear,
-        helmets, cards}, mini_images): draws a compact summary of the country's
-        owner under the country info."""
+    def draw_country_stats(self, view, country, font, images):
+        """The info panel (top right) of `country`: what it yields, its
+        airport/fort/assets, under a band in its owner's colour. (The owner's
+        stock is in the turn order: Engine._draw_turn_order.)"""
         # A developed country yields double, so its resources show doubled
         # (troops don't double) -- but not while it's still under
         # construction (dormant_owner set until its first income).
@@ -1062,26 +1057,14 @@ class Gui:
         per_row, cell = (5, 28) if compact else (3, 46)
         y_status = 30 + -(-len(image_list) // per_row) * cell
         y_assets = y_status + status_h
-        base_h = y_assets + assets_grid_h + radioactive_h + immigrants_h + 6
-        panel_h = base_h
-        if owner_stats:
-            panel_h = max(panel_h, self.OWNER_MIN_H)  # room for the owner box beside it
+        panel_h = y_assets + assets_grid_h + radioactive_h + immigrants_h + 6
 
         x0 = view.WIDTH - self.width
         pg.draw.rect(view.screen, self.gray1, pg.Rect(x0, 0, self.width, panel_h))
 
-        # Another player's country: their colour makes a band over the top
-        # of both this panel and the owner box beside it, with the names in it.
+        # The owner's colour makes the name band over the panel.
         name_color = self.outline_color
-        if owner_stats:
-            owner = owner_stats[0]
-            name_color = name_text_color(owner.color)
-            if not hasattr(self, "small_font"):
-                self.small_font = game_font(15)
-            self._draw_owner_box(view, owner_stats, x0, font)
-        elif country.owner is not None:
-            # The active player's own country, or the neutral mouse's: the
-            # owner's colour makes the name band over this panel alone.
+        if country.owner is not None:
             name_color = name_text_color(country.owner.color)
             pg.draw.rect(view.screen, country.owner.color, pg.Rect(x0, 0, self.width, self.OWNER_BAND_H))
         banded = country.owner is not None
@@ -1139,54 +1122,15 @@ class Gui:
             for k, text in enumerate(lines):
                 view.screen.blit(self.small_font.render(text, True, self.outline_color), (x0 + 8, ry + 3 + 18 * k))
 
-        # Dark outline round the panel below the band. With the owner box
-        # beside it, the left side runs on from the box's right line as one
-        # line down to the bottom of this panel.
+        # Dark outline round the panel below the band.
         top = self.OWNER_BAND_H if banded else 0
-        left = x0 - 2 if owner_stats else x0
-        rects = [pg.Rect(view.WIDTH - 2, top, 2, panel_h - top), pg.Rect(left, panel_h - 2, view.WIDTH - left, 2),
-                 pg.Rect(left, top, 2, panel_h - top)]
+        rects = [pg.Rect(view.WIDTH - 2, top, 2, panel_h - top), pg.Rect(x0, panel_h - 2, self.width, 2),
+                 pg.Rect(x0, top, 2, panel_h - top)]
         for rect in rects:
             pg.draw.rect(view.screen, self.OWNER_LINE_COLOR, rect)
 
     OWNER_BAND_H = 26
-    OWNER_MIN_H = 82  # owner box height: that of a country panel with 3 resources
     OWNER_LINE_COLOR = (90, 90, 90)
-    # Order of the owner's stats: 4 columns over 2 rows, cards centred
-    # between the rows in the last column.
-    OWNER_ORDER = ["food", "wood", "steel", "cards", "nuclear", "helmets", "oil"]
-
-    def _draw_owner_box(self, view, owner_stats, country_x0, font):
-        """The owner's stats in a compact box flush left of the country panel,
-        always OWNER_MIN_H high whatever the country panel's height."""
-        h = self.OWNER_MIN_H
-        owner, amounts, mini = owner_stats
-        sprites = dict((key, mini[sprite]) for sprite, key in self.OWNER_CELLS)
-        col_w = 20 + 2 + self.small_font.size("88")[0] + 4
-        band = self.OWNER_BAND_H
-        row_h = 26
-        w = 3 * col_w + 4 + 20 + 3 + self.small_font.size(str(amounts["cards"]))[0] + 5
-        # Stat rows centred between the band and the outline at the bottom.
-        top = band + (h - 2 - band - (row_h + 20)) // 2
-        x0 = country_x0 - w
-        pg.draw.rect(view.screen, self.gray1, pg.Rect(x0, 0, w, h))
-        # The band runs on over the country panel to the screen edge.
-        pg.draw.rect(view.screen, owner.color, pg.Rect(x0, 0, w + self.width, band))
-        label = font.render(owner.name, True, name_text_color(owner.color))
-        view.screen.blit(label, (x0 + (w - label.get_width()) // 2, (band - label.get_height()) // 2))
-        for i, key in enumerate(self.OWNER_ORDER):
-            cx = x0 + 4 + (i % 4) * col_w
-            cy = top + (i // 4) * row_h
-            if key == "cards":
-                cy = top + row_h // 2
-            image = sprites[key]
-            iw, ih = image.image.get_size()
-            image.draw(view.screen, Position(cx + (20 - iw) // 2, cy + (20 - ih) // 2))
-            view.screen.blit(self.small_font.render(str(amounts[key]), True, self.outline_color), (cx + 22, cy + 2))
-        # Dark outline round the box, below the band.
-        for rect in (pg.Rect(x0, band, 2, h - band), pg.Rect(x0 + w - 2, band, 2, h - band),
-                     pg.Rect(x0, h - 2, w, 2)):
-            pg.draw.rect(view.screen, self.OWNER_LINE_COLOR, rect)
 
     # The current player's panel (left, under the top-left buttons): a name
     # band, then one row per resource with its amount and, right after it,
@@ -1265,79 +1209,79 @@ class Gui:
                 screen.blit(pieces[0], (x0 + bracket_x, row.centery - pieces[0].get_height() // 2))
         pg.draw.rect(screen, self.OWNER_LINE_COLOR, self.player_rect, 2)
 
-    # A player in the turn order (Engine._draw_turn_order): the owner box's
-    # style, smaller, as wide as the phase box.
+    # Another player in the turn order (Engine._draw_turn_order): a name band
+    # in their colour with their cards left of the name, their stock below
+    # in 3 columns.
+    TURN_BOX_W = 114
     TURN_BOX_H = 66
     TURN_BAND_H = 20
     TURN_ROW_H = 20
     TURN_ICON = 16
-    TURN_ORDER = ["food", "wood", "steel", "cards", "nuclear", "helmets", "oil"]
+    TURN_COLUMNS = 3
+    TURN_ORDER = ["food", "wood", "steel", "nuclear", "helmets", "oil"]
     TURN_ICONS = {"food": ("food", (11, 16)), "wood": ("wood", None), "steel": ("steel", None),
-                  "cards": ("cards", None), "nuclear": ("nuclear", None), "helmets": ("troops", None),
-                  "oil": ("oil", None)}
+                  "nuclear": ("nuclear", None), "helmets": ("troops", None), "oil": ("oil", None)}
     TURN_FADE = 0.35  # how much of its colour a player who skips their turn keeps
     EVENT_COLOR = (250, 225, 130)  # the event card's yellow (Engine.EVENT_COLOR)
 
     def _faded(self, color):
         return tuple(int(c + (g - c) * (1 - self.TURN_FADE)) for c, g in zip(color, self.gray1))
 
-    def draw_turn_box(self, view, player, amounts, rect, current=False, event_turns=None, skips=False):
-        """One player of the turn order in `rect`: a name band in their
-        colour and their stock below it (`amounts`: food, wood, steel, oil,
-        nuclear, helmets, cards). `current`: whose turn it is (black edge);
-        `event_turns`: the next event card is theirs to draw, in so many
-        turns; `skips`: their next turn is cancelled (faded)."""
+    def draw_turn_box(self, view, player, amounts, rect, event=False, skips=False):
+        """One player of the turn order in `rect` (`amounts`: food, wood,
+        steel, oil, nuclear, helmets, cards). `event`: the next event card
+        is theirs to draw (a yellow tag on the band); `skips`: their next
+        turn is cancelled (faded)."""
         if not hasattr(self, "_turn_small"):
             self._turn_small = game_font(13)
             self._turn_name = game_font(16)
-            self._turn_bold = game_font(16, bold=True)
             self._turn_icons = {key: Image(name, scale=size or (self.TURN_ICON, self.TURN_ICON))
                                 for key, (name, size) in self.TURN_ICONS.items()}
+            self._turn_card = Image("cards", scale=(14, 14))
             self._turn_event = Image("event", scale=(14, 14))
         screen, small = view.screen, self._turn_small
         x, y, w, h = rect
         band = self.TURN_BAND_H
         color = self._faded(player.color) if skips else player.color
+        text_color = (70, 70, 70) if skips else name_text_color(player.color)
         pg.draw.rect(screen, self._faded(self.gray1) if skips else self.gray1, rect)
         pg.draw.rect(screen, color, pg.Rect(x, y, w, band))
+        left = x + 4
+        self._turn_card.draw(screen, Position(left, y + (band - 14) // 2))
+        count = small.render(str(amounts["cards"]), True, text_color)
+        screen.blit(count, (left + 16, y + (band - count.get_height()) // 2))
+        left += 16 + count.get_width() + 4
         right = x + w - 3
-        if event_turns is not None:
-            badge = pg.Rect(0, 0, 32, band - 4)
-            badge.midright = (right, y + band // 2)
-            pg.draw.rect(screen, self.EVENT_COLOR, badge, border_radius=3)
-            pg.draw.rect(screen, (0, 0, 0), badge, 1, border_radius=3)
-            self._turn_event.draw(screen, Position(badge.x + 2, badge.centery - 7))
-            number = small.render(str(event_turns), True, (0, 0, 0))
-            screen.blit(number, (badge.right - 4 - number.get_width(), badge.centery - number.get_height() // 2))
-            right = badge.x - 3
+        if event:
+            tag = pg.Rect(0, 0, 20, band - 4)
+            tag.midright = (right, y + band // 2)
+            pg.draw.rect(screen, self.EVENT_COLOR, tag, border_radius=3)
+            pg.draw.rect(screen, (0, 0, 0), tag, 1, border_radius=3)
+            self._turn_event.draw(screen, Position(tag.centerx - 7, tag.centery - 7))
+            right = tag.x - 3
         if skips:
             label = small.render(t("skips"), True, (70, 70, 70))
             screen.blit(label, (right - label.get_width(), y + (band - label.get_height()) // 2))
             right -= label.get_width() + 3
-        font = self._turn_bold if current else self._turn_name
+        font = self._turn_name
         name, cut = player.name, player.name
-        while font.size(name)[0] > right - (x + 5) and len(cut) > 1:
+        while font.size(name)[0] > right - left and len(cut) > 1:
             cut = cut[:-1]
             name = cut.rstrip() + "…"
-        label = font.render(name, True, (70, 70, 70) if skips else name_text_color(player.color))
-        lx = min(x + (w - label.get_width()) // 2, right - label.get_width())
-        screen.blit(label, (max(x + 5, lx), y + (band - label.get_height()) // 2))
-        col_w = (w - 6) // 4
+        label = font.render(name, True, text_color)
+        lx = max(left, min(x + (w - label.get_width()) // 2, right - label.get_width()))
+        screen.blit(label, (lx, y + (band - label.get_height()) // 2))
+        col_w = (w - 6) // self.TURN_COLUMNS
         top = y + band + (h - 2 - band - (self.TURN_ROW_H + self.TURN_ICON)) // 2
         for i, key in enumerate(self.TURN_ORDER):
-            cx = x + 3 + (i % 4) * col_w
-            cy = top + (i // 4) * self.TURN_ROW_H
-            if key == "cards":
-                cy = top + self.TURN_ROW_H // 2  # centred between the rows, in the last column
+            cx = x + 3 + (i % self.TURN_COLUMNS) * col_w
+            cy = top + (i // self.TURN_COLUMNS) * self.TURN_ROW_H
             icon = self._turn_icons[key]
             iw, ih = icon.image.get_size()
             icon.draw(screen, Position(cx + (self.TURN_ICON - iw) // 2, cy + (self.TURN_ICON - ih) // 2))
             text = small.render(str(amounts[key]), True, self.outline_color)
             screen.blit(text, (cx + self.TURN_ICON + 2, cy + (self.TURN_ICON - text.get_height()) // 2))
-        if current:
-            pg.draw.rect(screen, (0, 0, 0), rect, 3)
-        else:
-            pg.draw.rect(screen, self.OWNER_LINE_COLOR, rect, 2)
+        pg.draw.rect(screen, self.OWNER_LINE_COLOR, rect, 2)
 
     phase_button_radius = 21
     PHASE_BOX_H = 100

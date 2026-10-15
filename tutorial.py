@@ -196,7 +196,7 @@ STEPS = [
          marks=["settings", "shop", "cards", "event"]),
     Step("Turn order",
          "The square at the bottom right shows the turn order: a band per player, whose turn it is "
-         "on top. Click it any time to see every player's stock and who draws the next world event; "
+         "on top. Click it any time to see the other players' stock and who draws the next world event; "
          "click it again to close it.",
          marks=["turn_order"]),
     Step("Cards",

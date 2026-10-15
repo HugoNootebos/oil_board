@@ -219,15 +219,18 @@ they're made. Bots' `_say` status lines aren't shown and aren't translated.
 - Mouse's colour is (140, 140, 140).
 - HUD layout: top left a row of 44 px buttons (settings, shop, cards,
   event card; `Engine.BUTTON_*`), online the chat button under settings
-  (`chat.BUTTON`), under that the current player's stock
-  (`Gui.draw_player_stats` at `Engine.STATS_POS`, as wide as its rows
-  need; the same place in a local game). Top right the country info
-  panel; bottom right the phase buttons and End turn (`Gui.draw_attack_phase`,
-  straight on the map) with the turn order above them
-  (`Engine._draw_turn_order`): a square with a colour band per player,
-  whose turn it is on top, that a click opens into a box per player
-  (`Gui.draw_turn_box`: their stock, the event card on whoever draws the
-  next one, `TurnManager.turns_until_next_event`). The turn order is each
+  (`chat.BUTTON`), under that, flush with the left edge, the current
+  player's stock (`Gui.draw_player_stats` at `Engine.STATS_POS`, as wide
+  as its rows need; the same place in a local game). Top right the
+  country info panel (the country alone, under a band in its owner's
+  colour); bottom right the phase buttons and End turn
+  (`Gui.draw_attack_phase`, straight on the map) with the turn order above
+  them (`Engine._draw_turn_order`): a square with a colour band per player,
+  whose turn it is on top, that a click opens into a box per other player,
+  the next one on top, flush with the right edge (`Gui.draw_turn_box`:
+  their cards on the name band, their stock, a yellow event tag on whoever
+  draws the next event card, `TurnManager.turns_until_next_event`). The
+  other players' stock is shown nowhere else. The turn order is each
   device's own like the action log: drawn in `present` after the game's
   layer is taken, under the action log, hidden under dialogs, own menus
   and the game's shop/cards; a joined device's in viewer.py.
