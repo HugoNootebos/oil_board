@@ -15,7 +15,7 @@ DEFAULT_ZOOM = 1.21
 CIRCLE_RADIUS = 16 / DEFAULT_ZOOM            # troop circle + a little margin
 LINE_HALF_WIDTH = 4 / DEFAULT_ZOOM           # connection line (5px) + margin
 ASSET_BOX = (-40 / DEFAULT_ZOOM, 25 / DEFAULT_ZOOM,   # x0, y0, x1, y1 around the
-             60 / DEFAULT_ZOOM, 62 / DEFAULT_ZOOM)    # centre (see draw_assets)
+             60 / DEFAULT_ZOOM, 62 / DEFAULT_ZOOM)    # centre (where asset icons once went)
 GRID_STEP = 0.5
 MAX_HALF_SIZE = 12.0   # biggest sprite: 24 map units across
 MIN_HALF_SIZE = 4.0

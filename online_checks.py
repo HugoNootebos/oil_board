@@ -1031,12 +1031,12 @@ def test_menus():
     settings_at = (game._settings_button().pos.x + 30, 50)
     _device_click(app, v, *settings_at)
     check("its settings: its own", game.settings_open and not app.settings_open and member.menu_open)
-    for x, y in ((300, 165), (600, 165)):  # Exit Game, Save As
+    for x, y in ((300, 215), (600, 215)):  # Exit Game, Save As
         _device_click(app, v, x, y)
     check("a joined device can't exit or save", not app.pending_quit and not game.pending_quit
           and not game.save_as_open and game.settings_open)
-    _device_click(app, v, 220, 227)  # the first toggle: show assets
-    check("what its map shows is its own to set", game.settings["assets"] and not app.settings["assets"])
+    _device_click(app, v, 220, 277)  # the first toggle: show continents
+    check("what its map shows is its own to set", game.settings["continents"] and not app.settings["continents"])
     _device_click(app, v, 5, 630)
     check("(closed)", not game.settings_open)
 
@@ -1116,7 +1116,7 @@ def test_pairing():
               not game.pairing_open and not member.menu_open and member.pointers["m"] in app.controls.clickers)
 
         _device_click(app, v, game._settings_button().pos.x + 30, 50)
-        _device_click(app, v, 605, 276)  # Controllers, in its settings
+        _device_click(app, v, 605, 326)  # Controllers, in its settings
         check("a joined device opens it from its own settings", game.pairing_open and not game.settings_open
               and not app.pairing_open)
         _device_click(app, v, 480, 418)

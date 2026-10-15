@@ -7,7 +7,7 @@ import chat as online_chat
 from fonts import game_font
 from lang import t, Msg, Join
 import numpy as np
-from board import get_connections, get_countries
+from board import CONTINENTS, get_connections, get_countries
 from models import Position, Image, Player, Io, View, Gui, Shop, Button, CardMenu, LANDMARKS, WORLD_WIDTH, WRAP_ROUTES
 from phases import TurnManager
 import random
@@ -176,8 +176,7 @@ class Engine:
         # save slots, and the exit request the main loop (runner.py) polls
         # for, since only it can cleanly exit.
         self.settings_open = False
-        self.settings = {"assets": False, "sea": True, "land": True,
-                         "landmarks": True, "fast_bots": False}
+        self.settings = {"continents": False, "fast_bots": False}
         self.pending_quit = False
         # Game controllers (controls.Controls, set by runner.py; None in the
         # headless tools) and the Controllers panel that pairs them with
@@ -299,9 +298,6 @@ class Engine:
             return Image(name, scale=(max(1, int(w * scale)), max(1, int(h * scale))))
 
         self.map_images = {
-            "spr_ship": sized("ship", 30, 30),
-            "spr_plane": sized("plane", 30, 30),
-            "spr_tank": sized("tank", 30, 30),
             "spr_fort": sized("fort", 30, 30),
             "spr_nuke": sized("nuke", 12, 32),
         }
@@ -349,8 +345,8 @@ class Engine:
                    c.dormant_owner is not None)
                   for c in self.countries.values()),
             tuple((c.kind, c.rails) for c in self.connections),
-            self.settings["sea"], self.settings["land"],
-            self.settings["landmarks"], tuple(self._landmark_shown(name) for name in LANDMARKS),
+            tuple(self._landmark_shown(name) for name in LANDMARKS),
+            self.settings["continents"],
         )
         return view_key, state_key
 
@@ -366,6 +362,19 @@ class Engine:
     BORDER_COLOR = (120, 120, 120)
     BORDER_OPACITY = 204      # 80%
     CONNECTION_OPACITY = 178  # 70%
+    # "Show continents" (settings menu): countries filled in their
+    # continent's colour instead of their owner's (the troop circles keep
+    # the owner's).
+    CONTINENT_COLORS = {
+        "North America": (240, 210, 40),   # yellow
+        "South America": (220, 60, 50),    # red
+        "Europe": (60, 110, 220),          # blue
+        "Africa": (150, 100, 55),          # brown
+        "Asia": (60, 170, 70),             # green
+        "Oceania": (150, 80, 190),         # purple
+    }
+    CONTINENT_FILL = {name: color for continent, color in CONTINENT_COLORS.items()
+                      for name in CONTINENTS[continent]}
 
     @staticmethod
     @contextmanager
@@ -400,10 +409,12 @@ class Engine:
         surface.set_clip(clip)
         surface.fill(tuple(background_color) + (255,), clip)
         copies = view.copies(self._world_extent)
+        by_continent = self.settings["continents"]
         for dx in copies:
             with view.shifted(dx):
                 for country in self.countries.values():
-                    country.draw(view, border_color=self.colors["outlines"], draw_border=False)
+                    fill = self.CONTINENT_FILL.get(country.name) if by_continent else None
+                    country.draw(view, border_color=self.colors["outlines"], draw_border=False, fill=fill)
         with self._blended(surface, self.BORDER_OPACITY):
             for dx in copies:
                 with view.shifted(dx):
@@ -413,13 +424,10 @@ class Engine:
             for dx in copies:
                 with view.shifted(dx):
                     for connection in self.connections:
-                        if not self.settings[connection.kind]:
-                            continue
                         connection.draw(self.countries, self.colors, view, outline_color=self.colors["outlines"])
-        if self.settings["landmarks"]:
-            for dx in copies:
-                with view.shifted(dx):
-                    self._draw_map_landmarks()
+        for dx in copies:
+            with view.shifted(dx):
+                self._draw_map_landmarks()
         surface.set_clip(None)
         if ss != 1:
             surface = pg.transform.smoothscale(surface, (sw, sh))
@@ -454,13 +462,6 @@ class Engine:
             with view.shifted(dx):
                 for country in self.countries.values():
                     country.draw_troops(self.map_font, view)
-                    country.draw_assets(
-                        view=view,
-                        img_ship=self.map_images["spr_ship"],
-                        img_plane=self.map_images["spr_plane"],
-                        img_tank=self.map_images["spr_tank"],
-                        show_military=self.settings["assets"],
-                    )
         view.window.set_clip(None)
 
     def present(self):
@@ -913,7 +914,7 @@ class Engine:
         if self.save_as_open:
             w, h = 340, 562
         else:
-            w, h = 600, 440
+            w, h = 600, 340
         x, y = view.WIDTH * 0.5 - w * 0.5, view.HEIGHT * 0.5 - h * 0.5
         pg.draw.rect(screen, self.SETTINGS_COLOR, pg.Rect(x, y, w, h))
         pg.draw.rect(screen, (0, 0, 0), pg.Rect(x, y, w, h), 3)
@@ -951,10 +952,9 @@ class Engine:
             self.save_as_slot = None
             self.save_as_names = [read_save_name(slot_path(i)) for i in range(SAVE_SLOT_COUNT)]
 
-        # Left column: what the map shows; right column: markers and bots.
+        # Left column: what the map shows; right column: bots.
         columns = [
-            [("assets", "Show assets"), ("sea", "Show sea connections"), ("land", "Show land connections"),
-             ("landmarks", "Show torii/pagoda")],
+            [("continents", "Show continents")],
             [("fast_bots", "Fast bots")],
         ]
         for c, toggles in enumerate(columns):

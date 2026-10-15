@@ -337,11 +337,14 @@ class Country:
             border_width=2,
             border_color=(0, 0, 0),
             draw_border=True,
+            fill=None,
     ):
         """Fill (and radioactive band), plus the border unless draw_border
         is False -- the map draws borders separately (draw_border below)
-        so it can blend them all in at once."""
-        color = tuple(int(c) for c in np.clip(self.owner.color + self.shade * shading_factor * np.array([1, 1, 1]), 0, 255))
+        so it can blend them all in at once. `fill` replaces the owner's
+        colour (the settings menu's "Show continents")."""
+        base = np.array(self.owner.color if fill is None else fill, dtype=float)
+        color = tuple(int(c) for c in np.clip(base + self.shade * shading_factor * np.array([1, 1, 1]), 0, 255))
         width = max(1, int(round(border_width * view.draw_scale)))
         for pol in self.polygon:
             points = [point.to_px(view) for point in pol]
@@ -527,27 +530,6 @@ class Country:
                 pg.draw.rect(surface, color, pg.Rect(x - rr, top - pad, 2 * rr + 1, y - top + pad + 1))
             for d in offsets:
                 pg.draw.rect(surface, color, pg.Rect(x + d - hw - pad, top - mh - pad, 2 * (hw + pad) + 1, mh + pad + 1))
-
-    def draw_assets(self, view, img_ship, img_tank, img_plane, show_military=True):
-        x, y = self.mass_center.to_px(view)
-        # One icon per asset type no matter how many units of it there are
-        # (2, 3, 4 ships all look the same as 1 ship) -- each entry below
-        # is only drawn once, gated on presence rather than count. Neither
-        # the fort nor radioactivity gets a map icon -- both only show in
-        # the country info panel.
-        if not show_military:
-            return
-        assets = [
-            (self.ships > 0, img_ship),
-            (self.tanks > 0, img_tank),
-            (self.planes > 0, img_plane),
-        ]
-        present = [img for is_present, img in assets if is_present]
-        y += int(30 * view.draw_scale)  # comfortably below the troop count circle, not obscuring it
-        spacing = 25 * view.draw_scale
-        start_x = -spacing * (len(present) - 1) / 2
-        for i, img in enumerate(present):
-            img.draw(view.map_surface, Position(int(x + start_x + i * spacing), y))
 
 
 # The map wraps around east-west: past Japan lies the Pacific, then the

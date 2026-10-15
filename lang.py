@@ -246,10 +246,7 @@ NL = {
     "Click a slot to save there": "Klik op een plek om daar op te slaan",
     "Type a name -- overwrites this slot": "Typ een naam -- overschrijft deze plek",
     "Type a name, then Save or Enter": "Typ een naam, dan Opslaan of Enter",
-    "Show assets": "Toon materieel",
-    "Show sea connections": "Toon zeeroutes",
-    "Show land connections": "Toon landroutes",
-    "Show torii/pagoda": "Toon torii/pagode",
+    "Show continents": "Toon continenten",
     "Fast bots": "Snelle bots",
 
     # Event cards
