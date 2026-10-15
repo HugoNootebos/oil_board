@@ -91,7 +91,11 @@ def restart():
     command = json.loads(os.environ["OIL_RESTART"])
     if os.name == "nt":
         # os.execv doesn't quote arguments on Windows (paths with spaces).
-        subprocess.Popen(command, close_fds=True)
+        # Not from the game's folder (runner.py's working directory): the
+        # new app puts the update in place by renaming game/, and Windows
+        # can't rename a folder that is a process's working directory.
+        os.chdir(_data_dir())
+        subprocess.Popen(command, cwd=_data_dir(), close_fds=True)
         os._exit(0)
     os.execv(command[0], command)
 

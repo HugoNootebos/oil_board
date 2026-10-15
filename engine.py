@@ -206,6 +206,9 @@ class Engine:
         self._device = None
         # Where the autosave at the start of each turn goes.
         self.save_path = AUTOSAVE_PATH
+        # The tutorial's guide over this game (tutorial.Tutorial, set by
+        # tutorial.new_game); None in any other game.
+        self.tutorial = None
 
         self.default_player = Player("mouse", color=(140, 140, 140))
         # What the box at the bottom left says: one line per thing that
@@ -1477,7 +1480,8 @@ class Engine:
         their mouse (a joined device's, or the host's while a joined
         device's player decides). Not for a click the game takes (a
         defender's dice, an event's pick: those controllers click, see
-        controls.py), nor through the shop menu, the card menu or a dialog."""
+        controls.py), nor through the shop menu, the card menu, a dialog, the
+        top-left buttons or (online) the chat."""
         pads = self.controls
         if pads is None or self.modal_open or self.card_menu.show:
             return
@@ -1485,8 +1489,12 @@ class Engine:
         if current.attack == 3 and current.subattack < 8:
             return  # shop menu open
 
-        def say(position, view=None):
-            name = self.io.country_at(view or self.view, self.countries.values(), Position(*position))
+        def say(position, view=None, chat=None):
+            point = (int(position[0]), int(position[1]))
+            if self.own_button_at(point) or (self.online is not None and (
+                    online_chat.BUTTON.collidepoint(point) or (chat is not None and chat.covers(point)))):
+                return  # a click on the top-left buttons or the chat, not on the country under them
+            name = self.io.country_at(view or self.view, self.countries.values(), Position(*point))
             if name is not None:
                 sounds.play_country(name)
 
@@ -1514,7 +1522,8 @@ class Engine:
             names = [seat.name for seat in self.online.seats if seat.kind == "host"]
             if names and current.name not in names:
                 x, y = pg.mouse.get_pos()
-                say((int((x - self.view.ox) / self.view.scale), int((y - self.view.oy) / self.view.scale)))
+                say((int((x - self.view.ox) / self.view.scale), int((y - self.view.oy) / self.view.scale)),
+                    chat=self.online.chat)
 
     def get_players(self, mode="prompt"):
         if mode == "default":

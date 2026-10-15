@@ -2,7 +2,7 @@
 Main menu shown before the game starts: "Local Game" (then "New Game", or
 "Continue": pick the autosave or a named save slot, loaded onto a freshly
 built default-mode game) vs "Online Game" (then "Host" or "Join", whose
-screens are in lobby.py). Each screen runs as its own small pygame loop, before an
+screens are in lobby.py) vs "Tutorial" (a guided game, tutorial.py). Each screen runs as its own small pygame loop, before an
 Engine exists yet -- it only needs a window and a font, not the game
 itself.
 """
@@ -86,8 +86,8 @@ def _save_entries():
 
 
 def run_main_menu(width=960, height=640):
-    """Blocks until the player picks an option. Returns "local" or
-    "online". The Online Game button is disabled (and unclickable) until
+    """Blocks until the player picks an option. Returns "local",
+    "online" or "tutorial". The Online Game button is disabled (and unclickable) until
     online play exists (ONLINE_PLAY)."""
     sounds.init_pygame()
     screen = _open_window(width, height)
@@ -106,8 +106,9 @@ def run_main_menu(width=960, height=640):
     update_font = game_font(26)
 
     button_w, button_h = 300, 70
-    local_rect = pg.Rect(width // 2 - button_w // 2, height // 2 - 120, button_w, button_h)
-    online_rect = pg.Rect(width // 2 - button_w // 2, height // 2 - 10, button_w, button_h)
+    local_rect = pg.Rect(width // 2 - button_w // 2, height // 2 - 130, button_w, button_h)
+    online_rect = pg.Rect(width // 2 - button_w // 2, height // 2 - 30, button_w, button_h)
+    tutorial_rect = pg.Rect(width // 2 - button_w // 2, height // 2 + 70, button_w, button_h)
     quit_rect = pg.Rect(width // 2 - button_w // 2, height // 2 + 180, button_w, button_h)
     flags = {
         key: pg.transform.smoothscale(pg.image.load(path).convert_alpha(), FLAG_SIZE)
@@ -144,6 +145,8 @@ def run_main_menu(width=960, height=640):
                 return "local"
             if ONLINE_PLAY and online_rect.collidepoint(click):
                 return "online"
+            if tutorial_rect.collidepoint(click):
+                return "tutorial"
             if quit_rect.collidepoint(click):
                 pg.quit()
                 raise SystemExit
@@ -165,6 +168,10 @@ def run_main_menu(width=960, height=640):
         if not ONLINE_PLAY:
             hint = hint_font.render(t("Coming soon"), True, (200, 200, 200))
             screen.blit(hint, (width // 2 - hint.get_width() // 2, online_rect.bottom + 10))
+        _draw_button(
+            screen, button_font, tutorial_rect, t("Tutorial"),
+            (245, 225, 140), hovered=tutorial_rect.collidepoint(mouse_pos),
+        )
         _draw_button(
             screen, button_font, quit_rect, t("Quit"),
             (240, 100, 100), hovered=quit_rect.collidepoint(mouse_pos),

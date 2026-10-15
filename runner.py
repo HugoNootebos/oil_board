@@ -8,12 +8,13 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 from engine import Engine
 from menu import (run_main_menu, run_local_menu, run_online_menu, run_new_game_menu,
                   run_player_names_menu, run_load_menu)
-from save_load import save_game, load_game, migrate_legacy_save, AUTOSAVE_PATH
+from save_load import save_game, load_game, migrate_legacy_save
 import pygame as pg
 import controls
 import lobby
 import online
 import sounds
+import tutorial
 
 # Nothing in the game changes on its own -- only in response to input --
 # so a frame is only drawn when some event arrives (the mouse moving or
@@ -28,7 +29,10 @@ def choose_game():
     """The start menus: returns a new or loaded game (an Engine). Back goes
     one menu up."""
     while True:
-        if run_main_menu() == "online":
+        choice = run_main_menu()
+        if choice == "tutorial":
+            return tutorial.new_game()
+        if choice == "online":
             app = choose_online()
             if app is not None:
                 return app
@@ -73,7 +77,7 @@ def new_game():
         return Engine(mode="default")
     player_names = run_player_names_menu(new_game_choice)
     # The first autosave happens once the first player ends their turn
-    # (see TurnManager.next_turn); autosaves always go to AUTOSAVE_PATH.
+    # (see TurnManager.next_turn); autosaves go to Engine.save_path.
     player_names, player_bots = player_names
     return Engine(mode="count", player_count=new_game_choice, player_names=player_names,
                   player_bots=player_bots)
@@ -145,14 +149,19 @@ def _play(app):
                 continue
             if event.type == pg.KEYDOWN and event.key == pg.K_ESCAPE:
                 app.toggle_fullscreen()
-            # Quicksave / quickload, using the autosave file.
+            # Quicksave / quickload, using the autosave file (the tutorial's
+            # own, in the tutorial).
             if event.type == pg.KEYDOWN and event.key == pg.K_F5:
-                save_game(app, app.turn_manager, AUTOSAVE_PATH)
+                save_game(app, app.turn_manager, app.save_path)
             if event.type == pg.KEYDOWN and event.key == pg.K_F9:
-                load_game(AUTOSAVE_PATH, app, app.turn_manager)
+                load_game(app.save_path, app, app.turn_manager)
 
         frames_left = max(0, frames_left - 1)
+        if app.tutorial is not None and app.tutorial.active:
+            frames_left = max(frames_left, 1)  # its rings pulse: no idling
         app.io_handle()
+        if app.tutorial is not None:
+            app.tutorial.handle_input()  # its panel's clicks, and those its step holds back
         if not pads.mouse_ok:
             # Online, while a player on another device decides: the mouse
             # here neither clicks nor zooms.
@@ -189,6 +198,8 @@ def _play(app):
         if app.pending_quit:
             return "menu"
 
+        if app.tutorial is not None:
+            app.tutorial.draw()
         app.present()
         pg.display.flip()
         if app.online is not None:

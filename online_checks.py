@@ -504,6 +504,21 @@ def test_names():
         _frame(app)
         check("another device's player's turn: both say it",
               click(device=True) == [name] and click(host=True) == [name])
+        # The country under a top-left button or the chat button: a click
+        # there is the button's, not the country's.
+        for spot_x, spot_y in [(b.pos.x + 30, b.pos.y + 30) for b in (
+                app._settings_button(), app._shop_button(), app._card_button(), app._event_button())] \
+                + [chat.BUTTON.center]:
+            mc = app.countries[name].mass_center
+            view.offset = Position((spot_x - 0.5 * view.WIDTH) / view.zoom - mc.x,
+                                   (spot_y - 0.5 * view.HEIGHT) / view.zoom - mc.y)
+            mouse.view = view
+            x, y = spot_x, spot_y
+            pg.mouse.get_pos = lambda: (x * view.scale + view.ox, y * view.scale + view.oy)
+            _frame(app)
+            check("a click on the button at {} says nothing (host, device)".format((spot_x, spot_y)),
+                  click(host=True) == [] and (_frame(app) or click(device=True) == []))
+            _frame(app)
         seats[0].kind = "open"  # nobody plays on the host's computer
         app.turn = 1
         _frame(app)
