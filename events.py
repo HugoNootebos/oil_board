@@ -84,6 +84,13 @@ class Event:
         all. The default never intervenes."""
         return False
 
+    def sea_attack_wheel(self, engine):
+        """How many equal slices the wheel has that is spun for everyone to
+        see as sea_attack_check decides (phases.AttackPhase: one red slice
+        with the pirate, the rest blank), or 0 for no wheel. The default is
+        0."""
+        return 0
+
     def on_player_eliminated(self, engine, victor, loser):
         """Called once, from within a normal interactive conquest, when it
         happens to eliminate `loser` (whoever conquered the finishing
@@ -515,6 +522,9 @@ class StormAtSea(Event):
 
     def sea_attack_check(self, engine):
         return np.random.random() < 1 / 3
+
+    def sea_attack_wheel(self, engine):
+        return 3  # one pirate in three
 
     def bot_sea_attack_loss(self, engine):
         return 1 / 3

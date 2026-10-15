@@ -159,6 +159,8 @@ def _play(app):
         frames_left = max(0, frames_left - 1)
         if app.tutorial is not None and app.tutorial.active:
             frames_left = max(frames_left, 1)  # its rings pulse: no idling
+        if app.turn_manager.animating():
+            frames_left = max(frames_left, 1)  # e.g. the pirates' wheel spinning
         app.io_handle()
         if app.tutorial is not None:
             app.tutorial.handle_input()  # its panel's clicks, and those its step holds back

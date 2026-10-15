@@ -99,7 +99,7 @@ phase's `update()`, which draws its UI and reacts to clicks.
 | `attack` | Phase | Main `subattack` steps |
 |---|---|---|
 | 0 | `ReinforcementPhase` | 0 start of turn (income, continent cards, events' `on_turn_start`) · 1 deploy troops (left-click add, right-click remove; 2 is an old alias) · 3 starvation popup · 4 starvation: remove troops |
-| 1 | `AttackPhase` | 0/1 pick attacker/target · 2 choose attack dice · 3 defender rolls · 4 resolve combat · 5 move troops in after a conquest · 6 asset panel (ships/tanks/planes) · 7 rail redistribution |
+| 1 | `AttackPhase` | 0/1 pick attacker/target · 2 choose attack dice · 3 defender rolls · 4 resolve combat · 5 move troops in after a conquest · 6 asset panel (ships/tanks/planes) · 7 rail redistribution · 8 defender picks tanks · 9 the pirates' wheel spins (an event's `sea_attack_wheel`, "storm of zee"; skipped headless, `bot.fast`) |
 | 2 | `MovementPhase` | 0 pick origin · 1 pick target · 2 adjust (troops/ships/tanks/planes) · 3 rails · 4 develop a country |
 | 3 | `ShopPhase` | 1–7 selected item · 9–17 placing the bought item on the map |
 | 4 | `RecruitPhase` | placing troops from a card trade outside the reinforcement phase |
@@ -156,6 +156,12 @@ menu and move phase once dice are cast.
   lines in the event panel), ...) rather than special-casing
   events in phases.py (or bot.py: bots see an event through those hooks,
   plus the `bot_*` hints for what they can't work out from them).
+- "storm of zee": when an attack over sea is confirmed, `sea_attack_check`
+  decides at once whether pirates take the troops on the selected dice
+  and everything brought along (ship/plane, tanks), which ends that battle;
+  everyone first sees it on a wheel (`phases.PirateWheel`: 1 red pirate
+  slice in 3) that lands accordingly, while `TurnManager.animating` keeps
+  `runner.play` drawing frames.
 - A cancelled turn (`TurnManager.skip_turns`, names, saved; "Woke") is
   skipped as the turn starts (`_skip_cancelled`): no income, nothing, and
   no event card is revealed on it.

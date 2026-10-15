@@ -385,10 +385,95 @@ def _(ev):
             if not land:
                 check("sea attack: the 3 committed troops are lost", country("Japan").units == 7,
                       country("Japan").units)
+                check("and the ship carrying them: the battle is over",
+                      country("Japan").ships == 0 and phase.selected_ships == 0 and a.subattack == 0
+                      and phase.attack_from is None, (country("Japan").ships, a.subattack))
+                country("Japan").ships = 1
             else:
                 check("land attack: never hit", country("Japan").units == 7 and a.subattack == 3)
+
+        # Only the troops on selected dice: the one left behind stays home.
+        own(a, "Japan", 3, ships=1)
+        phase.reset()
+        phase.attack_from, phase.defence_country = "Japan", "Kazachstan"
+        phase.attack_dice = phase._default_attack_dice(3)
+        phase.defence_dice = np.zeros(2)
+        phase.attack_via_land = False
+        phase.selected_ships, phase.selected_tanks, phase.selected_planes = 1, 0, 0
+        phase.roll_attack()
+        check("pirates take the 2 on selected dice, not the 1 left behind",
+              country("Japan").units == 1 and country("Japan").owner is a, country("Japan").units)
+
+        # Everything brought along sinks with them; what stayed home is kept.
+        own(a, "Japan", 10, ships=2, tanks=3, planes=1)
+        a.oil = 5
+        phase.reset()
+        phase.attack_from, phase.defence_country = "Japan", "Kazachstan"
+        phase.attack_dice = phase._default_attack_dice(10)
+        phase.defence_dice = np.zeros(2)
+        phase.attack_via_land = False
+        phase.selected_ships, phase.selected_tanks, phase.selected_planes = 1, 2, 0
+        phase.active_tanks = 2
+        phase.roll_attack()
+        japan = country("Japan")
+        check("the ship and the tanks on it are lost, the rest stays",
+              (japan.units, japan.ships, japan.tanks, japan.planes) == (7, 1, 1, 1) and a.oil == 5,
+              (japan.units, japan.ships, japan.tanks, japan.planes, a.oil))
+        check("the notice says the convoy went down", m().notices[-1] == lang.t(
+            "{} units and everything they brought along have been lost to pirates").format(3), m().notices[-1])
+        m().notices.clear()
+
+        # Flying across: 2 dice selected, the plane and a tank go down too.
+        own(a, "Japan", 10, ships=0, tanks=2, planes=2)
+        phase.reset()
+        phase.attack_from, phase.defence_country = "Japan", "Kazachstan"
+        phase.attack_dice = np.array([0.0, 0.0, 1.0])
+        phase.defence_dice = np.zeros(2)
+        phase.attack_via_land = False
+        phase.selected_ships, phase.selected_tanks, phase.selected_planes = 0, 1, 1
+        phase.active_tanks = 1
+        phase.roll_attack()
+        check("by plane: 2 troops (2 dice), the plane and the tank are lost",
+              (japan.units, japan.tanks, japan.planes) == (8, 1, 1),
+              (japan.units, japan.tanks, japan.planes))
+        m().notices.clear()
+
+        # In a real game everyone sees the wheel spin first (subattack 9).
+        m().bot.fast = False
+        for lost in (True, False):
+            ev.sea_attack_check = lambda engine, lost=lost: lost
+            own(a, "Japan", 10, ships=1)
+            a.attack = 1
+            phase.reset()
+            phase.attack_from, phase.defence_country = "Japan", "Kazachstan"
+            phase.attack_dice = phase._default_attack_dice(10)
+            phase.defence_dice = np.zeros(2)
+            phase.attack_via_land = False
+            phase.selected_ships, phase.selected_tanks, phase.selected_planes = 1, 0, 0
+            phase.roll_attack()
+            wheel = phase.wheel
+            check("wheel spins before anything happens ({})".format("pirates" if lost else "safe"),
+                  a.subattack == 9 and wheel is not None and wheel.lost is lost and wheel.slices == 3
+                  and country("Japan").units == 10)
+            check("shop and cards blocked while it spins", m().attack_in_progress() and m().animating())
+            phase.update()
+            check("still spinning a moment later", a.subattack == 9 and not wheel.landed())
+            # Where it stops: under the pointer at the top, in the pirate's
+            # slice (0) exactly when the army is lost.
+            under = (-wheel.final) % 360
+            check("it lands on the pirate only when lost", (under < wheel.width) is lost, round(under, 1))
+            wheel.start -= wheel.spin_ms + wheel.hold_ms + 1
+            phase.update()
+            if lost:
+                check("after the wheel: the army and its ship are lost at sea",
+                      country("Japan").units == 7 and country("Japan").ships == 0 and a.subattack == 0
+                      and phase.wheel is None)
+            else:
+                check("after the wheel: on to the dice", country("Japan").units == 10 and a.subattack == 3
+                      and country("Japan").ships == 1 and phase.wheel is None and not m().animating())
     finally:
         del ev.sea_attack_check
+        m().bot.fast = True
     finish()
 
 
@@ -752,6 +837,16 @@ def _(ev):
     phase.update()
     check("share screen draws, nothing shared yet", phase.shares == {a: 0, c: 0} and a.attack == 7, phase.shares)
     check("shop and cards blocked meanwhile", m().attack_in_progress())
+    io = app.io
+    io.mouse_position.x, io.mouse_position.y = phase.CONFIRM_X, phase.ROW_Y
+    io.left_pressed, io.top_button = 1, None
+    phase.update()
+    io.left_pressed = 0
+    check("the eye hides the panel", phase.hidden and a.attack == 7 and phase.shares == {a: 0, c: 0})
+    io.left_pressed = 1
+    phase.update()
+    io.left_pressed = 0
+    check("and shows it again", not phase.hidden and a.attack == 7)
     a, b, c = save_and_load()
     check("save/load mid-share keeps the pool and chooser", ev.pool == 40 and ev.chooser is b and a.attack == 7)
     phase.update()

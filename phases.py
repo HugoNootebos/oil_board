@@ -11,6 +11,9 @@ Country/connection lookups use country *names* (dict keys), matching
 board.py / models.py, instead of the list indices running.py used.
 """
 
+import math
+import random
+
 import pygame as pg
 from fonts import game_font
 from lang import t, Msg, Join
@@ -99,6 +102,23 @@ def draw_confirm_button(engine, cx, cy, enabled=True):
 def draw_cancel_button(engine, cx, cy):
     """Red cancel button (cancel_button.png)."""
     return draw_image_button(engine, cx, cy, "cancel")
+
+
+def draw_eye_button(engine, cx, cy):
+    """The eye button (images/eye.png) that hides/shows a pop-up so the map
+    can be seen, Confirm-sized and centred on (cx, cy); True when clicked."""
+    key = ("eye.png", (IMAGE_BUTTON_W, IMAGE_BUTTON_H))
+    if key not in _IMAGE_BUTTONS:
+        image = pg.transform.scale(pg.image.load("./images/eye.png").convert_alpha(), key[1])
+        hover = image.copy()
+        hover.fill((25, 25, 25), special_flags=pg.BLEND_RGB_ADD)
+        _IMAGE_BUTTONS[key] = image, hover
+    image, hover = _IMAGE_BUTTONS[key]
+    shape = image_button_shape(cx, cy)
+    if engine.io._contains(shape, engine.io.mouse_position):
+        image = hover
+    engine.view.screen.blit(image, shape[1:3])
+    return bool(engine.io.button(shape))
 
 
 class IconNotice(str):
@@ -978,12 +998,56 @@ class ReinforcementPhase(Phase):
                 sounds.play("error")  # not their country
 
 
+class PirateWheel:
+    """The wheel spun for everyone to see as an event's pirates may strike
+    an attack over sea (AttackPhase, subattack 9): `slices` equal slices,
+    slice 0 red with the pirate, the others blank yellow. The outcome is
+    drawn before it spins (`lost`: it lands on the pirate); it slows down
+    over SPIN_MS, then shows where it landed for HOLD_MS (both times
+    `pace`, shorter for a bot's attack with Fast bots)."""
+
+    SPIN_MS = 3200
+    HOLD_MS = 1500
+    TURNS = 4
+    RED = (200, 30, 30)
+    YELLOW = (255, 200, 40)
+
+    def __init__(self, slices, lost, title, line, pace=1.0):
+        self.slices, self.lost = slices, lost
+        self.title, self.line = title, line
+        self.width = 360 / slices
+        index = 0 if lost else random.randrange(1, slices)
+        # Where in that slice it stops under the pointer: well inside it.
+        at = (index + random.uniform(0.15, 0.85)) * self.width
+        self.final = 360 * self.TURNS + (-at) % 360
+        self.spin_ms, self.hold_ms = int(self.SPIN_MS * pace), int(self.HOLD_MS * pace)
+        self.start = pg.time.get_ticks()
+        self.ticks = 0  # slice edges that passed the pointer (a click each)
+
+    def elapsed(self):
+        return pg.time.get_ticks() - self.start
+
+    def angle(self):
+        """How far it has turned (degrees, clockwise): fast, then slowing."""
+        x = min(1.0, self.elapsed() / max(self.spin_ms, 1))
+        return self.final * (1 - (1 - x) ** 3)
+
+    def landed(self):
+        return self.elapsed() >= self.spin_ms
+
+    def done(self):
+        return self.elapsed() >= self.spin_ms + self.hold_ms
+
+
 class AttackPhase(Phase):
     """player.attack == 1"""
+
+    WHEEL_R = 110
 
     def __init__(self, manager):
         super().__init__(manager)
         self.attack_from = None
+        self.wheel = None  # the pirates' PirateWheel while it spins (subattack 9)
         self.defence_country = None
         self.attack_dice = None
         self.defence_dice = None
@@ -1020,6 +1084,7 @@ class AttackPhase(Phase):
         self.attack_dice = None
         self.defence_dice = None
         self.free_claim = False
+        self.wheel = None
         self.rail_network = []
         self.rail_initial_units = {}
         self.rail_initial_tanks = {}
@@ -1053,6 +1118,8 @@ class AttackPhase(Phase):
             self._redistribute_rails()
         elif sub == 8:
             self._select_defence_tanks()
+        elif sub == 9:
+            self._spin_wheel()
 
     def _draw_cancel_attack(self):
         """Cancel button: same as clicking the attacking country again
@@ -1510,29 +1577,153 @@ class AttackPhase(Phase):
             self.roll_attack()
 
     def roll_attack(self):
-        """The attacker presses roll (also called by bots)."""
+        """The attacker presses roll (also called by bots). Over sea an
+        event's pirates may strike first (sea_attack_check); with a wheel
+        (sea_attack_wheel) everyone sees it spin before it happens
+        (subattack 9, not in headless games)."""
         engine = self.engine
         manager = self.manager
-        if not self.attack_via_land and manager.current_event is not None and \
-                manager.current_event.sea_attack_check(engine):
-            # Pirates: the whole force committed to this roll is lost
-            # before any dice are even thrown.
-            killed = len(self.attack_dice)
-            attack_from = engine.countries[self.attack_from]
-            attack_from.units -= killed
-            manager.notices.append(t("{} units have been killed by pirates").format(killed))
-            engine.log_action(self.player, Msg("'s attack lost {} units to pirates", killed))
-            if attack_from.units <= 0:
-                self.abandon(attack_from)
-                self.player.subattack = 0
-                self.attack_from = None
-                self.defence_country = None
-            else:
-                defence = engine.countries[self.defence_country]
-                self.attack_dice = self._default_attack_dice(attack_from.units, attack_from.immigrants)
-                self.defence_dice = np.zeros(min(defence.units, 2))
-                self.player.subattack = 2
+        event = manager.current_event
+        if not self.attack_via_land and event is not None:
+            lost = event.sea_attack_check(engine)
+            slices = event.sea_attack_wheel(engine)
+            if slices and not manager.bot.fast:
+                pace = manager.bot._pace(1000) / 1000 if engine.bot_turn else 1.0
+                self.wheel = PirateWheel(
+                    slices, lost, t(event.name),
+                    t("{} sails from {} to {}").format(
+                        self.player.name, t(self.attack_from), t(self.defence_country)), pace)
+                self.player.subattack = 9
+                return
+            if lost:
+                self._lost_at_sea()
+                return
+        self._cross()
+
+    def _lost_at_sea(self):
+        """Pirates: the troops committed to this roll (its selected dice)
+        are lost before any dice are even thrown, and with them the ship or
+        plane carrying them and everything else brought along (as a failed
+        roll over sea), so the battle is over."""
+        engine = self.engine
+        manager = self.manager
+        killed = int(np.sum(self.attack_dice == 0))
+        attack_from = engine.countries[self.attack_from]
+        attack_from.units -= killed
+        sunk = self.selected_ships + self.selected_tanks + self.selected_planes
+        manager.notices.append(
+            t("{} units and everything they brought along have been lost to pirates").format(killed)
+            if sunk else t("{} units have been killed by pirates").format(killed))
+        engine.log_action(self.player, Msg("'s attack lost {} units to pirates", killed))
+        self._destroy_brought_assets(attack_from, self.defence_country)
+        if attack_from.units <= 0:
+            self.abandon(attack_from)
+        # Back to picking an attacker: troops left there can only cross
+        # again with a spare ship or plane.
+        self.player.subattack = 0
+        self.attack_from = None
+        self.defence_country = None
+
+    def _spin_wheel(self):
+        """Subattack 9: the pirates' wheel spins, then the attack is lost at
+        sea or goes on to the dice."""
+        wheel = self.wheel
+        if wheel is None:
+            self.player.subattack = 2
             return
+        self._draw_wheel(wheel)
+        if wheel.done():
+            self.wheel = None
+            if wheel.lost:
+                self._lost_at_sea()
+            else:
+                self._cross()
+
+    def _draw_wheel(self, wheel):
+        view = self.view
+        screen = view.screen
+        r = self.WHEEL_R
+        w, h = 2 * r + 80, 20 + 32 + 22 + 16 + 2 * r + 16 + 34 + 14
+        x0 = int(self.DICE_CX - w // 2)
+        y0 = (view.HEIGHT - h) // 2
+        self.draw_rect(self.POPUP_COLOR, x0, y0, w, h)
+        self.draw_rect((0, 0, 0), x0, y0, w, h, 3)
+        self.io.button(("r", x0, y0, w, h))  # keeps clicks off the map
+        fonts = _ASSET_ICONS.get("wheel_fonts")
+        if fonts is None:
+            fonts = _ASSET_ICONS["wheel_fonts"] = (game_font(24, bold=True), game_font(17),
+                                                   game_font(26, bold=True))
+        title_font, text_font, result_font = fonts
+        y = y0 + 20
+        title = title_font.render(wheel.title, True, (0, 0, 0))
+        screen.blit(title, title.get_rect(midtop=(x0 + w // 2, y)))
+        y += 32
+        line = text_font.render(wheel.line, True, self.POPUP_HINT_COLOR)
+        screen.blit(line, line.get_rect(midtop=(x0 + w // 2, y)))
+        y += 22 + 16
+
+        angle = wheel.angle()
+        passed = int(angle // wheel.width)
+        if passed > wheel.ticks:
+            wheel.ticks = passed
+            sounds.play("click")
+        cx, cy = x0 + w // 2, y + r
+        screen.blit(self._wheel_image(wheel, angle), (cx - r - 2, cy - r - 2))
+        # The pointer at the top, pointing into the wheel.
+        tip = [(cx - 13, cy - r - 12), (cx + 13, cy - r - 12), (cx, cy - r + 14)]
+        pg.draw.polygon(screen, (255, 255, 255), tip)
+        pg.draw.polygon(screen, (0, 0, 0), tip, 3)
+        y += 2 * r + 16
+
+        if wheel.landed():
+            text, color = (t("Lost at sea!"), self.RESULT_LOST) if wheel.lost \
+                else (t("Safe crossing"), self.RESULT_SAFE)
+            result = result_font.render(text, True, color)
+            screen.blit(result, result.get_rect(midtop=(x0 + w // 2, y)))
+
+    RESULT_LOST = (170, 20, 20)
+    RESULT_SAFE = (20, 110, 40)
+    WHEEL_SUPERSAMPLE = 3
+
+    def _wheel_image(self, wheel, angle):
+        """The wheel turned `angle` degrees clockwise, drawn large and
+        scaled down so its edges are smooth (2 px of margin)."""
+        k = self.WHEEL_SUPERSAMPLE
+        r = self.WHEEL_R * k
+        size = 2 * r + 4 * k
+        surface = pg.Surface((size, size), pg.SRCALPHA)
+        c = size / 2
+
+        def point(degrees, radius):
+            a = math.radians(degrees + angle)
+            return c + radius * math.sin(a), c - radius * math.cos(a)
+
+        for i in range(wheel.slices):
+            start = i * wheel.width
+            arc = [point(start + wheel.width * s / 24, r) for s in range(25)]
+            pg.draw.polygon(surface, PirateWheel.RED if i == 0 else PirateWheel.YELLOW, [(c, c)] + arc)
+        for i in range(wheel.slices):
+            pg.draw.line(surface, (0, 0, 0), (c, c), point(i * wheel.width, r), 3 * k)
+        pg.draw.circle(surface, (0, 0, 0), (c, c), r, 4 * k)
+        # The pirate in the middle of the red slice, turning with the wheel.
+        sprite = _ASSET_ICONS.get("pirate")
+        if sprite is None:
+            image = pg.image.load("./images/pirate.png").convert_alpha()
+            sprite = _ASSET_ICONS["pirate"] = pg.transform.scale(
+                image, (image.get_width() * 3 * k, image.get_height() * 3 * k))
+        middle = wheel.width / 2
+        turned = pg.transform.rotate(sprite, -(middle + angle))
+        surface.blit(turned, turned.get_rect(center=point(middle, r * 0.56)))
+        pg.draw.circle(surface, (255, 255, 255), (c, c), 9 * k)
+        pg.draw.circle(surface, (0, 0, 0), (c, c), 9 * k, 3 * k)
+        final = 2 * self.WHEEL_R + 4
+        return pg.transform.smoothscale(surface, (final, final))
+
+    def _cross(self):
+        """The troops are across (or went by land): the defender's tanks,
+        then the dice."""
+        engine = self.engine
+        manager = self.manager
         if self._needs_defence_tank_choice():
             defence = engine.countries[self.defence_country]
             if getattr(defence.owner, "is_bot", False):
@@ -1680,19 +1871,7 @@ class AttackPhase(Phase):
         failed = len(A) in (1, 2) and n == len(A) and all(attack_loss)
         escort_lost = failed and not self.attack_via_land
         if failed:
-            ships, tanks, planes = self.selected_ships, self.selected_tanks, self.selected_planes
-            if ships or tanks or planes:
-                attack_from.ships = max(attack_from.ships - ships, 0)
-                attack_from.tanks = max(attack_from.tanks - tanks, 0)
-                attack_from.planes = max(attack_from.planes - planes, 0)
-                self.selected_ships = self.selected_tanks = self.selected_planes = 0
-                # Destroyed tanks give no +1 any more: neither by themselves
-                # nor through their paid oil passed on to a tank brought in
-                # from home for the next round.
-                self.tank_fee_paid = max(self.tank_fee_paid - self.active_tanks, 0)
-                manager.tank_fees[self.attack_from] = (self.defence_country, self.tank_fee_paid)
-                self.active_tanks = 0
-                engine.log_destroyed(player, defence.name, ships, tanks, planes)
+            self._destroy_brought_assets(attack_from, defence.name)
 
         if defence.units <= 0:
             self.conquest_units = len(A)
@@ -1730,6 +1909,26 @@ class AttackPhase(Phase):
             self.attack_dice = self._default_attack_dice(attack_from.units, attack_from.immigrants)
             self.defence_dice = np.zeros(min(defence.units, 2))
             player.subattack = 2
+
+    def _destroy_brought_assets(self, attack_from, where):
+        """Every ship, tank and plane brought along on this attack is
+        destroyed (a failed roll, pirates), logged as lost in `where`."""
+        engine = self.engine
+        manager = self.manager
+        ships, tanks, planes = self.selected_ships, self.selected_tanks, self.selected_planes
+        if not (ships or tanks or planes):
+            return
+        attack_from.ships = max(attack_from.ships - ships, 0)
+        attack_from.tanks = max(attack_from.tanks - tanks, 0)
+        attack_from.planes = max(attack_from.planes - planes, 0)
+        self.selected_ships = self.selected_tanks = self.selected_planes = 0
+        # Destroyed tanks give no +1 any more: neither by themselves
+        # nor through their paid oil passed on to a tank brought in
+        # from home for the next round.
+        self.tank_fee_paid = max(self.tank_fee_paid - self.active_tanks, 0)
+        manager.tank_fees[self.attack_from] = (self.defence_country, self.tank_fee_paid)
+        self.active_tanks = 0
+        engine.log_destroyed(self.player, where, ships, tanks, planes)
 
     def _log_battle(self, player, defender, country, lost, killed, conquered):
         """One log line per attack on a country: successive rounds against
@@ -2806,17 +3005,19 @@ class OilSharePhase(Phase):
     """player.attack == 7 -- an event has its `chooser` share out a pool of
     oil among the other players (GasInRoubles: Sovjet-Rusland's owner hands
     out everyone else's oil): the pool at the top, a row per player with
-    -5/-1/+1/+5/Rest buttons, Confirm once the pool is empty. Everything
+    -5/-1/+1/+5 buttons, Confirm once the pool is empty; the eye
+    button (Confirm's usual spot) hides the panel to see the map. Everything
     but the split so far is in the event (saved), so a save loaded here
     starts the split over; then back to the event's `return_to`."""
 
     W = 480
     ROW_H = 46
-    SMALL_BUTTONS = ((-5, "-5"), (-1, "-1"), (1, "+1"), (5, "+5"), (None, "Rest"))
+    SMALL_BUTTONS = ((-5, "-5"), (-1, "-1"), (1, "+1"), (5, "+5"))
 
     def __init__(self, manager):
         super().__init__(manager)
         self.shares = {}
+        self.hidden = False  # the panel hidden by the eye button
         self._fonts = None
 
     def update(self):
@@ -2829,9 +3030,15 @@ class OilSharePhase(Phase):
         others = event.recipients(self.engine)
         if player.subattack == 0:
             self.shares = {p: 0 for p in others}
+            self.hidden = False
             player.subattack = 1
         if chooser.is_bot:
             self._finish(event, self.manager.bot.share_oil(chooser, others, event.pool))
+            return
+        # The eye (in Confirm's usual spot) hides the panel to look at the map.
+        if draw_eye_button(self.engine, self.CONFIRM_X, self.ROW_Y):
+            self.hidden = not self.hidden
+        if self.hidden:
             return
         left = event.pool - sum(self.shares.get(p, 0) for p in others)
         if self._draw(event, chooser, others, left):
@@ -2885,14 +3092,16 @@ class OilSharePhase(Phase):
             share = self.shares.get(p, 0)
             bx = x0 + 176
             for step, label in self.SMALL_BUTTONS:
-                bw = 50 if step is None else 36
-                change = left if step is None else (min(step, left) if step > 0 else max(step, -share))
+                bw = 36
+                change = min(step, left) if step > 0 else max(step, -share)
                 if self._small_button(bx, cy - 15, bw, 30, t(label), change != 0, button_font):
                     self.shares[p] = share + change
                 bx += bw + 4
-            screen.blit(small, (x0 + w - 86, cy - 13))
+            # The share, just left of the oil sprite at the row's end.
+            icon_x = x0 + w - 18 - small.get_width()
+            screen.blit(small, (icon_x, cy - 13))
             count = row_font.render(str(self.shares.get(p, 0)), True, (0, 0, 0))
-            screen.blit(count, count.get_rect(midright=(x0 + w - 18, cy)))
+            screen.blit(count, count.get_rect(midright=(icon_x - 6, cy)))
             y += self.ROW_H
 
         return self.confirm_button(x0 + w // 2, y + 8 + IMAGE_BUTTON_H // 2, left == 0)
@@ -2977,7 +3186,7 @@ class BidPhase(OilSharePhase):
         screen.blit(number, number.get_rect(midleft=(left_x + icon.get_width() + 10, y + 25)))
         y += 62
 
-        buttons = self.SMALL_BUTTONS[:-1] + ((None, "All"),)
+        buttons = self.SMALL_BUTTONS + ((None, "All"),)
         widths = [50 if step is None else 36 for step, _ in buttons]
         bx = x0 + (w - sum(widths) - 4 * (len(buttons) - 1)) // 2
         for (step, label), bw in zip(buttons, widths):
@@ -3475,7 +3684,13 @@ class TurnManager:
             # question (MouseAttackPhase, OilSharePhase, BidPhase,
             # TurnOrderPhase, EventChoicePhase).
             return True
-        return player.attack == 1 and player.subattack in (3, 4, 5, 8)
+        return player.attack == 1 and player.subattack in (3, 4, 5, 8, 9)
+
+    def animating(self):
+        """Something on screen moves by itself (the pirates' wheel), so the
+        game keeps drawing frames without any input (runner.play)."""
+        player = self.engine.players[self.engine.turn]
+        return player.attack == 1 and player.subattack == 9
 
     def open_shop(self):
         player = self.engine.players[self.engine.turn]
