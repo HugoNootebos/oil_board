@@ -139,10 +139,12 @@ class Engine:
             "spr_pagoda": Image("pagoda", scale=(24, 24)),
             "spr_torii": Image("torii", scale=(24, 24)),
             "spr_rails": Image("rails", scale=(30, 30)),
-            "spr_shop": Image("shop", scale=(52, 52)),
-            "spr_cards": Image("cards", scale=(52, 52)),
-            "spr_settings": Image("settings", scale=(52, 52)),
-            "spr_event": Image("event", scale=(56, 56)),
+            # The top-left buttons' sprites (BUTTON_SIZE).
+            "spr_shop": Image("shop", scale=(38, 38)),
+            "spr_cards": Image("cards", scale=(38, 38)),
+            "spr_settings": Image("settings", scale=(38, 38)),
+            "btn_event": Image("event", scale=(40, 40)),
+            "spr_event": Image("event", scale=(56, 56)),  # (the event card dialogs)
             "spr_recruit_phase": Image("recruit_phase", scale=(26, 26)),
             "spr_attack_phase": Image("attack_phase", scale=(26, 26)),
             "spr_move_phase": Image("move_phase", scale=(26, 26)),
@@ -216,6 +218,9 @@ class Engine:
         self.hint_rows = 0
         self.action_log_open = False
         self.action_scroll = 0  # lines back from the newest, while open
+        # The turn order (bottom right): a square of colour bands, or opened
+        # into a box per player. Each device's own, like the action log.
+        self.turn_order_open = False
         self.players = self.get_players(mode)
         # player_bots: which of the players (in order) the computer plays
         # (True) and which are human (False). Each bot gets a random
@@ -472,7 +477,8 @@ class Engine:
             # own map: before what's this computer's own (the action log, the
             # country info panel, its menus, its chat, the cursors).
             self.online.capture(self.ui)
-        self._draw_action_box()
+        self._draw_turn_order()
+        self._draw_action_box()  # (an opened log goes over the turn order too)
         width, height = self.logical_size
         size = (int(round(width * view.scale)), int(round(height * view.scale)))
         ui = self.ui if size == (width, height) else pg.transform.smoothscale(self.ui, size)
@@ -633,6 +639,91 @@ class Engine:
             self._blit_action_line(box, self.action_log[-1], 10, 0, rect.h, rect.w - 12)
         self.ui.blit(box, rect.topleft)
 
+    # --- the turn order (bottom right, over the phase box) ------------------------------
+
+    TURN_ORDER_GAP = 4
+
+    def _turn_order_players(self):
+        """The players still in the game in turn order, whose turn it is first."""
+        n = len(self.players)
+        current = self.players[self.turn]
+        players = [self.players[(self.turn + k) % n] for k in range(n)]
+        return [p for p in players if p is current or not self.turn_manager._is_out(p)]
+
+    def _turn_order_rect(self):
+        """Where the turn order is (logical): the square, or opened its boxes,
+        right above the phase box."""
+        view, gui = self.view, self.gui
+        bottom = view.HEIGHT - gui.PHASE_BOX_H
+        if not self.turn_order_open:
+            size = self.BUTTON_SIZE
+            return pg.Rect(view.WIDTH - self.BUTTON_MARGIN - size, bottom - self.BUTTON_MARGIN - size, size, size)
+        height = len(self._turn_order_players()) * (gui.TURN_BOX_H + self.TURN_ORDER_GAP)
+        return pg.Rect(view.WIDTH - gui.width, bottom - height, gui.width, height - self.TURN_ORDER_GAP)
+
+    def _turn_order_hidden(self):
+        """Whether the turn order is left out: under a dialog or a menu of
+        this device's own, or while the game's shop or cards are open on this
+        screen (a joined device works that out itself: viewer.py)."""
+        if self.modal_open:
+            return True
+        if self.mirror is not None:
+            return False
+        player = self.players[self.turn]
+        here = self.online is None or self.online.current_device() == 0
+        return here and ((player.attack == 3 and player.subattack < 8) or self.card_menu.show)
+
+    def _handle_turn_order(self, hidden=False):
+        """A click on the turn order opens or closes it and goes no further;
+        the map under it is out of reach. Runs before the phases each frame,
+        like _handle_action_box."""
+        if hidden or self._turn_order_hidden() or self._remote_pointer():
+            return
+        rect = self._turn_order_rect()
+        io = self.io
+        io.button(("r", rect.x, rect.y, rect.w, rect.h))
+        if rect.collidepoint(io.mouse_position.x, io.mouse_position.y):
+            if io.left_pressed:
+                self.turn_order_open = not self.turn_order_open
+            if io.left_pressed or io.right_clicked:
+                io.left_pressed = 0
+                io.right_clicked = False
+
+    def _draw_turn_order(self, hidden=False):
+        """The turn order: closed, a square with a band in each player's
+        colour, whose turn it is on top; opened, a box per player with their
+        stock (Gui.draw_turn_box) and the event card on whoever draws the
+        next one. Each device's own (drawn after the game's layer is taken),
+        under the action log."""
+        if hidden or self._turn_order_hidden():
+            return
+        view, gui, manager = self.view, self.gui, self.turn_manager
+        players = self._turn_order_players()
+        rect = self._turn_order_rect()
+        if not self.turn_order_open:
+            inner = rect.inflate(-4, -4)
+            top = inner.y
+            for i, player in enumerate(players):
+                bottom = inner.y + inner.h * (i + 1) // len(players)
+                color = gui._faded(player.color) if player.name in manager.skip_turns else player.color
+                pg.draw.rect(view.screen, color, pg.Rect(inner.x, top, inner.w, bottom - top))
+                top = bottom
+            pg.draw.rect(view.screen, (0, 0, 0), rect, 2)
+            return
+        upcoming = manager.turns_until_next_event()
+        if self.tutorial is not None and self.tutorial.active:
+            upcoming = None  # (the tutorial holds the events back)
+        y = rect.y
+        for player in players:
+            amounts = {r: getattr(player, r) for r in ("food", "wood", "steel", "oil", "nuclear")}
+            amounts["helmets"] = self.production(player)["helmets"]
+            amounts["cards"] = len(player.cards)
+            turns = upcoming[0] if upcoming is not None and upcoming[1] is player else None
+            gui.draw_turn_box(view, player, amounts, pg.Rect(rect.x, y, rect.w, gui.TURN_BOX_H),
+                              current=player is self.players[self.turn], event_turns=turns,
+                              skips=player.name in manager.skip_turns)
+            y += gui.TURN_BOX_H + self.TURN_ORDER_GAP
+
     def _blit_action_line(self, surface, line, x, y, height, max_x):
         for text, color in line:
             piece = self.font.render(str(text), True, tuple(color))
@@ -659,18 +750,17 @@ class Engine:
             self.card_menu.use_cards_automatic()
 
         self._handle_action_box()
-        self.gui.draw_overlay(self.view)
+        self._handle_turn_order()
         if self.io.hover_country is not None and self.online is None:
             # (Online every device shows the country its own pointer is
             # over: online.HostSession.show_hovers.)
             self._draw_country_info(self.io.hover_country)
         player = self.players[self.turn]
-        self.gui.draw_player_stats(self.view, player, self.font, self.hud_images, self.production(player))
+        self.gui.draw_player_stats(self.view, player, self.font, self.STATS_POS, self.production(player))
         self.gui.draw_attack_phase(
             self.view, self.players[self.turn], images=self.hud_images, outline_color=self.colors["outlines"],
             end_turn_enabled=self.turn_manager.can_end_turn(),
         )
-        self.gui.draw_player_outline(self.view)
 
         # Online every device opens these menus for itself (own_menus);
         # only the shop and cards of the player whose turn it is are the
@@ -750,15 +840,23 @@ class Engine:
         """The country a device's pointer at `position` (logical) is over,
         for that device's info panel: None through the buttons on screen,
         the chat (its button is every device's; `chat` the host's own, panel
-        and all) or a dialog."""
+        and all, and the turn order: this computer's) or a dialog."""
         if self.modal_open:
             return None
         point = (int(position[0]), int(position[1]))
         if online_chat.BUTTON.collidepoint(point) or (chat is not None and chat.covers(point)):
             return None
+        if chat is not None and not self._turn_order_hidden() and self._turn_order_rect().collidepoint(point):
+            return None
         return self.io.country_at(self.view, self.countries.values(), Position(*point), self.io.buttons)
 
-    BUTTON_STEP = 68  # top-left row: settings, shop, cards, event cards (60 wide + 8 gap)
+    # Top-left row: settings, shop, cards, event card; the chat button
+    # (online) under settings (chat.BUTTON), the current player's stats
+    # under that (also in a local game, where that place stays empty).
+    BUTTON_MARGIN = 10
+    BUTTON_SIZE = 44
+    BUTTON_STEP = 50  # 44 wide + 6 gap
+    STATS_POS = (BUTTON_MARGIN, BUTTON_MARGIN + 2 * BUTTON_STEP)
 
     @property
     def bot_turn(self):
@@ -1061,49 +1159,31 @@ class Engine:
         dim.fill((0, 0, 0, 140))
         self.view.screen.blit(dim, (0, 0))
 
-    def _settings_button(self):
+    def _top_left_button(self, index, color, sprite, outline_width):
         return Button(
-            pos=Position(20, 20),
-            width=60,
-            height=60,
-            color=self.SETTINGS_COLOR,
-            outline_width=4 if self.settings_open else 2,
-            image=self.hud_images['spr_settings'],
+            pos=Position(self.BUTTON_MARGIN + index * self.BUTTON_STEP, self.BUTTON_MARGIN),
+            width=self.BUTTON_SIZE,
+            height=self.BUTTON_SIZE,
+            color=color,
+            outline_width=outline_width,
+            image=self.hud_images[sprite],
         )
+
+    def _settings_button(self):
+        return self._top_left_button(0, self.SETTINGS_COLOR, "spr_settings", 4 if self.settings_open else 2)
 
     SHOP_COLOR = (165, 165, 255)  # same blue as the shop menu's background
 
     def _shop_button(self, outline_width=2):
-        return Button(
-            pos=Position(20 + self.BUTTON_STEP, 20),
-            width=60,
-            height=60,
-            color=self.SHOP_COLOR,
-            outline_width=outline_width,
-            image=self.hud_images['spr_shop'],
-        )
+        return self._top_left_button(1, self.SHOP_COLOR, "spr_shop", outline_width)
 
     def _card_button(self, outline_width=2):
-        return Button(
-            pos=Position(20 + 2 * self.BUTTON_STEP, 20),
-            width=60,
-            height=60,
-            color=CardMenu.PANEL_COLOR,
-            outline_width=outline_width,
-            image=self.hud_images['spr_cards'],
-        )
+        return self._top_left_button(2, CardMenu.PANEL_COLOR, "spr_cards", outline_width)
 
     EVENT_COLOR = (250, 225, 130)  # same yellow as the event card dialog
 
     def _event_button(self):
-        return Button(
-            pos=Position(20 + 3 * self.BUTTON_STEP, 20),
-            width=60,
-            height=60,
-            color=self.EVENT_COLOR,
-            outline_width=4 if self.event_info_open else 2,
-            image=self.hud_images['spr_event'],
-        )
+        return self._top_left_button(3, self.EVENT_COLOR, "btn_event", 4 if self.event_info_open else 2)
 
     def _draw_event_info(self):
         """The active event card (as shown when it was drawn), or "No

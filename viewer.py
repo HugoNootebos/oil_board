@@ -421,6 +421,11 @@ class Viewer:
         return game is not None and (game.settings_open or game.event_info_open or game.pairing_open
                                      or self.device.look is not None)
 
+    def _turn_order_hidden(self):
+        """The turn order is left out under a menu of this device's own and
+        while the game's shop or cards (its player's) are on its screen."""
+        return self._own_open() or self.private is not None or self._my_shop()
+
     def _my_shop(self):
         """The game's shop is open on this device (its player's turn)."""
         player = self.game.players[self.game.turn]
@@ -436,6 +441,8 @@ class Viewer:
             return True
         box = game._action_box_rect()
         if box is not None and box.collidepoint(position):
+            return True
+        if not (self._turn_order_hidden() or game._turn_order_hidden()) and                 game._turn_order_rect().collidepoint(position):
             return True
         kind = game.own_button_at(position)
         if kind in ("settings", "event"):
@@ -566,11 +573,13 @@ class Viewer:
         if menu_was_open:
             game.io.left_pressed, game.io.right_clicked = 0, False  # (the clicks are the Esc menu's)
         game._handle_action_box()
+        game._handle_turn_order(self._turn_order_hidden())
         if not game.dialog_up:
             game._hud_buttons(shop_open=self._my_shop() or self.device.look == "shop")
         name = self._hovered() if not menu_was_open else None
         if name is not None:
             game._draw_country_info(name)
+        game._draw_turn_order(self._turn_order_hidden())
         game._draw_action_box()
         start = not menu_was_open and any(pad.tapped(controls.START) for pad in self.pads.pads)
         game._own_menu(self.device, start)

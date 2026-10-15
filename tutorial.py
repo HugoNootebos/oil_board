@@ -49,7 +49,7 @@ PANEL_COLOR = (255, 248, 225)
 MARK_COLOR = (255, 205, 0)
 WIDTH = 268          # the panel (logical px)
 PAD = 14
-LEFT = (12, 96)      # its top-left: under the top-left buttons...
+LEFT = (12, 60)      # its top-left: under the top-left buttons, right of the player's stock...
 RIGHT = (676, 88)    # ...or, while the shop is open, in the shop's empty top right
 
 
@@ -177,7 +177,7 @@ STEPS = [
          marks=lambda tu: ["Somalië"] + (["info_panel"] if tu.app.io.hover_country else []),
          names=["Somalië"]),
     Step("Your stock",
-         "The panel at the bottom right shows your stock. The number in brackets next to it is what "
+         "The panel on the left shows your stock. The number in brackets next to it is what "
          "comes in at your next turn.\n"
          "At the start of every turn each troop eats 1 food (the red number); the green number is "
          "your harvest. Troops you can't feed starve.",
@@ -194,6 +194,11 @@ STEPS = [
          "At the top left: the settings (save, exit, display), the shop, your cards and the world "
          "event. You'll use the shop and the cards in a moment.",
          marks=["settings", "shop", "cards", "event"]),
+    Step("Turn order",
+         "The square at the bottom right shows the turn order: a band per player, whose turn it is "
+         "on top. Click it any time to see every player's stock and who draws the next world event; "
+         "click it again to close it.",
+         marks=["turn_order"]),
     Step("Cards",
          "You hold three cards. Three of a kind, or one of each, make a set, which you can trade "
          "for troops or resources, but only while deploying troops.\n"
@@ -284,8 +289,8 @@ STEPS = [
          done=lambda tu: _ours(tu) and tu.app.turn_manager.turn_started,
          marks=["log"]),
     Step("Your turn again",
-         "Your troops have eaten and your countries delivered their production: see your stock at "
-         "the bottom right. The soldier shows your new troops.",
+         "Your troops have eaten and your countries delivered their production: see your stock on "
+         "the left. The soldier shows your new troops.",
          marks=["player_panel", "soldier"]),
     Step("World events",
          "Every few turns a world event is drawn: a card that changes the rules for a full round, "
@@ -460,10 +465,11 @@ class Tutorial:
             return [("r", pg.Rect(button.pos.x, button.pos.y, button.width, button.height))]
         x0 = view.WIDTH - gui.width
         if key == "player_panel":
-            return [("r", pg.Rect(x0, view.HEIGHT - gui.height, gui.width, gui.height - gui.PHASE_BOX_H))]
+            return [("r", gui.player_rect)] if gui.player_rect is not None else []
         if key == "helmets":
-            cy = gui.player_row_center_y(view, gui.HELMET_ROW)
-            return [("r", pg.Rect(x0 + 2, cy - 21, gui.width - 4, 42))]
+            return [("r", gui.player_rows[gui.HELMET_ROW])] if gui.player_rows else []
+        if key == "turn_order":
+            return [("r", app._turn_order_rect())]
         if key == "info_panel":
             return [("r", pg.Rect(x0, 0, gui.width, 170))]
         if key in ("phases", "attack_phase", "move_phase"):
@@ -512,6 +518,8 @@ class Tutorial:
         player = self.player
         shop_open = app.players[app.turn] is player and player.attack == 3 and player.subattack < 8
         x, y = RIGHT if shop_open else LEFT
+        if not shop_open and app.gui.player_rect is not None:
+            x = max(x, app.gui.player_rect.right + 10)
         inner = WIDTH - 2 * PAD
 
         title = TurnManager._wrap_text(t(step.title), self.title_font, inner - 50)

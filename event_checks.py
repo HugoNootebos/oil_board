@@ -462,8 +462,18 @@ def _(ev):
             # slice (0) exactly when the army is lost.
             under = (-wheel.final) % 360
             check("it lands on the pirate only when lost", (under < wheel.width) is lost, round(under, 1))
+            io = app.io
+            io.left_pressed, io.top_button = 1, None
+            phase.update()
+            io.left_pressed = 0
+            check("a click while it spins does nothing", a.subattack == 9 and phase.wheel is wheel)
             wheel.start -= wheel.spin_ms + wheel.hold_ms + 1
             phase.update()
+            check("landed, it waits for a click (however long)",
+                  a.subattack == 9 and phase.wheel is wheel and not m().animating())
+            io.left_pressed = 1
+            phase.update()
+            io.left_pressed = 0
             if lost:
                 check("after the wheel: the army and its ship are lost at sea",
                       country("Japan").units == 7 and country("Japan").ships == 0 and a.subattack == 0
@@ -471,6 +481,26 @@ def _(ev):
             else:
                 check("after the wheel: on to the dice", country("Japan").units == 10 and a.subattack == 3
                       and country("Japan").ships == 1 and phase.wheel is None and not m().animating())
+
+        # On a bot's turn nobody has to click: it closes after HOLD_MS.
+        a.is_bot = True
+        ev.sea_attack_check = lambda engine: False
+        own(a, "Japan", 10, ships=1)
+        a.attack = 1
+        phase.reset()
+        phase.attack_from, phase.defence_country = "Japan", "Kazachstan"
+        phase.attack_dice = phase._default_attack_dice(10)
+        phase.defence_dice = np.zeros(2)
+        phase.attack_via_land = False
+        phase.roll_attack()
+        wheel = phase.wheel
+        wheel.start -= wheel.spin_ms + 1
+        phase.update()
+        check("bot's turn: landed, it shows for a moment", a.subattack == 9)
+        wheel.start -= wheel.hold_ms
+        phase.update()
+        check("bot's turn: then closes by itself", a.subattack == 3 and phase.wheel is None)
+        a.is_bot = False
     finally:
         del ev.sea_attack_check
         m().bot.fast = True

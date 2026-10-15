@@ -1001,20 +1001,22 @@ class ReinforcementPhase(Phase):
 class PirateWheel:
     """The wheel spun for everyone to see as an event's pirates may strike
     an attack over sea (AttackPhase, subattack 9): `slices` equal slices,
-    slice 0 red with the pirate, the others blank yellow. The outcome is
-    drawn before it spins (`lost`: it lands on the pirate); it slows down
-    over SPIN_MS, then shows where it landed for HOLD_MS (both times
-    `pace`, shorter for a bot's attack with Fast bots)."""
+    slice 0 red with the pirate, the others blank green. `stakes` is what
+    goes down if it lands on the pirate: [(sprite, count)], troops first.
+    The outcome is drawn before it spins (`lost`: it lands on the pirate);
+    it slows down over SPIN_MS, then shows where it landed until a click
+    anywhere, on a bot's turn for HOLD_MS (both times `pace`, shorter for
+    a bot's attack with Fast bots)."""
 
     SPIN_MS = 3200
     HOLD_MS = 1500
     TURNS = 4
     RED = (200, 30, 30)
-    YELLOW = (255, 200, 40)
+    GREEN = (70, 175, 70)
 
-    def __init__(self, slices, lost, title, line, pace=1.0):
+    def __init__(self, slices, lost, title, stakes, pace=1.0):
         self.slices, self.lost = slices, lost
-        self.title, self.line = title, line
+        self.title, self.stakes = title, stakes
         self.width = 360 / slices
         index = 0 if lost else random.randrange(1, slices)
         # Where in that slice it stops under the pointer: well inside it.
@@ -1589,10 +1591,10 @@ class AttackPhase(Phase):
             slices = event.sea_attack_wheel(engine)
             if slices and not manager.bot.fast:
                 pace = manager.bot._pace(1000) / 1000 if engine.bot_turn else 1.0
-                self.wheel = PirateWheel(
-                    slices, lost, t(event.name),
-                    t("{} sails from {} to {}").format(
-                        self.player.name, t(self.attack_from), t(self.defence_country)), pace)
+                stakes = [(sprite, count) for sprite, count in (
+                    ("card0", int(np.sum(self.attack_dice == 0))), ("ship", self.selected_ships),
+                    ("tank", self.selected_tanks), ("plane", self.selected_planes)) if count > 0]
+                self.wheel = PirateWheel(slices, lost, t(event.name), stakes, pace)
                 self.player.subattack = 9
                 return
             if lost:
@@ -1625,14 +1627,15 @@ class AttackPhase(Phase):
         self.defence_country = None
 
     def _spin_wheel(self):
-        """Subattack 9: the pirates' wheel spins, then the attack is lost at
-        sea or goes on to the dice."""
+        """Subattack 9: the pirates' wheel spins; once it has landed a click
+        anywhere (on a bot's turn: HOLD_MS) closes it, and the attack is
+        lost at sea or goes on to the dice."""
         wheel = self.wheel
         if wheel is None:
             self.player.subattack = 2
             return
-        self._draw_wheel(wheel)
-        if wheel.done():
+        clicked = self._draw_wheel(wheel)
+        if clicked or (self.engine.bot_turn and wheel.done()):
             self.wheel = None
             if wheel.lost:
                 self._lost_at_sea()
@@ -1640,27 +1643,41 @@ class AttackPhase(Phase):
                 self._cross()
 
     def _draw_wheel(self, wheel):
+        """The wheel's pop-up; True when it's clicked anywhere (but on a
+        button) after the wheel has landed, past POPUP_GRACE_MS."""
         view = self.view
         screen = view.screen
         r = self.WHEEL_R
-        w, h = 2 * r + 80, 20 + 32 + 22 + 16 + 2 * r + 16 + 34 + 14
-        x0 = int(self.DICE_CX - w // 2)
-        y0 = (view.HEIGHT - h) // 2
-        self.draw_rect(self.POPUP_COLOR, x0, y0, w, h)
-        self.draw_rect((0, 0, 0), x0, y0, w, h, 3)
-        self.io.button(("r", x0, y0, w, h))  # keeps clicks off the map
+        stake_h = self.STAKE_H
         fonts = _ASSET_ICONS.get("wheel_fonts")
         if fonts is None:
-            fonts = _ASSET_ICONS["wheel_fonts"] = (game_font(24, bold=True), game_font(17),
-                                                   game_font(26, bold=True))
-        title_font, text_font, result_font = fonts
+            fonts = _ASSET_ICONS["wheel_fonts"] = (game_font(24, bold=True), game_font(24),
+                                                   game_font(26, bold=True), game_font(14))
+        title_font, count_font, result_font, hint_font = fonts
+        hint_h = hint_font.get_height()
+        w, h = 2 * r + 80, 20 + 32 + stake_h + 18 + 2 * r + 16 + 34 + 10 + hint_h + 14
+        x0 = int(self.DICE_CX - w // 2)
+        y0 = (view.HEIGHT - h) // 2
+        self.draw_rect(self.WHEEL_POPUP_COLOR, x0, y0, w, h)
+        self.draw_rect((0, 0, 0), x0, y0, w, h, 3)
+        on_box = self.io.button(("r", x0, y0, w, h))  # keeps clicks off the map
         y = y0 + 20
         title = title_font.render(wheel.title, True, (0, 0, 0))
         screen.blit(title, title.get_rect(midtop=(x0 + w // 2, y)))
         y += 32
-        line = text_font.render(wheel.line, True, self.POPUP_HINT_COLOR)
-        screen.blit(line, line.get_rect(midtop=(x0 + w // 2, y)))
-        y += 22 + 16
+        # What's at stake: "3 [soldier]  1 [ship]  2 [tank]", centred.
+        pieces = []
+        for sprite, count in wheel.stakes:
+            pieces.append((count_font.render(str(count), True, (0, 0, 0)), self._stake_sprite(sprite)))
+        gap, spacing = 4, 16
+        total = sum(n.get_width() + gap + s.get_width() for n, s in pieces) + spacing * max(len(pieces) - 1, 0)
+        x = x0 + (w - total) // 2
+        for number, sprite in pieces:
+            screen.blit(number, number.get_rect(midleft=(x, y + stake_h // 2)))
+            x += number.get_width() + gap
+            screen.blit(sprite, sprite.get_rect(midleft=(x, y + stake_h // 2)))
+            x += sprite.get_width() + spacing
+        y += stake_h + 18
 
         angle = wheel.angle()
         passed = int(angle // wheel.width)
@@ -1675,15 +1692,34 @@ class AttackPhase(Phase):
         pg.draw.polygon(screen, (0, 0, 0), tip, 3)
         y += 2 * r + 16
 
-        if wheel.landed():
-            text, color = (t("Lost at sea!"), self.RESULT_LOST) if wheel.lost \
-                else (t("Safe crossing"), self.RESULT_SAFE)
-            result = result_font.render(text, True, color)
-            screen.blit(result, result.get_rect(midtop=(x0 + w // 2, y)))
+        if not wheel.landed():
+            return False
+        text, color = (t("Lost at sea!"), self.RESULT_LOST) if wheel.lost \
+            else (t("Safe crossing"), self.RESULT_SAFE)
+        result = result_font.render(text, True, color)
+        screen.blit(result, result.get_rect(midtop=(x0 + w // 2, y)))
+        # As the event card's dialog.
+        hint = hint_font.render(t("click anywhere to continue"), True, (90, 50, 50))
+        screen.blit(hint, hint.get_rect(midbottom=(x0 + w // 2, y0 + h - 14)))
+        return (bool(self.io.left_pressed) and (on_box or self.io.top_button is None)
+                and wheel.elapsed() - wheel.spin_ms >= self.POPUP_GRACE_MS)
 
     RESULT_LOST = (170, 20, 20)
     RESULT_SAFE = (20, 110, 40)
     WHEEL_SUPERSAMPLE = 3
+    WHEEL_POPUP_COLOR = (250, 225, 130)  # the event cards' yellow
+    STAKE_H = 44
+
+    def _stake_sprite(self, name):
+        """images/<name>.png at the stake row's height (the soldier from the
+        troop card keeps its shape)."""
+        key = "stake_" + name
+        if key not in _ASSET_ICONS:
+            image = pg.image.load("./images/{}.png".format(name)).convert_alpha()
+            h = self.STAKE_H if name == "card0" else self.STAKE_H - 6
+            _ASSET_ICONS[key] = pg.transform.smoothscale(
+                image, (round(image.get_width() * h / image.get_height()), h))
+        return _ASSET_ICONS[key]
 
     def _wheel_image(self, wheel, angle):
         """The wheel turned `angle` degrees clockwise, drawn large and
@@ -1701,7 +1737,7 @@ class AttackPhase(Phase):
         for i in range(wheel.slices):
             start = i * wheel.width
             arc = [point(start + wheel.width * s / 24, r) for s in range(25)]
-            pg.draw.polygon(surface, PirateWheel.RED if i == 0 else PirateWheel.YELLOW, [(c, c)] + arc)
+            pg.draw.polygon(surface, PirateWheel.RED if i == 0 else PirateWheel.GREEN, [(c, c)] + arc)
         for i in range(wheel.slices):
             pg.draw.line(surface, (0, 0, 0), (c, c), point(i * wheel.width, r), 3 * k)
         pg.draw.circle(surface, (0, 0, 0), (c, c), r, 4 * k)
@@ -3687,10 +3723,12 @@ class TurnManager:
         return player.attack == 1 and player.subattack in (3, 4, 5, 8, 9)
 
     def animating(self):
-        """Something on screen moves by itself (the pirates' wheel), so the
-        game keeps drawing frames without any input (runner.play)."""
+        """Something on screen moves by itself (the pirates' wheel, until it
+        has landed), so the game keeps drawing frames without any input
+        (runner.play)."""
         player = self.engine.players[self.engine.turn]
-        return player.attack == 1 and player.subattack == 9
+        wheel = self.phases[1].wheel
+        return player.attack == 1 and player.subattack == 9 and wheel is not None and not wheel.landed()
 
     def open_shop(self):
         player = self.engine.players[self.engine.turn]

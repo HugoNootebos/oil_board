@@ -322,7 +322,6 @@ NL = {
     "{} units have been killed by pirates": "{} eenheden zijn door piraten gedood",
     "{} units and everything they brought along have been lost to pirates":
         "{} eenheden en alles wat ze meenamen zijn aan piraten verloren",
-    "{} sails from {} to {}": "{} vaart van {} naar {}",
     "Lost at sea!": "Verloren op zee!",
     "Safe crossing": "Veilig overgestoken",
     "'s attack lost {} units to pirates": " verloor bij een aanval {} eenheden aan piraten",
@@ -482,11 +481,11 @@ NL = {
         "beurt oplevert: voedsel, hout, staal, olie, nucleair en helmen. Ook een luchthaven of fort "
         "staat erbij, als het die heeft.",
     "Your stock": "Je voorraad",
-    "The panel at the bottom right shows your stock. The number in brackets next to it is what "
+    "The panel on the left shows your stock. The number in brackets next to it is what "
     "comes in at your next turn.\n"
     "At the start of every turn each troop eats 1 food (the red number); the green number is "
     "your harvest. Troops you can't feed starve.":
-        "Het paneel rechtsonder toont je voorraad. Het getal tussen haakjes ernaast is wat er bij je "
+        "Het paneel links toont je voorraad. Het getal tussen haakjes ernaast is wat er bij je "
         "volgende beurt bijkomt.\n"
         "Aan het begin van elke beurt eet elke troep 1 voedsel (het rode getal); het groene getal is "
         "je oogst. Troepen die je niet kunt voeden, verhongeren.",
@@ -609,10 +608,18 @@ NL = {
         "De bots spelen nu. Alles wat er gebeurt, verschijnt linksonder: klik op dat vak om het hele "
         "logboek te lezen.",
     "Your turn again": "Weer jouw beurt",
-    "Your troops have eaten and your countries delivered their production: see your stock at "
-    "the bottom right. The soldier shows your new troops.":
+    "Your troops have eaten and your countries delivered their production: see your stock on "
+    "the left. The soldier shows your new troops.":
         "Je troepen hebben gegeten en je landen hebben hun productie geleverd: zie je voorraad "
-        "rechtsonder. De soldaat toont je nieuwe troepen.",
+        "links. De soldaat toont je nieuwe troepen.",
+    "Turn order": "Beurtvolgorde",
+    "The square at the bottom right shows the turn order: a band per player, whose turn it is "
+    "on top. Click it any time to see every player's stock and who draws the next world event; "
+    "click it again to close it.":
+        "Het vierkantje rechtsonder toont de beurtvolgorde: een band per speler, met wie aan de "
+        "beurt is bovenaan. Klik er wanneer je wilt op om ieders voorraad te zien en wie de "
+        "volgende wereldgebeurtenis trekt; klik nog eens om het te sluiten.",
+    "skips": "slaat over",
     "World events": "Wereldgebeurtenissen",
     "Every few turns a world event is drawn: a card that changes the rules for a full round, "
     "such as income, attacks or prices. The event button shows the active one and when the "

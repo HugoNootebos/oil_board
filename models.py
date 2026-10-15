@@ -997,24 +997,17 @@ class Gui:
             gray1=(200, 200, 200),
             gray2=(150, 150, 150),
             width=150,
-            height=384,
             outline_color=(0, 0, 0),
     ):
         self.gray1 = gray1
         self.gray2 = gray2
-        self.width = width
-        self.height = height
+        self.width = width  # the country info panel and the phase box (bottom right)
         self.outline_color = outline_color
         self.io = io
-
-    def draw_overlay(self, view):
-        # Only the player panel is always there; the country info panel
-        # draws its own background, sized to its contents.
-        pg.draw.rect(
-            view.screen,
-            self.gray1,
-            pg.Rect(view.WIDTH - self.width, view.HEIGHT - self.height, self.width, view.HEIGHT),
-        )
+        # Where draw_player_stats last drew the current player's panel and
+        # its six rows (food .. helmets), for the tutorial's rings.
+        self.player_rect = None
+        self.player_rows = []
 
     # Owner mini-stats under the country info: icon + amount, 3 per row.
     OWNER_CELLS = [("spr_food", "food"), ("spr_wood", "wood"), ("spr_steel", "steel"),
@@ -1195,83 +1188,156 @@ class Gui:
                      pg.Rect(x0, h - 2, w, 2)):
             pg.draw.rect(view.screen, self.OWNER_LINE_COLOR, rect)
 
-    def draw_player_outline(self, view):
-        """Dark outline all round the player panel (name band included),
-        drawn after the phase box so nothing covers it."""
-        x0, y0 = view.WIDTH - self.width, view.HEIGHT - self.height
-        h = view.HEIGHT - y0
-        for rect in (pg.Rect(x0, y0, self.width, 2), pg.Rect(x0, view.HEIGHT - 2, self.width, 2),
-                     pg.Rect(x0, y0, 2, h), pg.Rect(view.WIDTH - 2, y0, 2, h)):
-            pg.draw.rect(view.screen, self.OWNER_LINE_COLOR, rect)
-
-    # Player panel layout (all in logical UI pixels): a name header, then
-    # one row per resource, with enough clearance below the last row that
-    # it doesn't crowd the phase-selector buttons anchored to the bottom.
-    PLAYER_HEADER_H = 24
-    PLAYER_ROWS_TOP_PAD = 6
-    PLAYER_ROW_H = 42
-    PLAYER_TEXT_X = 24         # left of the amount column (sprites sit at 8)
-    PLAYER_AMOUNT_CX = 79      # centre line of the amounts
+    # The current player's panel (left, under the top-left buttons): a name
+    # band, then one row per resource with its amount and, right after it,
+    # what comes in at the next turn. As wide as its widest row needs.
+    PLAYER_HEADER_H = 22
+    PLAYER_ROW_H = 28
+    PLAYER_ICON = 24
+    PLAYER_PAD = 4
     HELMET_ROW = 5
+    PLAYER_ICONS = [("food", (16, 24)), ("wood", None), ("steel", None), ("oil", None), ("nuclear", None),
+                    ("troops", None)]
 
-    def player_row_center_y(self, view, index):
-        """Centre line of the index-th resource row (its 40 px icon box)."""
-        return (view.HEIGHT - self.height + self.PLAYER_HEADER_H + self.PLAYER_ROWS_TOP_PAD
-                + index * self.PLAYER_ROW_H + 20)
+    def _player_fonts(self):
+        if not hasattr(self, "_stat_small"):
+            self._stat_small = game_font(13)
+            self._stat_bold = game_font(17, bold=True)
+            self._stat_icons = [Image(name, scale=size or (self.PLAYER_ICON, self.PLAYER_ICON))
+                                for name, size in self.PLAYER_ICONS]
+        return self._stat_small, self._stat_bold
 
-    def draw_player_stats(self, view, player, font, images, production=None):
-        if not hasattr(self, "small_font"):
-            self.small_font = game_font(15)
-        x0 = view.WIDTH - self.width
-        y0 = view.HEIGHT - self.height
-
-        header_rect = pg.Rect(x0, y0, self.width, self.PLAYER_HEADER_H)
-        pg.draw.rect(view.screen, player.color, header_rect)
-        if not hasattr(self, "bold_font"):
-            self.bold_font = game_font(20, bold=True)
+    def draw_player_stats(self, view, player, font, pos, production=None):
+        """The current player's stock, top-left corner at `pos` (logical)."""
+        small, bold = self._player_fonts()
+        screen = view.screen
+        x0, y0 = pos
+        pad = self.PLAYER_PAD
+        amounts = [player.food, player.wood, player.steel, player.oil, player.nuclear,
+                   # Helmets: what the player's countries hold right now (live),
+                   # not the figure frozen at the start of the turn.
+                   production["helmets"] if production else player.troops]
+        # What comes in: food has the troops to feed (top) and the harvest
+        # (bottom); helmets the reinforcements they bring each turn.
+        brackets = []
+        for index, key in enumerate(["food", "wood", "steel", "oil", "nuclear", "troops"]):
+            if production is None:
+                brackets.append([])
+            elif index == 0:
+                brackets.append([small.render("(-{})".format(production["units"]), True, (170, 0, 0)),
+                                 small.render("(+{})".format(production["food"] + production["units"]),
+                                              True, (0, 120, 0))])
+            else:
+                gain = production[key] if index < 5 else production["helmets"] // 3 + 3
+                color = (0, 120, 0) if gain > 0 else (170, 0, 0) if gain < 0 else self.outline_color
+                brackets.append([small.render("({:+d})".format(gain), True, color)])
+        amount_x = pad + self.PLAYER_ICON + pad
+        amount_w = max(font.size(str(amount))[0] for amount in amounts)
+        bracket_x = amount_x + amount_w + 4
         label = player.name + (" (bot)" if player.is_bot else "")
-        name = self.bold_font.render(label, True, name_text_color(player.color))
-        view.screen.blit(name, (x0 + (self.width - name.get_width()) // 2, header_rect.centery - name.get_height() // 2))
-
-        resource_stats = [
-            (images["spr_food"], player.food, 0),
-            (images["spr_wood"], player.wood, 1),
-            (images["spr_steel"], player.steel, 2),
-            (images["spr_oil"], player.oil, 3),
-            (images["spr_nuclear"], player.nuclear, 4),
-            # Helmets: what the player's countries hold right now (live),
-            # not the figure frozen at the start of the turn.
-            (images["spr_troops"], production["helmets"] if production else player.troops, 5),
-        ]
-        resource_names = ["food", "wood", "steel", "oil", "nuclear", "troops"]
-        rows_top = y0 + self.PLAYER_HEADER_H + self.PLAYER_ROWS_TOP_PAD
-        for image, amount, index in resource_stats:
-            pos = Position(x0 + self.PLAYER_TEXT_X, rows_top + index * self.PLAYER_ROW_H)
-            iw, ih = image.image.get_size()
-            image.draw(view.screen, pos + Position((40 - iw) // 2 - self.PLAYER_TEXT_X + 8, (40 - ih) // 2))
+        w = max(bracket_x + max((b.get_width() for row in brackets for b in row), default=0) + pad + 1,
+                bold.size(label)[0] + 2 * pad + 4)
+        h = self.PLAYER_HEADER_H + 6 * self.PLAYER_ROW_H + 6
+        self.player_rect = pg.Rect(x0, y0, w, h)
+        self.player_rows = []
+        pg.draw.rect(screen, self.gray1, self.player_rect)
+        pg.draw.rect(screen, player.color, pg.Rect(x0, y0, w, self.PLAYER_HEADER_H))
+        name = bold.render(label, True, name_text_color(player.color))
+        screen.blit(name, (x0 + (w - name.get_width()) // 2, y0 + (self.PLAYER_HEADER_H - name.get_height()) // 2))
+        for index, amount in enumerate(amounts):
+            row = pg.Rect(x0, y0 + self.PLAYER_HEADER_H + 3 + index * self.PLAYER_ROW_H, w, self.PLAYER_ROW_H)
+            self.player_rows.append(row)
+            icon = self._stat_icons[index]
+            iw, ih = icon.image.get_size()
+            icon.draw(screen, Position(x0 + pad + (self.PLAYER_ICON - iw) // 2, row.centery - ih // 2))
             color = self.outline_color
             if index == 0 and production is not None and production["units"] > amount:
                 color = (200, 0, 0)  # more troops than food in stock: some will starve
-            text = font.render("{}".format(amount), True, color)
-            text_pos = pos + Position(0, (40 - text.get_height()) // 2)
-            # Amounts are centred on one line so 1- and 2-digit ones line up.
-            view.screen.blit(text, (x0 + self.PLAYER_AMOUNT_CX - text.get_width() // 2, text_pos.y))
-            if production is not None and index == 0:
-                # Food: the troops to feed (top) and the harvest (bottom).
-                right = x0 + self.width - 10
-                upper = self.small_font.render("(-{})".format(production["units"]), True, (170, 0, 0))
-                lower = self.small_font.render("(+{})".format(production["food"] + production["units"]),
-                                               True, (0, 120, 0))
-                view.screen.blit(upper, (right - upper.get_width(), pos.y + 3))
-                view.screen.blit(lower, (right - lower.get_width(), pos.y + 20))
-            elif production is not None:
-                if index < 5:
-                    gain = production[resource_names[index]]
-                else:  # helmets: the reinforcements they bring each turn
-                    gain = production["helmets"] // 3 + 3
-                color = (0, 120, 0) if gain > 0 else (170, 0, 0) if gain < 0 else self.outline_color
-                bracket = self.small_font.render("({:+d})".format(gain), True, color)
-                view.screen.blit(bracket, (x0 + self.width - 10 - bracket.get_width(), pos.y + 13))
+            text = font.render(str(amount), True, color)
+            # Amounts are centred in one column so 1- and 2-digit ones line up.
+            screen.blit(text, (x0 + amount_x + (amount_w - text.get_width()) // 2,
+                               row.centery - text.get_height() // 2))
+            pieces = brackets[index]
+            if len(pieces) == 2:
+                screen.blit(pieces[0], (x0 + bracket_x, row.centery - pieces[0].get_height()))
+                screen.blit(pieces[1], (x0 + bracket_x, row.centery))
+            elif pieces:
+                screen.blit(pieces[0], (x0 + bracket_x, row.centery - pieces[0].get_height() // 2))
+        pg.draw.rect(screen, self.OWNER_LINE_COLOR, self.player_rect, 2)
+
+    # A player in the turn order (Engine._draw_turn_order): the owner box's
+    # style, smaller, as wide as the phase box.
+    TURN_BOX_H = 66
+    TURN_BAND_H = 20
+    TURN_ROW_H = 20
+    TURN_ICON = 16
+    TURN_ORDER = ["food", "wood", "steel", "cards", "nuclear", "helmets", "oil"]
+    TURN_ICONS = {"food": ("food", (11, 16)), "wood": ("wood", None), "steel": ("steel", None),
+                  "cards": ("cards", None), "nuclear": ("nuclear", None), "helmets": ("troops", None),
+                  "oil": ("oil", None)}
+    TURN_FADE = 0.35  # how much of its colour a player who skips their turn keeps
+    EVENT_COLOR = (250, 225, 130)  # the event card's yellow (Engine.EVENT_COLOR)
+
+    def _faded(self, color):
+        return tuple(int(c + (g - c) * (1 - self.TURN_FADE)) for c, g in zip(color, self.gray1))
+
+    def draw_turn_box(self, view, player, amounts, rect, current=False, event_turns=None, skips=False):
+        """One player of the turn order in `rect`: a name band in their
+        colour and their stock below it (`amounts`: food, wood, steel, oil,
+        nuclear, helmets, cards). `current`: whose turn it is (black edge);
+        `event_turns`: the next event card is theirs to draw, in so many
+        turns; `skips`: their next turn is cancelled (faded)."""
+        if not hasattr(self, "_turn_small"):
+            self._turn_small = game_font(13)
+            self._turn_name = game_font(16)
+            self._turn_bold = game_font(16, bold=True)
+            self._turn_icons = {key: Image(name, scale=size or (self.TURN_ICON, self.TURN_ICON))
+                                for key, (name, size) in self.TURN_ICONS.items()}
+            self._turn_event = Image("event", scale=(14, 14))
+        screen, small = view.screen, self._turn_small
+        x, y, w, h = rect
+        band = self.TURN_BAND_H
+        color = self._faded(player.color) if skips else player.color
+        pg.draw.rect(screen, self._faded(self.gray1) if skips else self.gray1, rect)
+        pg.draw.rect(screen, color, pg.Rect(x, y, w, band))
+        right = x + w - 3
+        if event_turns is not None:
+            badge = pg.Rect(0, 0, 32, band - 4)
+            badge.midright = (right, y + band // 2)
+            pg.draw.rect(screen, self.EVENT_COLOR, badge, border_radius=3)
+            pg.draw.rect(screen, (0, 0, 0), badge, 1, border_radius=3)
+            self._turn_event.draw(screen, Position(badge.x + 2, badge.centery - 7))
+            number = small.render(str(event_turns), True, (0, 0, 0))
+            screen.blit(number, (badge.right - 4 - number.get_width(), badge.centery - number.get_height() // 2))
+            right = badge.x - 3
+        if skips:
+            label = small.render(t("skips"), True, (70, 70, 70))
+            screen.blit(label, (right - label.get_width(), y + (band - label.get_height()) // 2))
+            right -= label.get_width() + 3
+        font = self._turn_bold if current else self._turn_name
+        name, cut = player.name, player.name
+        while font.size(name)[0] > right - (x + 5) and len(cut) > 1:
+            cut = cut[:-1]
+            name = cut.rstrip() + "…"
+        label = font.render(name, True, (70, 70, 70) if skips else name_text_color(player.color))
+        lx = min(x + (w - label.get_width()) // 2, right - label.get_width())
+        screen.blit(label, (max(x + 5, lx), y + (band - label.get_height()) // 2))
+        col_w = (w - 6) // 4
+        top = y + band + (h - 2 - band - (self.TURN_ROW_H + self.TURN_ICON)) // 2
+        for i, key in enumerate(self.TURN_ORDER):
+            cx = x + 3 + (i % 4) * col_w
+            cy = top + (i // 4) * self.TURN_ROW_H
+            if key == "cards":
+                cy = top + self.TURN_ROW_H // 2  # centred between the rows, in the last column
+            icon = self._turn_icons[key]
+            iw, ih = icon.image.get_size()
+            icon.draw(screen, Position(cx + (self.TURN_ICON - iw) // 2, cy + (self.TURN_ICON - ih) // 2))
+            text = small.render(str(amounts[key]), True, self.outline_color)
+            screen.blit(text, (cx + self.TURN_ICON + 2, cy + (self.TURN_ICON - text.get_height()) // 2))
+        if current:
+            pg.draw.rect(screen, (0, 0, 0), rect, 3)
+        else:
+            pg.draw.rect(screen, self.OWNER_LINE_COLOR, rect, 2)
 
     phase_button_radius = 21
     PHASE_BOX_H = 100
@@ -1303,8 +1369,8 @@ class Gui:
             outline_width=2,
             end_turn_enabled=True,
     ):
-        """The phase box under the player panel: the three phase buttons
-        and an End turn button."""
+        """The phase box at the bottom right, straight on the map: the three
+        phase buttons and an End turn button."""
         if not hasattr(self, "_phase_dim_overlay"):
             # A translucent dark circle dropped over a phase button dims
             # its fill and icon together, without touching the (shared)
@@ -1313,10 +1379,6 @@ class Gui:
             overlay = pg.Surface((d, d), pg.SRCALPHA)
             pg.draw.circle(overlay, (15, 15, 15, 150), (self.phase_button_radius, self.phase_button_radius), self.phase_button_radius)
             self._phase_dim_overlay = overlay
-
-        x0 = view.WIDTH - self.width
-        y0 = view.HEIGHT - self.PHASE_BOX_H
-        pg.draw.line(view.screen, outline_color, (x0, y0), (view.WIDTH, y0), 2)
 
         for index, color in enumerate(colors):
             center = self.phase_button_center(view, index)

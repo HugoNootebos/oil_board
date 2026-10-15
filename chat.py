@@ -30,8 +30,9 @@ NAME_MAX = 40
 HISTORY = 100    # messages kept (and given to a device that comes in)
 COLOR = (245, 200, 215)        # the button: pale pink, no other HUD button's colour
 NO_COLOR = (200, 200, 200)     # someone without a player (watching)
-BUTTON = pg.Rect(20, 88, 60, 60)    # under the settings button (Engine.BUTTON_STEP lower)
-PANEL = pg.Rect(88, 88, 400, 270)   # opens to the right of it
+BUTTON = pg.Rect(10, 60, 44, 44)    # under the settings button (Engine.BUTTON_STEP lower, as big)
+PANEL = pg.Rect(60, 60, 400, 270)   # opens to the right of it
+SPRITE = 38      # the sprite on the button, as on the other top-left buttons
 MARGIN = 14      # room around the button for its hover growth and the badge
 ROW_H = 22
 INPUT_H = 32
@@ -189,7 +190,8 @@ class Chat:
         """Like the HUD's buttons (models.Button): grows a little under the
         mouse, a thicker edge while open; the badge on its corner."""
         if self._sprite is None:
-            self._sprite = pg.image.load("./images/chat.png").convert_alpha()
+            self._sprite = pg.transform.smoothscale(pg.image.load("./images/chat.png").convert_alpha(),
+                                                    (SPRITE, SPRITE))
         image = pg.Surface((BUTTON.w + 2 * MARGIN, BUTTON.h + 2 * MARGIN), pg.SRCALPHA)
         rect = pg.Rect(MARGIN, MARGIN, BUTTON.w, BUTTON.h).inflate(6 * hovered, 6 * hovered)
         pg.draw.rect(image, COLOR, rect)
