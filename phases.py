@@ -3350,12 +3350,14 @@ class TurnOrderPhase(OilSharePhase):
 
 class EventChoicePhase(OilSharePhase):
     """player.attack == 10 -- an event asks its `chooser` a yes/no question
-    (`event.question()`, e.g. EvilSpirits: pay to keep a development?) and
+    (`event.question()`, e.g. EvilSpirits: pay to drive the spirits away?) and
     hands the answer to `event.choose(engine, chooser, yes)`; then back to
-    the event's `return_to`. Everything is in the event (saved), so a save
+    the event's `return_to`. The eye button (Confirm's usual spot) hides the
+    panel to see the map. Everything is in the event (saved), so a save
     loaded here asks again."""
 
     W = 440
+    EVENT_COLOR = (250, 225, 130)  # the event cards' yellow
 
     def update(self):
         event = self.manager.current_event
@@ -3364,10 +3366,15 @@ class EventChoicePhase(OilSharePhase):
         if not hasattr(event, "choose") or chooser is None:
             player.attack, player.subattack = getattr(event, "return_to", (0, 0))
             return
+        if player.subattack == 0:
+            self.hidden = False
+            player.subattack = 1
         if chooser.is_bot:
-            answer = True  # a human made a bot meanwhile: keep it as it is
+            answer = True  # a human made a bot meanwhile: pay, so nothing happens
         else:
-            answer = self._draw_question(event)
+            if draw_eye_button(self.engine, self.CONFIRM_X, self.ROW_Y):
+                self.hidden = not self.hidden
+            answer = None if self.hidden else self._draw_question(event)
         if answer is not None:
             player.attack, player.subattack = event.return_to
             event.choose(self.engine, chooser, answer)
@@ -3382,7 +3389,7 @@ class EventChoicePhase(OilSharePhase):
         h = 20 + 36 + len(lines) * 26 + 20 + 48 + 22
         x0 = self.DICE_CX - w // 2
         y0 = (self.view.HEIGHT - h) // 2
-        self.draw_rect(self.POPUP_COLOR, x0, y0, w, h)
+        self.draw_rect(self.EVENT_COLOR, x0, y0, w, h)
         self.draw_rect((0, 0, 0), x0, y0, w, h, 3)
         self.io.button(("r", x0, y0, w, h))  # under its own buttons: keeps clicks off the map
 
@@ -3396,8 +3403,30 @@ class EventChoicePhase(OilSharePhase):
             y += 26
         y += 20
         bw, gap = 120, 24
-        if self._small_button(x0 + w // 2 - gap // 2 - bw, y, bw, 48, t("Yes"), True, row_font):
-            return True
+        yes_x = x0 + w // 2 - gap // 2 - bw
+        cost = getattr(event, "YES_COST", None)  # (resource, amount): Yes reads "-amount <sprite>"
+        if cost is None:
+            if self._small_button(yes_x, y, bw, 48, t("Yes"), True, row_font):
+                return True
+        else:
+            # Greyed out when the chooser can't pay.
+            resource, amount = cost
+            affordable = getattr(event.chooser, resource) >= amount
+            if self._small_button(yes_x, y, bw, 48, "", affordable, row_font):
+                return True
+            key = (resource, 30, affordable)
+            if key not in _ASSET_ICONS:
+                icon = pg.transform.smoothscale(
+                    pg.image.load("./images/{}.png".format(resource)).convert_alpha(), (30, 30))
+                if not affordable:
+                    icon.fill((255, 255, 255, 110), special_flags=pg.BLEND_RGBA_MULT)
+                _ASSET_ICONS[key] = icon
+            icon = _ASSET_ICONS[key]
+            label = row_font.render("-{}".format(amount), True, (0, 0, 0) if affordable else (110, 110, 110))
+            total = label.get_width() + 6 + icon.get_width()
+            lx = yes_x + (bw - total) // 2
+            screen.blit(label, label.get_rect(midleft=(lx, y + 24)))
+            screen.blit(icon, icon.get_rect(midleft=(lx + label.get_width() + 6, y + 24)))
         if self._small_button(x0 + w // 2 + gap // 2, y, bw, 48, t("No"), True, row_font):
             return False
         return None

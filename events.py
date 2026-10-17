@@ -1307,72 +1307,75 @@ class IsraelVictim(Event):
 class EvilSpirits(Event):
     COUNTRY = "Maleisië"
     PRICE = 10
+    YES_COST = ("food", PRICE)  # the Yes button reads "-10 <food>" (EventChoicePhase)
 
     def __init__(self):
         super().__init__(
             name="Boze geesten in Lara's huis",
-            description="Als Maleisië ontwikkeld is moet de speler die het bezit 10 voedsel betalen, "
-                        "anders word de ontwikkeling ongedaan gemaakt",
+            description="De speler die Maleisië bezit mag 10 voedsel betalen om de geesten te verjagen, "
+                        "anders gaan alle ontwikkelde landen op de kaart terug naar ontwikkelen",
         )
 
-    # The moment the event starts (once its pop-up is clicked away), a
-    # player holding Maleisië developed (or still developing) chooses: pay
-    # 10 food to keep the development, or lose it -- even outside their own
-    # turn. A bot at once, a human on the yes/no screen
-    # (phases.EventChoicePhase, attack == 10), which takes over the current
-    # turn for a moment and goes back to `return_to`; without the food
-    # there's no choice. If nobody holds it developed yet, that happens the
-    # moment that changes while the event lasts (check_pending); once per
-    # event.
+    # The moment the event starts (once its pop-up is clicked away), the
+    # player holding Maleisië chooses: pay 10 food and nothing happens, or
+    # don't and every developed country on the map goes back to developing
+    # (dormant_owner: its owner's next income from it is nothing, as right
+    # after developing) -- even outside their own turn. A bot at once, a
+    # human on the yes/no screen (phases.EventChoicePhase, attack == 10, with
+    # the eye button to look at the map), which takes over the current turn
+    # for a moment and goes back to `return_to`. Without the food a human
+    # still sees the screen with paying greyed out; with Maleisië the
+    # mouse's, nobody pays.
     triggered = False
     chooser = None
     return_to = (0, 0)
 
     def on_start(self, engine):
-        self.triggered, self.chooser = False, None
+        self.triggered, self.chooser = True, None
         current = engine.players[engine.turn]
-        self._launch(engine, (current.attack, current.subattack))
-
-    def check_pending(self, engine, player):
-        return self._launch(engine, (player.attack, player.subattack if player.attack == 0 else 0))
-
-    def _launch(self, engine, return_to):
-        country = engine.countries[self.COUNTRY]
-        owner = country.owner
-        if self.triggered or not country.developed or owner is engine.default_player:
-            return False
-        self.triggered = True
-        if owner.food < self.PRICE:
+        owner = engine.countries[self.COUNTRY].owner
+        if owner is engine.default_player:
             self.choose(engine, owner, False)
         elif owner.is_bot:
-            self.choose(engine, owner, engine.turn_manager.bot.keep_development(owner, country, self.PRICE))
+            pay = owner.food >= self.PRICE and engine.turn_manager.bot.pay_spirits(owner, self.PRICE)
+            self.choose(engine, owner, pay)
         else:
-            self.chooser, self.return_to = owner, return_to
-            current = engine.players[engine.turn]
+            self.chooser, self.return_to = owner, (current.attack, current.subattack)
             current.attack, current.subattack = 10, 0
-        return True
 
     def question(self):
         """The yes/no screen's question (EventChoicePhase)."""
-        return t("{}: pay {} food to keep {} developed?").format(self.chooser.name, self.PRICE, t(self.COUNTRY))
+        return t("Oh no, evil spirits from Malaysia have haunted all developed countries back to developing. "
+                 "{} please give us rice to drive the evil spirits away!").format(self.chooser.name)
+
+    @staticmethod
+    def setback(engine):
+        """The developed countries (not still developing) that not paying
+        sends back to developing."""
+        return [c for c in engine.countries.values() if c.developed and c.dormant_owner is None]
 
     def choose(self, engine, owner, pay):
-        """`owner` pays the food (`pay`) or loses the development."""
-        country = engine.countries[self.COUNTRY]
+        """`owner` pays the food (`pay`), or every developed country goes
+        back to developing."""
         self.chooser = None
-        if pay and owner.food >= self.PRICE:
+        mouse = owner is engine.default_player
+        if pay and not mouse and owner.food >= self.PRICE:
             owner.food -= self.PRICE
-            text = t("{} pays {} food to keep {} developed").format(owner.name, self.PRICE, t(self.COUNTRY))
-            engine.log_action(owner, Msg(" pays {} food to keep {} developed", self.PRICE, self.COUNTRY))
+            text = t("{} pays {} food: the spirits leave").format(owner.name, self.PRICE)
+            engine.log_action(owner, Msg(" pays {} food: the spirits leave", self.PRICE))
         else:
-            country.developed = False
-            country.dormant_owner = None
-            if owner.food < self.PRICE:
-                text = t("{} can't pay {} food: {} is no longer developed").format(
-                    owner.name, self.PRICE, t(self.COUNTRY))
+            for country in self.setback(engine):
+                country.dormant_owner = country.owner
+            if mouse:
+                text = t("Nobody pays: every developed country goes back to developing")
+                engine.log_action(Msg("Nobody pays: every developed country goes back to developing"))
             else:
-                text = t("{} doesn't pay: {} is no longer developed").format(owner.name, t(self.COUNTRY))
-            engine.log_action(owner, Msg(" lost the development of {}", self.COUNTRY))
+                if owner.food < self.PRICE:
+                    text = t("{} can't pay {} food: every developed country goes back to developing").format(
+                        owner.name, self.PRICE)
+                else:
+                    text = t("{} doesn't pay: every developed country goes back to developing").format(owner.name)
+                engine.log_action(owner, Msg(" doesn't pay: every developed country goes back to developing"))
         engine.turn_manager.notices.append([self.name, text])
 
     def on_end(self, engine):

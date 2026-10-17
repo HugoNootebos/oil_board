@@ -1069,67 +1069,81 @@ def _(ev):
 @test("EvilSpirits")
 def _(ev):
     a, b, c = reset()
-    own(a, "Londen", 5)
-    own(b, "Maleisië", 3, developed=True, dormant_owner=b)
+    own(a, "Londen", 5, developed=True)
+    own(c, "China", 5, developed=True)
+    own(c, "Japan", 5, developed=True, dormant_owner=c)
+    own(b, "Maleisië", 3)  # not developed itself: asked all the same
     b.food = 15
     a.attack, a.subattack = 1, 0
     activate(ev)
-    g = country("Maleisië")
-    check("developed: the owner is asked (also outside their turn)",
+    check("the owner is asked (also outside their turn)",
           a.attack == 10 and m().acting_player() is b and b.food == 15)
     check("shop and cards blocked meanwhile", m().attack_in_progress())
-    m().phases[10].update()
-    check("the question screen draws, nothing decided yet", a.attack == 10 and g.developed)
+    phase = m().phases[10]
+    phase.update()
+    check("the question screen draws, nothing decided yet", a.attack == 10 and ev.chooser is b)
+    phase.hidden = True
+    phase.update()
+    check("the eye hides the screen, still asking", a.attack == 10 and ev.chooser is b)
     a, b, c = save_and_load()
     check("save/load keeps the question", ev.chooser is b and a.attack == 10)
     ev.choose(app, b, True)
     a.attack, a.subattack = ev.return_to
-    g = country("Maleisië")
-    check("yes: pays 10 food, stays developed", b.food == 5 and g.developed, b.food)
+    check("yes: pays 10 food, nothing else happens",
+          b.food == 5 and country("Londen").dormant_owner is None and country("China").dormant_owner is None)
     check("... with a notice", len(m().notices) == 1)
-    check("only once", not ev.check_pending(app, a) and b.food == 5)
     finish()
 
     a, b, c = reset()
-    own(b, "Maleisië", 3, developed=True, dormant_owner=b)
+    own(a, "Londen", 5, developed=True)
+    own(c, "Japan", 5, developed=True, dormant_owner=c)
+    own(b, "Maleisië", 3, developed=True)
+    country("Sahara").developed = True  # the mouse's
     activate(ev)
     ev.choose(app, b, False)
-    g = country("Maleisië")
-    check("no: development undone, food kept", not g.developed and g.dormant_owner is None and b.food == 1000)
+    check("no: every developed country back to developing, food kept",
+          country("Londen").dormant_owner is a and country("Maleisië").dormant_owner is b
+          and country("Sahara").dormant_owner is app.default_player and b.food == 1000
+          and all(country(n).developed for n in ("Londen", "Maleisië", "Sahara")))
+    check("one still developing stays so", country("Japan").dormant_owner is c)
+    check("undeveloped countries untouched", not country("Canada").developed and country("Canada").dormant_owner is None)
     finish()
 
     a, b, c = reset()
-    own(b, "Maleisië", 3, developed=True)
+    own(a, "Londen", 5, developed=True)
+    own(b, "Maleisië", 3)
     b.food = 9
     activate(ev)
-    g = country("Maleisië")
-    check("not enough food: no question, development undone",
-          a.attack == 0 and not g.developed and b.food == 9)
+    check("not enough food: still asked", a.attack == 10 and ev.chooser is b)
+    m().phases[10].update()
+    ev.choose(app, b, True)  # can't actually pay
+    check("... paying anyway does nothing: back to developing",
+          country("Londen").dormant_owner is a and b.food == 9)
     finish()
 
     a, b, c = reset()
     b.is_bot = True
-    own(b, "Maleisië", 3, developed=True)
+    own(a, "Londen", 5, developed=True)
+    own(b, "Maleisië", 3)
+    b.food = 9
     activate(ev)
-    check("bot owner decides at once", a.attack == 0 and ev.triggered and ev.chooser is None
-          and (b.food == 990) == country("Maleisië").developed)
+    check("bot without the food: back to developing at once",
+          a.attack == 0 and country("Londen").dormant_owner is a and b.food == 9)
     finish()
 
     a, b, c = reset()
-    own(a, "Maleisië", 3)
+    own(a, "Londen", 5, developed=True)
     activate(ev)
-    check("not developed: nothing yet", a.attack == 0 and not ev.triggered)
-    country("Maleisië").developed = True
-    a.attack, a.subattack = 1, 0
-    check("developed during the event: asked then", ev.check_pending(app, a) and a.attack == 10)
+    check("Maleisië the mouse's: nobody pays", a.attack == 0 and country("Londen").dormant_owner is a)
     finish()
 
     a, b, c = reset()
-    country("Maleisië").developed = True  # the mouse's
+    b.is_bot = True
+    own(b, "Maleisië", 3)
+    own(b, "China", 5, developed=True)
     activate(ev)
-    check("the mouse's: nothing until a player holds it", not ev.triggered)
-    own(c, "Maleisië", 2)
-    check("... then they're asked", ev.check_pending(app, a) and ev.chooser is c)
+    check("bot owner decides at once", a.attack == 0 and ev.chooser is None
+          and (b.food == 990) == (country("China").dormant_owner is None))
     finish()
 
 @test("Inflation")

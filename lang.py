@@ -411,12 +411,20 @@ NL = {
     "{} immigrants": "{} immigranten",
     "never moves": "beweegt nooit",
     "never move": "bewegen nooit",
-    "{} pays {} food to keep {} developed": "{} betaalt {} voedsel om {} ontwikkeld te houden",
-    "{} can't pay {} food: {} is no longer developed": "{} kan geen {} voedsel betalen: {} is niet meer ontwikkeld",
-    " pays {} food to keep {} developed": " betaalt {} voedsel om {} ontwikkeld te houden",
-    "{}: pay {} food to keep {} developed?": "{}: {} voedsel betalen om {} ontwikkeld te houden?",
-    "{} doesn't pay: {} is no longer developed": "{} betaalt niet: {} is niet meer ontwikkeld",
-    " lost the development of {}": " verloor de ontwikkeling van {}",
+    "{} pays {} food: the spirits leave": "{} betaalt {} voedsel: de geesten vertrekken",
+    " pays {} food: the spirits leave": " betaalt {} voedsel: de geesten vertrekken",
+    "{} can't pay {} food: every developed country goes back to developing":
+        "{} kan geen {} voedsel betalen: alle ontwikkelde landen gaan terug naar ontwikkelen",
+    "{} doesn't pay: every developed country goes back to developing":
+        "{} betaalt niet: alle ontwikkelde landen gaan terug naar ontwikkelen",
+    " doesn't pay: every developed country goes back to developing":
+        " betaalt niet: alle ontwikkelde landen gaan terug naar ontwikkelen",
+    "Nobody pays: every developed country goes back to developing":
+        "Niemand betaalt: alle ontwikkelde landen gaan terug naar ontwikkelen",
+    "Oh no, evil spirits from Malaysia have haunted all developed countries back to developing. "
+    "{} please give us rice to drive the evil spirits away!":
+        "Oh nee, boze geesten uit Maleisië hebben alle ontwikkelde landen teruggespookt naar ontwikkelen. "
+        "{} geef ons alsjeblieft rijst om de boze geesten te verjagen!",
     "New turn order: {}": "Nieuwe speelvolgorde: {}",
     "(the others look away)": "(de anderen kijken weg)",
     "All": "Alles",
@@ -780,9 +788,10 @@ EN = {
     "daarnaast een Westers land bezit.":
         "If you own a Western country you pay twice as much in the shop. Belarus pays half, even if you "
         "also own a Western country.",
-    "Als Maleisië ontwikkeld is moet de speler die het bezit 10 voedsel betalen, anders word de ontwikkeling "
-    "ongedaan gemaakt":
-        "If Malaysia is developed, the player who owns it has to pay 10 food, or the development is undone",
+    "De speler die Maleisië bezit mag 10 voedsel betalen om de geesten te verjagen, anders gaan alle "
+    "ontwikkelde landen op de kaart terug naar ontwikkelen":
+        "The player who owns Malaysia may pay 10 food to drive the spirits away, or else every developed "
+        "country on the map goes back to developing",
     "De bezitter van het Ottomaanse Rijk bepaalt de nieuwe speelvolgorde":
         "The owner of the Ottoman Empire decides the new turn order",
     "Elke speler met een EU land ontvangt deze ronde geen voedsel en geen oil":

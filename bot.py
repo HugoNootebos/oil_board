@@ -491,13 +491,23 @@ class BotController:
                 + self._asset_price(country.ships, country.tanks, country.planes, country.fort_lvl)
             return min(player.oil, int(0.6 * value / self._weights()["oil"]))
 
-    def keep_development(self, player, country, food):
-        """Whether `player` (a bot) pays `food` to keep `country` developed
-        (Boze geesten in Lara's huis): when the extra half of its yield
-        over the horizon is worth more than the food."""
+    def pay_spirits(self, player, food):
+        """Whether `player` (a bot) pays `food` so that the developed
+        countries don't go back to developing (Boze geesten in Lara's
+        huis): when the one doubled income its own would miss is worth more
+        than the food. A country in a continent it holds whole misses
+        nothing (income_multiplier); the rivals' losses aren't counted."""
         with self._acting_as(player):
-            gain = 0.5 * self.params["horizon"] * self._income_value(country)
-            return gain > food * self._weights()["food"]
+            w = self._weights()
+            lost = 0
+            for country in self.manager.current_event.setback(self.engine):
+                if country.owner is not player or country.radioactive:
+                    continue
+                if all(self.engine.countries[n].owner is player
+                       for members in CONTINENTS.values() if country.name in members for n in members):
+                    continue
+                lost += 2 * sum(w[r] * getattr(country, r) for r in RESOURCES)
+            return lost > food * w["food"]
 
     def turn_order(self, player):
         """The turn order `player` (a bot) sets (Israël is het slachtoffer):
