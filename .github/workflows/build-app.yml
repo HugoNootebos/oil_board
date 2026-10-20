@@ -1,13 +1,20 @@
-# Builds the OIL app for Mac and Windows (packaging/build.py) and puts it in a
-# GitHub Release. Start it on GitHub: Actions > "Build app" > Run workflow.
-#
-# Only needed to make the app, and again only to change the Python inside it
-# or packaging/bootstrap.py: new versions of the game reach players through
-# the Update button in the main menu.
+# Builds the OIL app for Mac, Windows and Linux (packaging/build.py) and puts
+# it in a GitHub Release. Runs on every push to Master, so whoever downloads
+# the app gets the latest game in it; also by hand on GitHub: Actions >
+# "Build app" > Run workflow. Players who already have the app get new
+# versions of the game through the Update button in the main menu.
 name: Build app
 
 on:
+  push:
+    branches: [Master]
   workflow_dispatch:
+
+# A newer push replaces a build still running, so the newest release is
+# always the latest game.
+concurrency:
+  group: build-app
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -44,8 +51,22 @@ jobs:
           name: windows
           path: dist/OIL-Setup.exe
 
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install certifi
+      - run: python packaging/build.py linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/OIL-linux.tar.gz
+
   release:
-    needs: [mac, windows]
+    needs: [mac, windows, linux]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

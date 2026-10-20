@@ -22,7 +22,7 @@ Requirements: `pygame-ce>=2.5`, `numpy>=1.19.3`, `matplotlib>=3.3.3`,
 `certifi` (for the app's updater)
 (this Mac: Python 3.9 with numpy 1.19.3; the game also runs on a current
 Python with numpy 2). Players use the app instead (OIL.app / the Windows
-installer, see "App & updates" below). The only automated checks are `event_checks.py` (events),
+installer / the Linux tar.gz, see "App & updates" below). The only automated checks are `event_checks.py` (events),
 `bot_checks.py` (bot decisions on small boards), `bot_selfplay.py` (bots
 against each other), `bot_golden.py` (did a change leave the bots' play
 exactly as it was) and `online_checks.py` (online play).
@@ -79,8 +79,8 @@ events) both files were written on Windows with Python 3.12. numpy 2 is fine.
 | `save_load.py` | JSON save/load (`game_data` / `apply_data`: the state as a dict and back, also what an online host sends its devices), save paths (`saves/autosave.json`, `saves/slot1-4.json`; in the app `OIL_SAVES_DIR`), legacy `savegame.json` migration. |
 | `updater.py` | The app's Update button (main menu): checks GitHub Master, downloads only the changed files into `game.new/` (pip-installs `libs.new/` when `requirements.txt` changed), marks it ready, restarts. Only active in the app (`managed()`). |
 | `packaging/relay/` | The home relay: `install.sh` (Mac: a LaunchAgent; optionally DuckDNS), `nl.oil.relay.plist`, `install.ps1` + `oil_relay.pyw` (Windows: a Startup-folder shortcut to a windowless launcher that logs, keeps the PC awake, restarts the relay and optionally updates DuckDNS), `README.md` (firewall, router port, two routers, dynamic DNS, `net.DEFAULT_SERVER`). |
-| `packaging/` | The app: `bootstrap.py` (the one fixed piece inside the app: puts an update in place, rolls back one that never reached the menu, starts `runner.py`), `build.py` (builds OIL.app / the Windows folder with python-build-standalone 3.12), `oil_installer.iss` (Windows installer), `make_icon.py` + `icon.png` (app icon; `images/icon.png` is the window icon), `release_notes.md`. |
-| `.github/workflows/build-app.yml` | Builds the Mac zips and `OIL-Setup.exe` into a GitHub Release (Actions › Build app › Run workflow). |
+| `packaging/` | The app: `bootstrap.py` (the one fixed piece inside the app: puts an update in place, rolls back one that never reached the menu, starts `runner.py`), `build.py` (builds OIL.app / the Windows folder / the Linux tar.gz with its `install.sh`, with python-build-standalone 3.12), `oil_installer.iss` (Windows installer), `make_icon.py` + `icon.png` (app icon; `images/icon.png` is the window icon), `release_notes.md`. |
+| `.github/workflows/build-app.yml` | Builds the Mac zips, `OIL-Setup.exe` and `OIL-linux.tar.gz` into a GitHub Release, on every push to Master (and by hand: Actions › Build app › Run workflow). |
 | `player_colors.py` | Fixed player colours for N-player games, `light_tint`, `name_text_color` (black text on yellow). |
 | `map_polygons.py` | Country outline data. |
 | `outline_smoothing.py`, `landmark_placement.py` | Smoothed country outlines; where pagoda/torii landmark sprites go. |
@@ -253,11 +253,15 @@ Players' `is_bot` and `bot_personality` are saved.
 
 ## App & updates
 
-Players run OIL as an app: `OIL.app` (Mac) or the Windows installer, built by
-`packaging/build.py` (locally, or by the GitHub workflow into a Release). The
+Players run OIL as an app: `OIL.app` (Mac), the Windows installer or
+`OIL-linux.tar.gz` (x86_64, glibc 2.28+; its `install.sh` copies it to
+`~/.local/opt/OIL` and adds a `.desktop` entry), built by
+`packaging/build.py` (locally, or by the GitHub workflow into a Release on
+every push to Master, so a fresh download has the latest game). The
 app is a Python 3.12 (python-build-standalone, with pip) plus
 `packaging/bootstrap.py`; it keeps everything in the device's data folder
-(`~/Library/Application Support/OIL`, `%LOCALAPPDATA%\OIL`): `game/` (the
+(`~/Library/Application Support/OIL`, `%LOCALAPPDATA%\OIL`,
+`~/.local/share/OIL`): `game/` (the
 game files), `libs/` (libraries an update installed; until then the app's
 own), `saves/` (saves + settings.json, which no update touches),
 `crash.log`, `update.log`. The Update button (`updater.py`) brings in whatever
