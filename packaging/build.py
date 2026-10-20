@@ -9,11 +9,9 @@ keeps the game up to date, see updater.py).
                                                       # then oil_installer.iss -> dist/OIL-Setup.exe
     python3 packaging/build.py linux                  # on Linux: dist/OIL-linux.tar.gz
 
-The GitHub workflow (.github/workflows/build-app.yml) runs all of them on
-every push to Master and puts the results in a GitHub Release, so a new
-download always starts with the latest game. Players who have the app get
-new versions through Update; they only need a new download for a change to
-the Python itself or bootstrap.py.
+The GitHub workflow (.github/workflows/build-app.yml) runs all of them and
+puts the results in a GitHub Release. Only needed again to change the Python
+itself or bootstrap.py: everything else reaches players through Update.
 
 The game copy is this folder as it is (without saves/ and the other
 SKIP folders); its game/.version is the git commit when the folder is a

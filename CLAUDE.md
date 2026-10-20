@@ -80,7 +80,7 @@ events) both files were written on Windows with Python 3.12. numpy 2 is fine.
 | `updater.py` | The app's Update button (main menu): checks GitHub Master, downloads only the changed files into `game.new/` (pip-installs `libs.new/` when `requirements.txt` changed), marks it ready, restarts. Only active in the app (`managed()`). |
 | `packaging/relay/` | The home relay: `install.sh` (Mac: a LaunchAgent; optionally DuckDNS), `nl.oil.relay.plist`, `install.ps1` + `oil_relay.pyw` (Windows: a Startup-folder shortcut to a windowless launcher that logs, keeps the PC awake, restarts the relay and optionally updates DuckDNS), `README.md` (firewall, router port, two routers, dynamic DNS, `net.DEFAULT_SERVER`). |
 | `packaging/` | The app: `bootstrap.py` (the one fixed piece inside the app: puts an update in place, rolls back one that never reached the menu, starts `runner.py`), `build.py` (builds OIL.app / the Windows folder / the Linux tar.gz with its `install.sh`, with python-build-standalone 3.12), `oil_installer.iss` (Windows installer), `make_icon.py` + `icon.png` (app icon; `images/icon.png` is the window icon), `release_notes.md`. |
-| `.github/workflows/build-app.yml` | Builds the Mac zips, `OIL-Setup.exe` and `OIL-linux.tar.gz` into a GitHub Release, on every push to Master (and by hand: Actions › Build app › Run workflow). |
+| `.github/workflows/build-app.yml` | Builds the Mac zips, `OIL-Setup.exe` and `OIL-linux.tar.gz` into a GitHub Release (by hand: Actions › Build app › Run workflow). |
 | `player_colors.py` | Fixed player colours for N-player games, `light_tint`, `name_text_color` (black text on yellow). |
 | `map_polygons.py` | Country outline data. |
 | `outline_smoothing.py`, `landmark_placement.py` | Smoothed country outlines; where pagoda/torii landmark sprites go. |
@@ -256,8 +256,9 @@ Players' `is_bot` and `bot_personality` are saved.
 Players run OIL as an app: `OIL.app` (Mac), the Windows installer or
 `OIL-linux.tar.gz` (x86_64, glibc 2.28+; its `install.sh` copies it to
 `~/.local/opt/OIL` and adds a `.desktop` entry), built by
-`packaging/build.py` (locally, or by the GitHub workflow into a Release on
-every push to Master, so a fresh download has the latest game). The
+`packaging/build.py` (locally, or by the GitHub workflow into a Release,
+started by hand; a push doesn't make a new Release, the Update button
+brings players the new game). The
 app is a Python 3.12 (python-build-standalone, with pip) plus
 `packaging/bootstrap.py`; it keeps everything in the device's data folder
 (`~/Library/Application Support/OIL`, `%LOCALAPPDATA%\OIL`,
