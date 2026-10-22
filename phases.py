@@ -1110,6 +1110,7 @@ class DiceSmash:
     per pair whether the attacker lost it (ties go to the defender). Shards
     use `random`, never np.random, so the game's dice stay as they were."""
 
+    DELAY_MS = 1000  # the rolled dice first sit still this long
     WIND_MS = 160
     STRIKE_MS = 110
     RETURN_MS = 300
@@ -1122,7 +1123,7 @@ class DiceSmash:
     def __init__(self, attack, defence, attack_loss, pace=1.0):
         self.rows = (attack, defence)
         self.pace = max(pace, 0.05)
-        self.start = pg.time.get_ticks()
+        self.start = pg.time.get_ticks() + self.DELAY_MS * self.pace
         # Per pair: (index, winner side, loser side, unit vector winner -> loser, reach in px)
         self.pairs = []
         self.shards = []
