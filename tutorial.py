@@ -195,9 +195,8 @@ STEPS = [
          "event. You'll use the shop and the cards in a moment.",
          marks=["settings", "shop", "cards", "event"]),
     Step("Turn order",
-         "The square at the bottom right shows the turn order: a band per player, whose turn it is "
-         "on top. Click it any time to see the other players' stock and who draws the next world event; "
-         "click it again to close it.",
+         "The boxes at the bottom right show the other players in turn order, the next one on top: "
+         "their stock, their cards and who draws the next world event.",
          marks=["turn_order"]),
     Step("Cards",
          "You hold three cards. Three of a kind, or one of each, make a set, which you can trade "

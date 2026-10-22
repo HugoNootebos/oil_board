@@ -425,11 +425,6 @@ class Viewer:
         while the game's shop (its player's) is on its screen."""
         return self._own_open() or self._my_shop()
 
-    def cards_shown(self):
-        """The game's cards (its player's) are on its screen: what the host
-        sends it besides the shop (Engine._cards_shown)."""
-        return self.game is not None and self.private is not None and not self._my_shop()
-
     def _my_shop(self):
         """The game's shop is open on this device (its player's turn)."""
         player = self.game.players[self.game.turn]

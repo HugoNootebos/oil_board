@@ -219,9 +219,6 @@ class Engine:
         self.action_log_open = False
         self.action_scroll = 0  # lines back from the newest, while open
         self._mouse_was = None  # this computer's mouse last frame (logical), for dragging the map
-        # The turn order (bottom right): a square of colour bands, or opened
-        # into a box per player. Each device's own, like the action log.
-        self.turn_order_open = False
         self.players = self.get_players(mode)
         # player_bots: which of the players (in order) the computer plays
         # (True) and which are human (False). Each bot gets a random
@@ -659,24 +656,15 @@ class Engine:
         return [p for p in players if p is current or not self.turn_manager._is_out(p)]
 
     def _turn_order_opened(self):
-        """The players in the opened turn order, or None while it's the
-        square: the others only (the current player's stock is on the left).
-        Always opened while the game's cards are on this screen."""
+        """The players in the turn order's boxes: the others only (the current
+        player's stock is on the left); None when nobody else is left, and
+        then it's the square."""
         others = self._turn_order_players()[1:]
-        return others if (self.turn_order_open or self._cards_shown()) and others else None
-
-    def _cards_shown(self):
-        """Whether the game's cards (the hand, the too-many-cards warning or
-        the trade's rewards) are open on this screen (a joined device works
-        that out itself: viewer.py)."""
-        if self.mirror is not None:
-            return self.mirror.cards_shown()
-        here = self.online is None or self.online.current_device() == 0
-        return here and (self.card_menu.show or self.card_menu.trade_mode)
+        return others or None
 
     def _turn_order_rect(self):
-        """Where the turn order is (logical): the square right above the
-        phase box, or opened its boxes, flush with the right edge."""
+        """Where the turn order is (logical): its boxes above the phase box,
+        flush with the right edge (the square when nobody else is left)."""
         view, gui = self.view, self.gui
         size = self.BUTTON_SIZE
         bottom = view.HEIGHT - gui.PHASE_BOX_H - self.BUTTON_MARGIN
@@ -700,26 +688,23 @@ class Engine:
         return here and player.attack == 3 and player.subattack < 8
 
     def _handle_turn_order(self, hidden=False):
-        """A click on the turn order opens or closes it and goes no further;
-        the map under it is out of reach. Runs before the phases each frame,
-        like _handle_action_box."""
+        """A click on the turn order goes no further: the map under it is out
+        of reach. Runs before the phases each frame, like _handle_action_box."""
         if hidden or self._turn_order_hidden() or self._remote_pointer():
             return
         rect = self._turn_order_rect()
         io = self.io
         io.button(("r", rect.x, rect.y, rect.w, rect.h))
         if rect.collidepoint(io.mouse_position.x, io.mouse_position.y):
-            if io.left_pressed and not self._cards_shown():  # (opened for the cards)
-                self.turn_order_open = not self.turn_order_open
             if io.left_pressed or io.right_clicked:
                 io.left_pressed = 0
                 io.right_clicked = False
 
     def _draw_turn_order(self, hidden=False):
-        """The turn order: closed, a square with a band in each player's
-        colour, whose turn it is on top; opened, a box per other player with
-        their stock (Gui.draw_turn_box), the next player on top and the event
-        tag on whoever draws the next event card. Each device's own (drawn
+        """The turn order: a box per other player with their stock
+        (Gui.draw_turn_box), the next player on top and the event tag on
+        whoever draws the next event card; with nobody else left, a square in
+        the player's colour. Each device's own (drawn
         after the game's layer is taken), under the action log."""
         if hidden or self._turn_order_hidden():
             return

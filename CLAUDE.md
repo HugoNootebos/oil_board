@@ -235,9 +235,8 @@ they're made. Bots' `_say` status lines aren't shown and aren't translated.
   country info panel (the country alone, under a band in its owner's
   colour); bottom right the phase buttons and End turn
   (`Gui.draw_attack_phase`, straight on the map) with the turn order above
-  them (`Engine._draw_turn_order`): a square with a colour band per player,
-  whose turn it is on top, that a click opens into a box per other player,
-  the next one on top, flush with the right edge (`Gui.draw_turn_box`:
+  them (`Engine._draw_turn_order`): always a box per other player (no
+  button to close it), the next one on top, flush with the right edge (`Gui.draw_turn_box`:
   their cards on the name band, their stock, a yellow event tag on whoever
   draws the next event card, `TurnManager.turns_until_next_event`). The
   other players' stock is shown nowhere else. The turn order is each

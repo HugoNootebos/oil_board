@@ -624,12 +624,10 @@ NL = {
         "Je troepen hebben gegeten en je landen hebben hun productie geleverd: zie je voorraad "
         "links. De soldaat toont je nieuwe troepen.",
     "Turn order": "Beurtvolgorde",
-    "The square at the bottom right shows the turn order: a band per player, whose turn it is "
-    "on top. Click it any time to see the other players' stock and who draws the next world event; "
-    "click it again to close it.":
-        "Het vierkantje rechtsonder toont de beurtvolgorde: een band per speler, met wie aan de "
-        "beurt is bovenaan. Klik er wanneer je wilt op om de voorraad van de anderen te zien en wie de "
-        "volgende wereldgebeurtenis trekt; klik nog eens om het te sluiten.",
+    "The boxes at the bottom right show the other players in turn order, the next one on top: "
+    "their stock, their cards and who draws the next world event.":
+        "De vakjes rechtsonder tonen de andere spelers in beurtvolgorde, de volgende bovenaan: "
+        "hun voorraad, hun kaarten en wie de volgende wereldgebeurtenis trekt.",
     "skips": "slaat over",
     "World events": "Wereldgebeurtenissen",
     "Every few turns a world event is drawn: a card that changes the rules for a full round, "
