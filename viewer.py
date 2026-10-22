@@ -45,7 +45,6 @@ from events import EVENTS
 from fonts import game_font
 from lang import t
 from menu import _draw_button
-from models import Position
 
 WIDTH, HEIGHT = controls.WIDTH, controls.HEIGHT
 MOTION_MS = 16    # input sent at most this often while only the pointer moves
@@ -423,8 +422,13 @@ class Viewer:
 
     def _turn_order_hidden(self):
         """The turn order is left out under a menu of this device's own and
-        while the game's shop or cards (its player's) are on its screen."""
-        return self._own_open() or self.private is not None or self._my_shop()
+        while the game's shop (its player's) is on its screen."""
+        return self._own_open() or self._my_shop()
+
+    def cards_shown(self):
+        """The game's cards (its player's) are on its screen: what the host
+        sends it besides the shop (Engine._cards_shown)."""
+        return self.game is not None and self.private is not None and not self._my_shop()
 
     def _my_shop(self):
         """The game's shop is open on this device (its player's turn)."""
@@ -482,22 +486,12 @@ class Viewer:
                     swallowed.add(button)
                 else:
                     self._pad_down.setdefault(pad.number, []).append(button)
-        # Panning and zooming are this device's own.
-        zoom = 1.0
-        for _ in range(abs(self._wheel)):
-            step = 1 if self._wheel > 0 else -1
-            if not game.scroll_action_log(step):  # (an open action log keeps the wheel)
-                zoom *= 1.1 ** step
+        # Panning and zooming are this device's own: everyone's here, or only
+        # the deciding player's when several players share it.
+        scroll_mouse, scroll_pads = pads.scrollers(mine, self._online("acting"))
+        game.zoom_view([1 if self._wheel > 0 else -1] * abs(self._wheel) if scroll_mouse else [], scroll_pads)
         self._wheel = 0
-        if zoom != 1.0:
-            view.zoom_at(io.mouse_position, zoom)
-        for pad in pads.pads:
-            if pad.zoom_steps:
-                view.zoom_at(Position(*pad.pos), 1.1 ** sum(pad.zoom_steps))
-            if pad.pan != (0.0, 0.0):
-                view.offset = view.offset + Position(-pad.pan[0] / view.zoom, -pad.pan[1] / view.zoom)
-        view.offset = io.drag_map(view.offset)
-        view.wrap()
+        game.pan_view(scroll_mouse, scroll_pads)
 
     def _hovered(self):
         """The country whose info panel this device shows: the one under its

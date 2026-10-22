@@ -16,7 +16,8 @@ buttons, the map's hover panels, panning and zooming). The real mouse
 keeps working for everyone -- except in an online game, where it doesn't
 click while a player on a joined device decides; that device's mouse and
 controllers do (online.RemotePointer, taken like a controller here). In
-the start menus every controller clicks.
+the start menus every controller clicks. Online, panning and zooming
+aren't clicks: every device's are its own (`scrollers`).
 
 Controllers are paired with players by name: on the player-names screen
 (menu.py) or in the game's Controllers panel (Engine._draw_pairing).
@@ -39,7 +40,7 @@ except ImportError:  # a pygame without SDL2's game controller support
 
 WIDTH, HEIGHT = 960, 640
 DEADZONE = 0.2  # of a stick's full tilt
-CURSOR_SPEED = 700  # logical px per second at full tilt
+CURSOR_SPEED = 350  # logical px per second at full tilt
 PAN_SPEED = 650  # logical px per second at full tilt
 MAX_DT = 50  # ms: a longer gap (the game loop idling) doesn't make a cursor jump
 UNPAIRED_COLOR = (235, 235, 235)
@@ -300,6 +301,18 @@ class Controls:
     def fresh(self, source):
         """Buttons of `source` (a Pad, or None for the mouse) pressed this frame."""
         return source.fresh if source is not None else self.mouse_fresh
+
+    def scrollers(self, players, acting):
+        """Online, who on this device may pan and zoom its map (its own
+        view, nobody else's): (mouse, pads). Everyone, whoever decides --
+        unless several of this device's human `players` share it and one of
+        them is `acting` (a name): then only their controller, or the mouse
+        when they have none."""
+        humans = [p.name for p in players if not p.is_bot]
+        if len(humans) < 2 or acting not in humans:
+            return True, list(self.pads)
+        pad = self.pad_of(acting)
+        return pad is None, [] if pad is None else [pad]
 
     def _latest(self, pads, mouse_ok=True, io=None):
         latest = max(pads, key=lambda pad: pad.last_active, default=None)

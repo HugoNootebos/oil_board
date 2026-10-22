@@ -567,6 +567,9 @@ class BotController:
             self._last_state = state
             wait = self.dice_ms if state == (1, 4) else self._pace(STEP_MS)
             self._next_at = max(self._next_at, now + wait)
+        smash = self.manager.phases[1].smash
+        if state == (1, 4) and smash is not None and not smash.done():
+            return False  # the dice are still smashing each other
         return now >= self._next_at
 
     def _human_defending(self):
@@ -2245,6 +2248,7 @@ class BotController:
         country.units = 0
         target.tanks += country.tanks
         country.tanks = 0
+        event.on_troops_moved(engine, player, country, target, "move")
         engine.log_action(player, Msg(" moved: {}", Join([Msg("{:+d} {}{}", -n, "", country.name),
                                                           Msg("{:+d} {}{}", n, "", target.name)])))
         phase.abandon(country)
@@ -2376,6 +2380,8 @@ class BotController:
             return False  # they never move
         target.units += troops
         country.units = 0
+        if self.manager.current_event is not None:
+            self.manager.current_event.on_troops_moved(self.engine, self.player, country, target, "move")
         self._vacated[country.name] = self.manager.turn_num
         phase.abandon(country)
         self.player.repositioned_this_turn = True
@@ -2483,6 +2489,8 @@ class BotController:
         target.planes += plane
         player.oil -= plane
         player.repositioned_this_turn = True
+        if n and self.manager.current_event is not None:
+            self.manager.current_event.on_troops_moved(engine, player, origin, target, "move")
         # Logged like MovementPhase._log_move does for a human's move.
         moved = [Msg("{} {}", k, word) for k, word in
                  ((n, "troops"), (tanks, "tanks"), (ship, "ships"), (plane, "planes")) if k]

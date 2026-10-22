@@ -136,6 +136,15 @@ class Event:
         `previous_owner` still holding it, while this event is the active
         one. The default does nothing."""
 
+    def on_troops_moved(self, engine, player, origin, target, kind):
+        """Called when `player`'s troops go from country `origin` to
+        `target`, while this event is the active one: `kind` is
+        "conquest" (moving in, right after the conquest, before
+        on_conquest), "move" (a confirmed Movement-phase move; whichever
+        way the troops went) or "rails"/"air" (redistribution, once per
+        country that sent troops and country that got them). The default
+        does nothing."""
+
     def panel_lines(self, engine):
         """Extra lines for the event panel (the event button), under the
         description, while this event is the active one: e.g. a scoreboard.
@@ -411,6 +420,8 @@ class EmperorsHonor(Event):
                 if name == "Japan":
                     continue
                 country = engine.countries[name]
+                if country.owner is winner:
+                    continue  # already the winner's: left exactly as it is
                 # Wiped out the same way a regular conquest wipes out
                 # whatever the previous owner had stationed there (see
                 # AttackPhase._conquer) -- radioactivity, if any, is left
@@ -489,7 +500,9 @@ class WrongButton(Event):
             self._strike(engine, chooser, target)
             manager.notices.append([self.name, t("{}: {} drops the nuke on {}").format(why, chooser.name, t(target.name))])
             return
-        manager.notices.append([self.name, t("{}: pick a country in Asia for the nuke").format(why)])
+        from phases import ChooserNotice
+        manager.notices.append(ChooserNotice(
+            [self.name, t("{}: pick a country in Asia for the nuke").format(why)], chooser))
         manager.phases[5].start(
             predicate=lambda c: c.name in CONTINENTS["Asia"],
             on_pick=self._strike,
@@ -502,15 +515,74 @@ class WrongButton(Event):
 
 
 # Filled in one at a time as they're described -- 31 now.
-class JapaneseAggression(Event):
+class MarchedThrough(Event):
+    """+1 on every attack die of an army that started in COUNTRY or has
+    been through it while the event runs: an attack from COUNTRY itself,
+    or from a country troops reached from it (marked, by owner): moved
+    in after a conquest from a marked country, moved there in the
+    Movement phase from one (or along a route that can only go through
+    COUNTRY), or sent by rails/air from one. A country stays marked as
+    long as its owner holds it; troops from an unmarked country taking
+    it, or it falling to the mouse, clears it."""
+    COUNTRY = None
+    marked = {}  # country name -> owner name
+
+    def is_marked(self, engine, country):
+        return country.name == self.COUNTRY or self.marked.get(country.name) == country.owner.name
+
+    def on_start(self, engine):
+        self.marked = {}
+
+    def on_end(self, engine):
+        self.marked = {}
+
+    def attack_bonus(self, engine, attack_from):
+        return 1 if self.is_marked(engine, attack_from) else 0
+
+    def on_troops_moved(self, engine, player, origin, target, kind):
+        if kind == "conquest":
+            self.marked.pop(target.name, None)  # the defenders are gone
+        through = (kind == "move" and engine.countries[self.COUNTRY].owner is player
+                   and self.COUNTRY not in (origin.name, target.name)
+                   and target.name not in self._reachable_without(engine, player, origin.name))
+        if self.is_marked(engine, origin) or through:
+            if target.name != self.COUNTRY:
+                self.marked[target.name] = player.name
+
+    def _reachable_without(self, engine, player, origin):
+        """The player's countries a move from `origin` reaches (as
+        MovementPhase._flood_fill) without going through COUNTRY."""
+        found = {origin}
+        while True:
+            more = {n for c in engine.connections if any(n in found for n in c.connection) for n in c.connection
+                    if n != self.COUNTRY and engine.countries[n].owner is player}
+            if more <= found:
+                return found
+            found |= more
+
+    def on_abandon(self, engine, country, previous_owner):
+        self.marked.pop(country.name, None)
+
+    def panel_lines(self, engine):
+        names = [t(n) for n, owner in sorted(self.marked.items()) if engine.countries[n].owner.name == owner]
+        return [t("Also attacking with +1: {}").format(", ".join(names))] if names else []
+
+    def save_state(self, engine):
+        return {"marked": dict(self.marked)}
+
+    def load_state(self, engine, data):
+        self.marked = {n: o for n, o in data.get("marked", {}).items() if n in engine.countries}
+
+
+class JapaneseAggression(MarchedThrough):
+    COUNTRY = "Japan"
+
     def __init__(self):
         super().__init__(
             name="japanse agressie",
-            description="Als Japan aanvalt mag het 1 optellen bij elke dobbelsteen.",
+            description="Elk leger dat in Japan begon of door Japan is getrokken mag 1 optellen bij elke "
+                        "aanvalsdobbelsteen.",
         )
-
-    def attack_bonus(self, engine, attack_from):
-        return 1 if attack_from.name == "Japan" else 0
 
 
 class StormAtSea(Event):
@@ -824,7 +896,7 @@ class Pilgrimage(Event):
     def __init__(self):
         super().__init__(
             name="bedevaart",
-            description="De speler die Arabië bezit verplaatst al zijn troepen naar dat land en krijgt +5 troepen.",
+            description="De speler die Arabië bezit verplaatst al zijn troepen, schepen, tanks en vliegtuigen naar dat land en krijgt +5 troepen.",
         )
 
     pending = False
@@ -843,7 +915,7 @@ class Pilgrimage(Event):
         self.pending = False
         self._apply(engine)
         engine.turn_manager.notices.append([
-            self.name, t("{} took {}: all their troops move there, +5 troops").format(owner.name, t("Arabië"))])
+            self.name, t("{} took {}: all their troops and assets move there, +5 troops").format(owner.name, t("Arabië"))])
         return True
 
     def on_end(self, engine):
@@ -864,6 +936,12 @@ class Pilgrimage(Event):
             if country.owner is owner and country is not arabia:
                 # Immigrants never move: a country with any stays theirs.
                 total += country.units - country.immigrants
+                # Ships, tanks and planes go along (before abandon would
+                # destroy them); forts stay where they are built.
+                arabia.ships += country.ships
+                arabia.tanks += country.tanks
+                arabia.planes += country.planes
+                country.ships = country.tanks = country.planes = 0
                 if country.immigrants:
                     country.units = country.immigrants
                 else:
@@ -992,15 +1070,15 @@ class Drugs(Event):
         return 1 if any(engine.countries[name].owner is player for name in self.COUNTRIES) else 0
 
 
-class NaziExpansion(Event):
+class NaziExpansion(MarchedThrough):
+    COUNTRY = "Nazi-Duitsland"
+
     def __init__(self):
         super().__init__(
             name="de nazi's breiden uit",
-            description="Als Nazi-Duitsland aanvalt mag het 1 optellen bij elke dobbelsteen.",
+            description="Elk leger dat in Nazi-Duitsland begon of door Nazi-Duitsland is getrokken mag 1 "
+                        "optellen bij elke aanvalsdobbelsteen.",
         )
-
-    def attack_bonus(self, engine, attack_from):
-        return 1 if attack_from.name == "Nazi-Duitsland" else 0
 
 
 class GasInRoubles(Event):
@@ -1306,38 +1384,51 @@ class IsraelVictim(Event):
 
 class EvilSpirits(Event):
     COUNTRY = "Maleisië"
-    PRICE = 10
-    YES_COST = ("food", PRICE)  # the Yes button reads "-10 <food>" (EventChoicePhase)
 
     def __init__(self):
         super().__init__(
             name="Boze geesten in Lara's huis",
-            description="De speler die Maleisië bezit mag 10 voedsel betalen om de geesten te verjagen, "
-                        "anders gaan alle ontwikkelde landen op de kaart terug naar ontwikkelen",
+            description="De speler die Maleisië bezit mag 1 voedsel per ontwikkeld land betalen om de "
+                        "geesten te verjagen, anders gaan alle ontwikkelde landen op de kaart terug naar "
+                        "ontwikkelen (die van mouse niet)",
         )
 
     # The moment the event starts (once its pop-up is clicked away), the
-    # player holding Maleisië chooses: pay 10 food and nothing happens, or
-    # don't and every developed country on the map goes back to developing
+    # player holding Maleisië chooses: pay 1 food per country it would send
+    # back and nothing happens, or don't and every developed country of a
+    # player (the mouse's are left alone) goes back to developing
     # (dormant_owner: its owner's next income from it is nothing, as right
     # after developing) -- even outside their own turn. A bot at once, a
     # human on the yes/no screen (phases.EventChoicePhase, attack == 10, with
     # the eye button to look at the map), which takes over the current turn
     # for a moment and goes back to `return_to`. Without the food a human
     # still sees the screen with paying greyed out; with Maleisië the
-    # mouse's, nobody pays.
+    # mouse's, nobody pays. With nothing to send back, nobody is asked.
     triggered = False
     chooser = None
     return_to = (0, 0)
+
+    def price(self, engine):
+        """The food that drives the spirits away: 1 per country they'd send back."""
+        return len(self.setback(engine))
+
+    def yes_cost(self, engine):
+        """The Yes button reads "-<price> <food>" (EventChoicePhase)."""
+        return "food", self.price(engine)
 
     def on_start(self, engine):
         self.triggered, self.chooser = True, None
         current = engine.players[engine.turn]
         owner = engine.countries[self.COUNTRY].owner
-        if owner is engine.default_player:
+        price = self.price(engine)
+        if not price:
+            text = t("No developed countries: the spirits leave")
+            engine.log_action(Msg("No developed countries: the spirits leave"))
+            engine.turn_manager.notices.append([self.name, text])
+        elif owner is engine.default_player:
             self.choose(engine, owner, False)
         elif owner.is_bot:
-            pay = owner.food >= self.PRICE and engine.turn_manager.bot.pay_spirits(owner, self.PRICE)
+            pay = owner.food >= price and engine.turn_manager.bot.pay_spirits(owner, price)
             self.choose(engine, owner, pay)
         else:
             self.chooser, self.return_to = owner, (current.attack, current.subattack)
@@ -1350,19 +1441,21 @@ class EvilSpirits(Event):
 
     @staticmethod
     def setback(engine):
-        """The developed countries (not still developing) that not paying
-        sends back to developing."""
-        return [c for c in engine.countries.values() if c.developed and c.dormant_owner is None]
+        """The developed countries (not still developing) of the players that
+        not paying sends back to developing; the mouse's are left alone."""
+        return [c for c in engine.countries.values()
+                if c.developed and c.dormant_owner is None and c.owner is not engine.default_player]
 
     def choose(self, engine, owner, pay):
         """`owner` pays the food (`pay`), or every developed country goes
         back to developing."""
         self.chooser = None
         mouse = owner is engine.default_player
-        if pay and not mouse and owner.food >= self.PRICE:
-            owner.food -= self.PRICE
-            text = t("{} pays {} food: the spirits leave").format(owner.name, self.PRICE)
-            engine.log_action(owner, Msg(" pays {} food: the spirits leave", self.PRICE))
+        price = self.price(engine)
+        if pay and not mouse and owner.food >= price:
+            owner.food -= price
+            text = t("{} pays {} food: the spirits leave").format(owner.name, price)
+            engine.log_action(owner, Msg(" pays {} food: the spirits leave", price))
         else:
             for country in self.setback(engine):
                 country.dormant_owner = country.owner
@@ -1370,9 +1463,9 @@ class EvilSpirits(Event):
                 text = t("Nobody pays: every developed country goes back to developing")
                 engine.log_action(Msg("Nobody pays: every developed country goes back to developing"))
             else:
-                if owner.food < self.PRICE:
+                if owner.food < price:
                     text = t("{} can't pay {} food: every developed country goes back to developing").format(
-                        owner.name, self.PRICE)
+                        owner.name, price)
                 else:
                     text = t("{} doesn't pay: every developed country goes back to developing").format(owner.name)
                 engine.log_action(owner, Msg(" doesn't pay: every developed country goes back to developing"))
@@ -1421,17 +1514,20 @@ class Immigration(Event):
     def __init__(self):
         super().__init__(
             name="Immigratie",
-            description="Alle West-Europese landen krijgen 3 troepen erbij die nooit kunnen bewegen of aanvallen.",
+            description="Alle West-Europese landen van spelers krijgen 3 troepen erbij die nooit kunnen "
+                        "bewegen of aanvallen.",
         )
 
     # The troops stay for good (Country.immigrants, saved with the country):
     # they defend and eat like any troop, die last, and every move, attack,
     # move-in and rail/air screen leaves them where they are. The mouse's
-    # countries get them too.
+    # countries get none.
 
     def on_start(self, engine):
         for name in self.COUNTRIES:
             country = engine.countries[name]
+            if country.owner is engine.default_player:
+                continue
             country.units += self.TROOPS
             country.immigrants += self.TROOPS
 

@@ -166,8 +166,11 @@ def _play(app):
             app.tutorial.handle_input()  # its panel's clicks, and those its step holds back
         if not pads.mouse_ok:
             # Online, while a player on another device decides: the mouse
-            # here neither clicks nor zooms.
-            mouse_clicked, wheel = False, []
+            # here doesn't click (it still zooms this computer's map).
+            mouse_clicked = False
+        scroll_mouse, scroll_pads = app.scrollers()
+        if not scroll_mouse:
+            wheel = []
         if mouse_clicked:
             sounds.click_pressed()
         # The controllers that may click this frame (see controls.py): a click
@@ -177,19 +180,11 @@ def _play(app):
         if any(pad.tapped(controls.START) for pad in pads.clickers) and not app.turn_manager.dialog_active \
                 and app.online is None:
             app.toggle_settings()  # (online every device's Start opens its own: Engine.own_menus)
-        wheel += [step for pad in pads.clickers for step in pad.zoom_steps]
         app.bystander_clicks()  # the other players' controllers (online: mice too) say a country's name
         if not app.modal_open and pads.needs_pairing(app.local_players()) and any(
                 pad.tapped(controls.A) and pads.player_of(pad, app.local_players()) is None for pad in pads.pads):
             app.open_pairing()  # a controller nobody has yet wants in
-        zoom = 1.0
-        for step in wheel:
-            # An open action log keeps the wheel for scrolling itself.
-            if not app.scroll_action_log(step):
-                zoom *= 1.1 ** step
-        if zoom != 1.0:
-            # After io_handle, so it zooms around where the mouse is now.
-            app.view.zoom_at(app.io.mouse_position, zoom)
+        app.zoom_view(wheel, scroll_pads)  # (after io_handle: around where the pointers are now)
         click_state = sounds.frame_start(app)
         app.draw_world()
         app.draw_gui()

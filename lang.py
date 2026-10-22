@@ -402,6 +402,7 @@ NL = {
     "now": "nu",
     "Immigrants only starve when no other troops are left": "Immigranten verhongeren pas als er geen andere troepen meer zijn",
     "Given back to the mouse:": "Teruggegeven aan de mouse:",
+    "Also attacking with +1: {}": "Valt ook aan met +1: {}",
     "Taken from other players:": "Veroverd op andere spelers:",
     "{} cancelled for 1 round": "{} gecancelled voor 1 ronde",
     "Woke: {} cancelled for 1 round": "Woke: {} gecancelled voor 1 ronde",
@@ -413,6 +414,7 @@ NL = {
     "never move": "bewegen nooit",
     "{} pays {} food: the spirits leave": "{} betaalt {} voedsel: de geesten vertrekken",
     " pays {} food: the spirits leave": " betaalt {} voedsel: de geesten vertrekken",
+    "No developed countries: the spirits leave": "Geen ontwikkelde landen: de geesten vertrekken",
     "{} can't pay {} food: every developed country goes back to developing":
         "{} kan geen {} voedsel betalen: alle ontwikkelde landen gaan terug naar ontwikkelen",
     "{} doesn't pay: every developed country goes back to developing":
@@ -446,7 +448,8 @@ NL = {
     "{} of {} now has the most troops in Africa: it goes to the mouse":
         "{} van {} heeft nu de meeste troepen in Afrika: het gaat naar de mouse",
     "{}: pick which of your countries is hit by ebola": "{}: kies welk van je landen door ebola getroffen wordt",
-    "{} took {}: all their troops move there, +5 troops": "{} veroverde {}: al zijn troepen gaan erheen, +5 troepen",
+    "{} took {}: all their troops and assets move there, +5 troops":
+        "{} veroverde {}: al zijn troepen, schepen, tanks en vliegtuigen gaan erheen, +5 troepen",
 
     # Continents
     "Africa": "Afrika",
@@ -742,8 +745,8 @@ EN = {
         "around Japan.",
     "Noord-Korea gooit per ongeluk een atoombom op een land in Azië.":
         "North Korea accidentally drops a nuke on a country in Asia.",
-    "Als Japan aanvalt mag het 1 optellen bij elke dobbelsteen.":
-        "When Japan attacks it may add 1 to every die.",
+    "Elk leger dat in Japan begon of door Japan is getrokken mag 1 optellen bij elke aanvalsdobbelsteen.":
+        "Every army that started in or passed through Japan may add 1 to every attack die.",
     "Piraten brengen alle legers om die over een zee-route reizen met een kans van 1/3.":
         "Pirates kill every army that travels over a sea route, with a chance of 1 in 3.",
     "Voor elk Afrikaans land dat een speler verovert ontvangt hij één extra kaertske (géén Mouse).":
@@ -762,8 +765,8 @@ EN = {
         "The country with the most armies in Africa goes to Mouse.",
     "De Noordelijkst gelegen landen mogen niet aangevallen worden of zelf aanvallen.":
         "The northernmost countries can't be attacked and can't attack.",
-    "De speler die Arabië bezit verplaatst al zijn troepen naar dat land en krijgt +5 troepen.":
-        "The player who owns Arabia moves all their troops there and gets +5 troops.",
+    "De speler die Arabië bezit verplaatst al zijn troepen, schepen, tanks en vliegtuigen naar dat land en krijgt +5 troepen.":
+        "The player who owns Arabia moves all their troops, ships, tanks and planes there and gets +5 troops.",
     "Criminelen plunderen de shop en zetten alles voor de helft van het geld op marktplaats.":
         "Criminals loot the shop and sell everything on eBay for half the price.",
     "Iedereen een gratis vliegtuig. Hoe meer CO2 hoe beter!":
@@ -782,16 +785,16 @@ EN = {
         "Greenland's previous owner and gets the country with everything on it (troops, tanks, etc.)",
     "De speler(s) die de minste landen aan Maus teruggeeft deze ronde wordt gecancelled voor 1 ronde":
         "The player(s) who give the fewest countries back to Mouse this round get cancelled for 1 round",
-    "Alle West-Europese landen krijgen 3 troepen erbij die nooit kunnen bewegen of aanvallen.":
-        "Every Western European country gets 3 extra troops that can never move or attack.",
+    "Alle West-Europese landen van spelers krijgen 3 troepen erbij die nooit kunnen bewegen of aanvallen.":
+        "Every Western European country held by a player gets 3 extra troops that can never move or attack.",
     "Als je een Westers land bezit betaal je 2x zo veel in de sop. Belarus betaalt de helft, ook als je "
     "daarnaast een Westers land bezit.":
         "If you own a Western country you pay twice as much in the shop. Belarus pays half, even if you "
         "also own a Western country.",
-    "De speler die Maleisië bezit mag 10 voedsel betalen om de geesten te verjagen, anders gaan alle "
-    "ontwikkelde landen op de kaart terug naar ontwikkelen":
-        "The player who owns Malaysia may pay 10 food to drive the spirits away, or else every developed "
-        "country on the map goes back to developing",
+    "De speler die Maleisië bezit mag 1 voedsel per ontwikkeld land betalen om de geesten te verjagen, "
+    "anders gaan alle ontwikkelde landen op de kaart terug naar ontwikkelen (die van mouse niet)":
+        "The player who owns Malaysia may pay 1 food per developed country to drive the spirits away, or "
+        "else every developed country on the map goes back to developing (not the mouse's)",
     "De bezitter van het Ottomaanse Rijk bepaalt de nieuwe speelvolgorde":
         "The owner of the Ottoman Empire decides the new turn order",
     "Elke speler met een EU land ontvangt deze ronde geen voedsel en geen oil":
@@ -801,6 +804,7 @@ EN = {
     "Als je de landen Venezuela, Mexico, Los Angeles, Siberië of Cuba bezit, "
     "haal dan 1 af van de waarde van elke dobbelsteen die je gooit.":
         "If you own Venezuela, Mexico, Los Angeles, Siberia or Cuba, subtract 1 from every die you throw.",
-    "Als Nazi-Duitsland aanvalt mag het 1 optellen bij elke dobbelsteen.":
-        "When Nazi Germany attacks it may add 1 to every die.",
+    "Elk leger dat in Nazi-Duitsland begon of door Nazi-Duitsland is getrokken mag 1 optellen bij elke "
+    "aanvalsdobbelsteen.":
+        "Every army that started in or passed through Nazi Germany may add 1 to every attack die.",
 }

@@ -8,7 +8,8 @@ an open chat, or a message being typed, is nobody else's business. The
 button sits under the settings button (images/chat.png); a click opens the
 panel to its right: the messages, newest at the bottom (the wheel scrolls
 back), and a line to type in. While it's open the keyboard belongs to it:
-Enter sends, Esc closes. A red badge counts the messages that came in while
+Enter sends, Esc closes; a click anywhere outside it closes it too (and
+does nothing else). A red badge counts the messages that came in while
 it was closed. Mouse and keyboard only: game controllers can't type.
 
 The host keeps the messages and stamps who said what
@@ -67,6 +68,10 @@ class Chat:
         self.draft = ""
         self.unread = 0
         self.scroll = 0    # rows scrolled back from the newest
+        # Mouse buttons whose press closed it (outside it): the game mustn't
+        # take them, held or let go (`taking`).
+        self.taken = set()
+        self._let_go = False
         self._font = None
         self._sprite = None
         self._rows = (None, [])
@@ -117,6 +122,12 @@ class Chat:
             shapes.append(("r", PANEL.x, PANEL.y, PANEL.w, PANEL.h))
         return shapes
 
+    def taking(self):
+        """Whether a click that closed it is still going on (held, or let go
+        this frame): the game takes nothing from this computer's mouse."""
+        let_go, self._let_go = self._let_go, False
+        return bool(self.taken) or let_go
+
     def toggle(self):
         self.open = not self.open
         self.scroll = 0
@@ -131,12 +142,20 @@ class Chat:
         if event.type == pg.MOUSEBUTTONDOWN:
             pos = to_logical(event.pos)
             if not self.covers(pos):
-                return False
+                if not (self.open and event.button in (1, 2, 3)):
+                    return False
+                self.toggle()  # a click outside it closes it
+                self.taken.add(event.button)
+                return True
             if event.button == 1 and BUTTON.collidepoint(int(pos[0]), int(pos[1])):
                 self.toggle()
             elif event.button in (4, 5) and self.open:
                 self.scroll = max(0, self.scroll + (1 if event.button == 4 else -1))
             return True
+        if event.type == pg.MOUSEBUTTONUP and event.button in self.taken:
+            self.taken.discard(event.button)
+            self._let_go = True
+            return False
         if not self.open:
             return False
         if event.type == pg.TEXTINPUT:

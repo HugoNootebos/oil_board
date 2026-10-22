@@ -218,6 +218,7 @@ class Engine:
         self.hint_rows = 0
         self.action_log_open = False
         self.action_scroll = 0  # lines back from the newest, while open
+        self._mouse_was = None  # this computer's mouse last frame (logical), for dragging the map
         # The turn order (bottom right): a square of colour bands, or opened
         # into a box per player. Each device's own, like the action log.
         self.turn_order_open = False
@@ -599,13 +600,19 @@ class Engine:
                 io.left_pressed = 0
                 io.right_clicked = False
 
-    def scroll_action_log(self, direction):
+    def scroll_action_log(self, direction, position=None):
         """Mouse wheel over the open history: direction +1 scrolls back into
-        the past, -1 forward. True when the wheel was used up by it."""
+        the past, -1 forward. True when the wheel was used up by it.
+        `position`: where the wheel was turned (logical; default the pointer
+        Io follows)."""
         rect = self._action_box_rect()
-        if rect is None or not self.action_log_open or self.modal_open or self._remote_pointer():
+        if rect is None or not self.action_log_open or self.modal_open:
             return False
-        if not rect.collidepoint(self.io.mouse_position.x, self.io.mouse_position.y):
+        if position is None:
+            if self._remote_pointer():
+                return False
+            position = self.io.mouse_position
+        if not rect.collidepoint(position.x, position.y):
             return False
         self.action_scroll = max(0, min(self.action_scroll + direction, self._action_scroll_max()))
         return True
@@ -653,9 +660,19 @@ class Engine:
 
     def _turn_order_opened(self):
         """The players in the opened turn order, or None while it's the
-        square: the others only (the current player's stock is on the left)."""
+        square: the others only (the current player's stock is on the left).
+        Always opened while the game's cards are on this screen."""
         others = self._turn_order_players()[1:]
-        return others if self.turn_order_open and others else None
+        return others if (self.turn_order_open or self._cards_shown()) and others else None
+
+    def _cards_shown(self):
+        """Whether the game's cards (the hand, the too-many-cards warning or
+        the trade's rewards) are open on this screen (a joined device works
+        that out itself: viewer.py)."""
+        if self.mirror is not None:
+            return self.mirror.cards_shown()
+        here = self.online is None or self.online.current_device() == 0
+        return here and (self.card_menu.show or self.card_menu.trade_mode)
 
     def _turn_order_rect(self):
         """Where the turn order is (logical): the square right above the
@@ -672,15 +689,15 @@ class Engine:
 
     def _turn_order_hidden(self):
         """Whether the turn order is left out: under a dialog or a menu of
-        this device's own, or while the game's shop or cards are open on this
-        screen (a joined device works that out itself: viewer.py)."""
+        this device's own, or while the game's shop is open on this screen
+        (a joined device works that out itself: viewer.py)."""
         if self.modal_open:
             return True
         if self.mirror is not None:
             return False
         player = self.players[self.turn]
         here = self.online is None or self.online.current_device() == 0
-        return here and ((player.attack == 3 and player.subattack < 8) or self.card_menu.show)
+        return here and player.attack == 3 and player.subattack < 8
 
     def _handle_turn_order(self, hidden=False):
         """A click on the turn order opens or closes it and goes no further;
@@ -692,7 +709,7 @@ class Engine:
         io = self.io
         io.button(("r", rect.x, rect.y, rect.w, rect.h))
         if rect.collidepoint(io.mouse_position.x, io.mouse_position.y):
-            if io.left_pressed:
+            if io.left_pressed and not self._cards_shown():  # (opened for the cards)
                 self.turn_order_open = not self.turn_order_open
             if io.left_pressed or io.right_clicked:
                 io.left_pressed = 0
@@ -1529,8 +1546,11 @@ class Engine:
             self.io.update(self.view, self.countries.values())
         else:
             self.io.update(self.view, self.countries.values(), source, self.controls.fresh(source))
-        if chat is not None and source is None and chat.covers((self.io.mouse_position.x, self.io.mouse_position.y)):
-            # (runner.play gave the click to the chat already)
+        taking = chat is not None and chat.taking()  # (every frame: a let-go counts for one)
+        if chat is not None and source is None and (
+                taking or chat.covers((self.io.mouse_position.x, self.io.mouse_position.y))):
+            # (runner.play gave the click to the chat already, also one that
+            # closed it from outside)
             self.io.left_pressed = 0
             self.io.right_clicked = False
         shopper = self.players[self.turn]
@@ -1539,15 +1559,61 @@ class Engine:
             # no country clicks); placing a bought item (subattack > 8)
             # still needs the map.
             self.io.hover_country = None
-        if not self._remote_pointer():  # (a joined device pans and zooms its own map)
-            self.view.offset = self.io.drag_map(self.view.offset)
-        if self.controls is not None:
-            # A controller's right stick moves the view the way it's tilted.
-            for pad in self.controls.clickers:
-                if pad.pan != (0.0, 0.0):
-                    self.view.offset = self.view.offset + Position(-pad.pan[0] / self.view.zoom,
-                                                                   -pad.pan[1] / self.view.zoom)
-        self.view.wrap()
+        self.pan_view(*self.scrollers())  # (a joined device pans and zooms its own map)
+
+    def zoom_view(self, wheel, pads):
+        """Zoom the map: `wheel` (+1 per notch up, -1 down) around this
+        computer's mouse, and LB/RB of `pads` around their cursors. An open
+        action log keeps the wheel for scrolling itself."""
+        zooms = [(self.mouse_point(), wheel)] + [(Position(*pad.pos), pad.zoom_steps) for pad in pads]
+        for point, steps in zooms:
+            zoom = 1.0
+            for step in steps:
+                if not self.scroll_action_log(step, point):
+                    zoom *= 1.1 ** step
+            if zoom != 1.0:
+                self.view.zoom_at(point, zoom)
+
+    def pan_view(self, mouse, pads):
+        """Drag the map with the pointer Io follows when it's one of those
+        that may (`mouse`: whether this computer's mouse may, `pads`: the
+        controllers that may, see scrollers), else with this computer's
+        mouse if it may; and pan it with those controllers' right sticks."""
+        view = self.view
+        point = self.mouse_point()
+        source = self.io.source
+        if (source is None and mouse) or source in pads:
+            view.offset = self.io.drag_map(view.offset)
+        elif mouse and self._mouse_was is not None and any(pg.mouse.get_pressed()[1:]):
+            # Online, while Io follows another pointer.
+            view.offset = view.offset + point.screen_to_coordinates(view) - self._mouse_was.screen_to_coordinates(view)
+        self._mouse_was = point
+        # A controller's right stick moves the view the way it's tilted.
+        for pad in pads:
+            if pad.pan != (0.0, 0.0):
+                view.offset = view.offset + Position(-pad.pan[0] / view.zoom, -pad.pan[1] / view.zoom)
+        view.wrap()
+
+    def scrollers(self):
+        """Whether this computer's mouse may pan and zoom the map, and which
+        of its controllers may: (mouse, pads). In a local game the mouse and
+        the controllers that click; online see controls.Controls.scrollers
+        (not while a menu of the host's own is open)."""
+        controls = self.controls
+        if controls is None:
+            return True, []
+        if self.online is None:
+            return True, controls.clickers
+        if self.online.state == "game" and self.online.own_menu_open(0):
+            return False, []
+        return controls.scrollers(self.local_players(), self.turn_manager.acting_player().name)
+
+    def mouse_point(self):
+        """Where this computer's mouse is, in the logical 960x640 (also
+        while Io follows another pointer)."""
+        x, y = pg.mouse.get_pos()
+        view = self.view
+        return Position(int((x - view.ox) / view.scale), int((y - view.oy) / view.scale))
 
     def bystander_clicks(self):
         """A player whose turn it isn't, pressing A with their controller's

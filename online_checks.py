@@ -615,6 +615,31 @@ def test_chat():
     check("the host's message goes under its player's name and colour",
           line == [0, "A", list(app.players[0].color), "hello world"], line)
     check("Esc closes the chat", s.chat.handle(_key(pg.K_ESCAPE), to_logical) and not s.chat.open)
+    s.chat.handle(_event(pg.MOUSEBUTTONDOWN, button=1, pos=button), to_logical)
+    outside = _window_pos(view, 600, 400)
+    real_pos, real_pressed = pg.mouse.get_pos, pg.mouse.get_pressed
+    try:
+        pg.mouse.get_pos = lambda: outside
+        pg.mouse.get_pressed = lambda num_buttons=3: (False, False, False)
+        app.io_handle()
+        took = s.chat.handle(_event(pg.MOUSEBUTTONDOWN, button=1, pos=outside), to_logical)
+        pg.mouse.get_pressed = lambda num_buttons=3: (True, False, False)
+        app.io_handle()
+        check("a click anywhere outside the chat closes it, and the game doesn't get that click",
+              took and not s.chat.open and not app.io.left_pressed)
+        pg.mouse.get_pressed = lambda num_buttons=3: (False, False, False)
+        s.chat.handle(_event(pg.MOUSEBUTTONUP, button=1, pos=outside), to_logical)
+        app.io_handle()
+        app.io_handle()
+        pg.mouse.get_pressed = lambda num_buttons=3: (True, False, False)
+        app.io_handle()
+        check("(the next click is the game's again)", not s.chat.taken and app.io.left_pressed)
+        pg.mouse.get_pressed = lambda num_buttons=3: (False, False, False)
+        app.io_handle()
+    finally:
+        pg.mouse.get_pos, pg.mouse.get_pressed = real_pos, real_pressed
+    check("closed, a click outside it is the game's",
+          not s.chat.handle(_event(pg.MOUSEBUTTONDOWN, button=1, pos=outside), to_logical))
     check("closed, the keys are the game's again",
           not s.chat.handle(_key(pg.K_ESCAPE), to_logical)
           and not s.chat.handle(_event(pg.TEXTINPUT, text="x"), to_logical))
@@ -641,6 +666,13 @@ def test_chat():
           v.chat.open and v._down == [] and v._swallowed == {controls.A} and v.chat.unread == 0)
     v._events([_event(pg.MOUSEBUTTONUP, button=1, pos=at), _event(pg.TEXTINPUT, text="gg"), _key(pg.K_RETURN)])
     check("its message goes to the host", {"type": "chat", "text": "gg"} in conn.sent and not v._swallowed)
+    far = (round(v.area.x + 700 * v.scale), round(v.area.y + 500 * v.scale))
+    v._events([_event(pg.MOUSEBUTTONDOWN, button=3, pos=far)])
+    check("a click outside its chat closes it, and isn't sent to the host",
+          not v.chat.open and v._down == [] and v._swallowed == {controls.B})
+    v._events([_event(pg.MOUSEBUTTONUP, button=3, pos=far)])
+    v._events([_event(pg.MOUSEBUTTONDOWN, button=1, pos=at)])
+    v._events([_event(pg.MOUSEBUTTONUP, button=1, pos=at)])
     v._events([_key(pg.K_ESCAPE)])
     check("Esc closes its chat first, then opens its menu", not v.chat.open and not v.menu_open)
     v._events([_key(pg.K_ESCAPE)])
@@ -1138,6 +1170,102 @@ def test_pairing():
         pads.pads[:], pads.bindings = saved
 
 
+def test_scrolling():
+    pads = controls.get()
+    pad_a, pad_d = controls.Pad(_FakeController(), 5151, 8), controls.Pad(_FakeController(), 5252, 9)
+    saved = list(pads.pads), dict(pads.bindings)
+    pads.pads[:] = [pad_a, pad_d]  # (one process: the host and the device share it)
+    saved_mouse = pg.mouse.get_pos, pg.mouse.get_pressed
+    try:
+        # The host's computer has A and D, the device B and C.
+        app = _game(("A", "B", "C", "D"))
+        seats = [online.Seat("A", kind="host"), online.Seat("B"), online.Seat("C"), online.Seat("D", kind="host")]
+        s = _session(seats)
+        s._member_joined({"member": 1, "device": "dev"})
+        for i in (1, 2):
+            s._seat_request(s.members[1], "take", {"seat": i})
+        s.members[1].viewing = True
+        s.start_game(app)
+        pads.bind(pad_a, "A")
+        pads.bind(pad_d, "D")
+        app.pairing_open = False  # (opened by itself: controllers nobody had)
+        theirs = s.members[1].view
+
+        def pans(pad):
+            before, kept = app.view.offset.x, (theirs.zoom, theirs.offset.x, theirs.offset.y)
+            pad.pan = (40.0, 0.0)
+            _frame(app)
+            pad.pan = (0.0, 0.0)
+            return app.view.offset.x != before and kept == (theirs.zoom, theirs.offset.x, theirs.offset.y)
+
+        app.turn = 1
+        _frame(app)
+        mouse, moving = app.scrollers()
+        check("a joined player decides: everyone here still pans and zooms this computer's map "
+              "(its mouse too, which doesn't click)", not pads.mouse_ok and mouse and moving == [pad_a, pad_d])
+        check("a controller's stick pans this computer's map, not the device's", pans(pad_d))
+        pg.mouse.get_pressed = lambda num_buttons=3: (False, False, True)
+        pg.mouse.get_pos = lambda: (300, 300)
+        _frame(app)
+        before = app.view.offset.x
+        pg.mouse.get_pos = lambda: (340, 300)
+        _frame(app)
+        check("and the mouse drags it, while Io follows the device's pointer",
+              app.view.offset.x > before and app.io.source is not None)
+        pg.mouse.get_pressed = lambda num_buttons=3: (False, False, False)
+        zoom = app.view.zoom
+        app.zoom_view([1], [])
+        check("and its wheel zooms it", app.view.zoom > zoom)
+
+        app.turn = 0
+        _frame(app)
+        check("two players here, A decides: only A's controller pans and zooms (not the mouse, not D's)",
+              app.scrollers() == (False, [pad_a]) and pans(pad_a) and not pans(pad_d))
+        pads.bind(pad_a, None)
+        check("A without a controller: the mouse does (it's A's)", app.scrollers() == (True, []))
+        app.players[0].is_bot = True
+        check("A a bot: everyone here does", app.scrollers() == (True, [pad_a, pad_d]))
+        app.players[0].is_bot = False
+        seats[3].kind = "bot"
+        app.players[3].is_bot = True
+        check("one player here: everyone here, always", app.scrollers() == (True, [pad_a, pad_d]))
+        s.close()
+
+        # The device's side: B and C on it, A on the host's computer.
+        pg.mouse.get_pos, pg.mouse.get_pressed = saved_mouse
+        pads.bindings = {}
+        app, s, v, wire, _ = _linked(turn=0)
+        game = v.game
+        app.pairing_open = game.pairing_open = False
+        mine = game.local_players()
+        check("the device: another device's player decides, everyone here pans and zooms",
+              pads.scrollers(mine, v._online("acting")) == (True, [pad_a, pad_d]))
+
+        def drag():
+            before, host = game.view.offset.x, (app.view.offset.x, app.view.zoom)
+            with _Mouse(v, 300, 300, held=(False, True, False)):
+                _both(app, v, [_event(pg.MOUSEMOTION, pos=_device_pos(v, 300, 300), rel=(1, 1), buttons=(0, 1, 0))])
+            with _Mouse(v, 340, 300, held=(False, True, False)):
+                _both(app, v, [_event(pg.MOUSEMOTION, pos=_device_pos(v, 340, 300), rel=(40, 0), buttons=(0, 1, 0))])
+            with _Mouse(v, 340, 300):
+                _both(app, v)
+            return game.view.offset.x != before and (app.view.offset.x, app.view.zoom) == host
+
+        check("its mouse drags its own map (the host's stays put)", drag())
+        app.turn = 1
+        for _ in range(2):
+            _both(app, v)
+        pads.bind(pad_d, "B")
+        check("its B decides with a controller: only that one pans and zooms there",
+              pads.scrollers(mine, v._online("acting")) == (False, [pad_d]) and not drag())
+        pads.bind(pad_d, None)
+        check("B without one: its mouse does", pads.scrollers(mine, v._online("acting")) == (True, []) and drag())
+        s.close()
+    finally:
+        pads.pads[:], pads.bindings = saved
+        pg.mouse.get_pos, pg.mouse.get_pressed = saved_mouse
+
+
 def test_game():
     real = net.find_main_relay
     net.find_main_relay = lambda stop=None: None  # no main relay: the host starts its own
@@ -1246,7 +1374,7 @@ def _game_through_relay():
 
 
 TESTS = [test_relay, test_discovery, test_stream, test_seats, test_clicks, test_names, test_state, test_chat,
-         test_hover, test_menus, test_pairing, test_game]
+         test_hover, test_menus, test_pairing, test_scrolling, test_game]
 
 
 def main():

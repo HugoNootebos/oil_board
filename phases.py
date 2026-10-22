@@ -130,6 +130,16 @@ class IconNotice(str):
         return obj
 
 
+class ChooserNotice(list):
+    """A notice's lines that the given player closes (their controller or
+    device clicks it) rather than whoever's turn it is: the message that
+    asks them to make an event's pick."""
+
+    def __init__(self, lines, chooser):
+        super().__init__(lines)
+        self.chooser = chooser
+
+
 class Phase:
     """Base class for a single turn-phase (a value of player.attack)."""
 
@@ -199,6 +209,30 @@ class Phase:
         attack = sum(1 for d in self.attack_dice if d > 0)
         defence = sum(1 for d in self.defence_dice if d > 0)
         return max(attack, defence, 1)
+
+    def _start_smash(self, attack_dice, defence_dice, attack_loss):
+        """The thrown dice smash each other (DiceSmash): `attack_dice` and
+        `defence_dice` are (colour, eyes) highest first, `attack_loss[i]`
+        whether attack die i lost to defence die i. Not in headless games."""
+        if self.manager.bot.fast:
+            return None
+        columns = self.thrown_columns()
+        rows = []
+        for dice, y in ((attack_dice, self.THROWN_ATTACK_Y), (defence_dice, self.THROWN_DEFENCE_Y)):
+            rows.append([(Position(self.dice_x(i, columns) + 35, y + 35), color, eyes)
+                         for i, (color, eyes) in enumerate(dice)])
+        pace = self.manager.bot._pace(1000) / 1000 if self.engine.bot_turn else 1.0
+        return DiceSmash(rows[0], rows[1], attack_loss, pace)
+
+    def _draw_thrown_die(self, color, eyes, x, y, side, index):
+        """Thrown die `index` of `side` (0 attacker, 1 defender) with its
+        top-left at (x, y), where the smash has it; False once it's
+        smashed (nothing drawn)."""
+        smash = getattr(self, "smash", None)
+        dx, dy, shown = smash.pose(side, index) if smash is not None else (0, 0, True)
+        if shown:
+            Dice(color, eyes=eyes).draw(self.view.screen, Position(x + 35 + dx, y + 35 + dy))
+        return shown, dx, dy
 
     def draw_rect(self, color, x, y, w, h, width=0):
         import pygame as pg
@@ -508,12 +542,20 @@ class Phase:
         screen.blit(text, (x, cy - text.get_height() // 2))
         screen.blit(oil, (x + text.get_width() + 3, cy - oil.get_height() // 2))
 
+    def _rails_network_offered(self, origin):
+        """The rail network the rails button would open from `origin`, or
+        None when no button is shown there."""
+        network = self._compute_rail_network(origin, self.player)
+        if len(network) <= 1 and not (self.rail_attack and self._rail_attack_targets(origin)):
+            return None
+        return network
+
     def _draw_rails_button(self, origin, allowed_subs):
         player = self.player
         if origin is None or player.subattack not in allowed_subs:
             return
-        network = self._compute_rail_network(origin, player)
-        if len(network) <= 1 and not (self.rail_attack and self._rail_attack_targets(origin)):
+        network = self._rails_network_offered(origin)
+        if network is None:
             return
 
         if self._redistribute_button(0, "train", player.oil >= 1):
@@ -544,20 +586,32 @@ class Phase:
         Needs the origin to be one of them, a plane at some airport and
         at least 1 oil; troops and tanks then move freely between all
         airports."""
-        player = self.player
-        engine = self.engine
-        if origin is None or player.subattack not in allowed_subs:
+        if origin is None or self.player.subattack not in allowed_subs:
             return
-        if not engine.countries[origin].airport or engine.countries[origin].owner != player:
-            return
-        network = {n for n, c in engine.countries.items() if c.owner == player and c.airport}
-        if player.oil < 1 or not any(engine.countries[n].planes > 0 for n in network):
-            return
-        if len(network) <= 1 and not (self.rail_attack and self._air_attack_targets()):
+        network = self._air_network_offered(origin)
+        if network is None:
             return
 
         if self._redistribute_button(1, "plane"):
             self._enter_redistribute(network, "air")
+
+    def _air_network_offered(self, origin):
+        """The airports the airport button would open from `origin`, or
+        None when no button is shown there."""
+        player = self.player
+        engine = self.engine
+        if not engine.countries[origin].airport or engine.countries[origin].owner != player:
+            return None
+        network = {n for n, c in engine.countries.items() if c.owner == player and c.airport}
+        if player.oil < 1 or not any(engine.countries[n].planes > 0 for n in network):
+            return None
+        if len(network) <= 1 and not (self.rail_attack and self._air_attack_targets()):
+            return None
+        return network
+
+    def _redistribute_offered(self, origin):
+        """Whether selecting `origin` would show the rails or airport button."""
+        return self._rails_network_offered(origin) is not None or self._air_network_offered(origin) is not None
 
     def _redistribute_rails(self):
         engine = self.engine
@@ -712,6 +766,13 @@ class Phase:
         self.engine.log_action(self.player, Msg(
             " moved {}: {}", "by air" if self._redistribute_kind == "air" else "along rails",
             Join(changes) if changes else "nothing changed"))
+        event = self.manager.current_event
+        if event is not None:
+            senders = [n for n in self.rail_network if countries[n].units < self.rail_initial_units.get(n, 0)]
+            for dest in [n for n in self.rail_network if countries[n].units > self.rail_initial_units.get(n, 0)]:
+                for source in senders:
+                    event.on_troops_moved(self.engine, self.player, countries[source], countries[dest],
+                                          self._redistribute_kind)
         for name in self.rail_network:
             country = self.engine.countries[name]
             if country.units == 0:
@@ -1041,6 +1102,121 @@ class PirateWheel:
         return self.elapsed() >= self.spin_ms + self.hold_ms
 
 
+class DiceSmash:
+    """The thrown dice once both sides have rolled: pair by pair (staggered)
+    the winning die winds up, strikes the die it beat and bounces back, and
+    the beaten die bursts into shards that fly off, fall and fade. `attack`
+    and `defence` are [(centre, colour, eyes)] highest first, `attack_loss`
+    per pair whether the attacker lost it (ties go to the defender). Shards
+    use `random`, never np.random, so the game's dice stay as they were."""
+
+    WIND_MS = 160
+    STRIKE_MS = 110
+    RETURN_MS = 300
+    SHARD_MS = 750
+    STAGGER_MS = 260
+    WIND_PX = 14
+    GRID = 4
+    GRAVITY = 0.0012  # px/ms²
+
+    def __init__(self, attack, defence, attack_loss, pace=1.0):
+        self.rows = (attack, defence)
+        self.pace = max(pace, 0.05)
+        self.start = pg.time.get_ticks()
+        # Per pair: (index, winner side, loser side, unit vector winner -> loser, reach in px)
+        self.pairs = []
+        self.shards = []
+        for i, lost in enumerate(attack_loss):
+            win, lose = (1, 0) if lost else (0, 1)
+            a, b = self.rows[win][i][0], self.rows[lose][i][0]
+            dist = max(math.hypot(b.x - a.x, b.y - a.y), 1)
+            direction = ((b.x - a.x) / dist, (b.y - a.y) / dist)
+            self.pairs.append((i, win, lose, direction, dist - 45))
+            self.shards += self._shatter(self.rows[lose][i], direction, self._impact_ms(i))
+
+    def _impact_ms(self, i):
+        return self.STAGGER_MS * i + self.WIND_MS + self.STRIKE_MS
+
+    def _shatter(self, die, direction, born):
+        """The die cut into jittered triangles, each flying off from the
+        impact: (piece, centre offset, velocity, spin, birth ms)."""
+        centre, color, eyes = die
+        size, pad = 70, 2
+        image = pg.Surface((size + 2 * pad, size + 2 * pad), pg.SRCALPHA)
+        Dice(color, eyes=eyes).draw(image, Position(size // 2 + pad, size // 2 + pad))
+        n = self.GRID
+        step = (size + 2 * pad) / n
+        points = [[(x * step + (random.uniform(-5, 5) if 0 < x < n else 0),
+                    y * step + (random.uniform(-5, 5) if 0 < y < n else 0))
+                   for x in range(n + 1)] for y in range(n + 1)]
+        half = (size + 2 * pad) / 2
+        shards = []
+        for y in range(n):
+            for x in range(n):
+                p00, p10, p01, p11 = points[y][x], points[y][x + 1], points[y + 1][x], points[y + 1][x + 1]
+                halves = ((p00, p10, p11), (p00, p11, p01)) if random.random() < 0.5 \
+                    else ((p00, p10, p01), (p10, p11, p01))
+                for tri in halves:
+                    left, top = int(min(p[0] for p in tri)), int(min(p[1] for p in tri))
+                    right, bottom = int(math.ceil(max(p[0] for p in tri))), int(math.ceil(max(p[1] for p in tri)))
+                    rect = pg.Rect(left, top, max(right - left, 1), max(bottom - top, 1)).clip(image.get_rect())
+                    mask = pg.Surface(rect.size, pg.SRCALPHA)
+                    pg.draw.polygon(mask, (255, 255, 255, 255), [(px - rect.x, py - rect.y) for px, py in tri])
+                    piece = image.subsurface(rect).copy()
+                    piece.blit(mask, (0, 0), special_flags=pg.BLEND_RGBA_MIN)
+                    cx = sum(p[0] for p in tri) / 3 - half
+                    cy = sum(p[1] for p in tri) / 3 - half
+                    out = math.hypot(cx, cy) or 1
+                    speed = random.uniform(0.12, 0.4)
+                    velocity = (cx / out * speed + direction[0] * 0.15 + random.uniform(-0.04, 0.04),
+                                cy / out * speed + direction[1] * 0.15 - 0.12)
+                    offset = (rect.centerx - half, rect.centery - half)
+                    shards.append((piece, centre, offset, velocity, random.uniform(-0.7, 0.7), born))
+        return shards
+
+    def elapsed(self):
+        return (pg.time.get_ticks() - self.start) / self.pace
+
+    def done(self):
+        return self.elapsed() >= self._impact_ms(len(self.pairs) - 1) + self.SHARD_MS if self.pairs else True
+
+    def pose(self, side, index):
+        """Where die `index` of `side` is drawn: (dx, dy, shown)."""
+        e = self.elapsed()
+        for i, win, lose, (ux, uy), reach in self.pairs:
+            if i != index:
+                continue
+            t0 = e - self.STAGGER_MS * i
+            if side == lose:
+                return 0, 0, t0 < self.WIND_MS + self.STRIKE_MS
+            if t0 <= 0:
+                return 0, 0, True
+            if t0 < self.WIND_MS:
+                u = t0 / self.WIND_MS
+                d = -self.WIND_PX * u * u * (3 - 2 * u)
+            elif t0 < self.WIND_MS + self.STRIKE_MS:
+                u = (t0 - self.WIND_MS) / self.STRIKE_MS
+                d = -self.WIND_PX + (reach + self.WIND_PX) * u * u
+            else:
+                u = min(1.0, (t0 - self.WIND_MS - self.STRIKE_MS) / self.RETURN_MS)
+                d = reach * (1 - u) ** 3
+            return ux * d, uy * d, True
+        return 0, 0, True
+
+    def draw_shards(self, screen):
+        e = self.elapsed()
+        for piece, centre, (ox, oy), (vx, vy), spin, born in self.shards:
+            age = e - born
+            if age < 0 or age >= self.SHARD_MS:
+                continue
+            x = centre.x + ox + vx * age
+            y = centre.y + oy + vy * age + 0.5 * self.GRAVITY * age * age
+            turned = pg.transform.rotate(piece, spin * age)
+            fade = age / self.SHARD_MS
+            turned.set_alpha(255 if fade < 0.5 else int(255 * (1 - fade) / 0.5))
+            screen.blit(turned, turned.get_rect(center=(int(x), int(y))))
+
+
 class AttackPhase(Phase):
     """player.attack == 1"""
 
@@ -1050,6 +1226,7 @@ class AttackPhase(Phase):
         super().__init__(manager)
         self.attack_from = None
         self.wheel = None  # the pirates' PirateWheel while it spins (subattack 9)
+        self.smash = None  # the thrown dice's DiceSmash (subattack 4)
         self.defence_country = None
         self.attack_dice = None
         self.defence_dice = None
@@ -1087,6 +1264,7 @@ class AttackPhase(Phase):
         self.defence_dice = None
         self.free_claim = False
         self.wheel = None
+        self.smash = None
         self.rail_network = []
         self.rail_initial_units = {}
         self.rail_initial_tanks = {}
@@ -1810,6 +1988,7 @@ class AttackPhase(Phase):
                 self.defence_dice[i] = (not self.defence_dice[i]) * np.random.randint(1, 7)
             self.player.subattack = 4
             self.timer = 0
+            self.smash = None
 
     def _draw_attack_dice(self):
         """The attacker's cast dice, highest to lowest. Active tanks boost
@@ -1828,10 +2007,10 @@ class AttackPhase(Phase):
         for i, value in enumerate(attack):
             x = self.dice_x(i, self.thrown_columns())
             y = self.THROWN_ATTACK_Y
-            Dice(self.player.color, eyes=value).draw(view.screen, Position(x + 35, y + 35))
+            shown, dx, dy = self._draw_thrown_die(self.player.color, value, x, y, 0, i)
             badge = event_bonus + (self.active_tanks if i == 0 else 0) - attacker_penalty
-            if badge != 0:
-                self._bonus_badge(x, y, badge)
+            if badge != 0 and shown:
+                self._bonus_badge(x + dx, y + dy, badge)
 
     def _resolve_combat(self):
         view = self.view
@@ -1844,16 +2023,26 @@ class AttackPhase(Phase):
                 engine, engine.countries[self.defence_country].owner)
         # Dice are shown highest to lowest; the fort boosts every defence
         # die (alongside any event dice penalty on the defender), and the
-        # defender's tanks boost the highest one.
-        self._draw_attack_dice()
+        # defender's tanks boost the highest one. The winning dice smash the
+        # ones they beat (a click goes straight on to the result).
         defence = sorted((int(d) for d in self.defence_dice if d > 0), reverse=True)
+        color = engine.countries[self.defence_country].owner.color
+        if self.smash is None:
+            A, D = self._effective_dice()
+            attack = sorted((int(d) for d in self.attack_dice if d > 0), reverse=True)
+            self.smash = self._start_smash(
+                [(self.player.color, v) for v in attack], [(color, v) for v in defence],
+                [A[-1 - i] <= D[-1 - i] for i in range(min(len(A), len(D)))])
+        self._draw_attack_dice()
         for i, value in enumerate(defence):
             x = self.dice_x(i, self.thrown_columns())
             y = self.THROWN_DEFENCE_Y
-            Dice(engine.countries[self.defence_country].owner.color, eyes=value).draw(view.screen, Position(x + 35, y + 35))
+            shown, dx, dy = self._draw_thrown_die(color, value, x, y, 1, i)
             badge = fort - defender_penalty + (self._defending_tanks() if i == 0 else 0)
-            if badge != 0:
-                self._bonus_badge(x, y, badge)
+            if badge != 0 and shown:
+                self._bonus_badge(x + dx, y + dy, badge)
+        if self.smash:
+            self.smash.draw_shards(view.screen)
         if self.io.left_pressed:
             self.timer = 150
         if self.timer != 150:
@@ -1868,23 +2057,33 @@ class AttackPhase(Phase):
         self.draw_rect((0, 0, 0), x + 34, y + 56, 38, 22, 2)
         self.blit_text("{:+d}".format(amount), x + 42, y + 58)
 
+    def _effective_dice(self):
+        """Both rolls lowest to highest with everything that counts: the
+        fort and the defender's tanks, the attacker's tanks, events."""
+        engine = self.engine
+        attack_from = engine.countries[self.attack_from]
+        defence = engine.countries[self.defence_country]
+        D = np.sort(self.defence_dice[self.defence_dice > 0]) + defence.fort_lvl
+        A = np.sort(self.attack_dice[self.attack_dice > 0])
+        if self.manager.current_event is not None:
+            event = self.manager.current_event
+            A = A + event.attack_bonus(engine, attack_from) - event.dice_penalty(engine, self.player)
+            D = D - event.dice_penalty(engine, defence.owner)
+        if len(A) > 0:
+            A[-1] += self.active_tanks
+        if len(D) > 0:
+            D[-1] += self._defending_tanks()
+        return A, D
+
     def _apply_combat_results(self):
         engine = self.engine
         player = self.player
         manager = self.manager
         attack_from = engine.countries[self.attack_from]
         defence = engine.countries[self.defence_country]
+        self.smash = None
 
-        D = np.sort(self.defence_dice[self.defence_dice > 0]) + defence.fort_lvl
-        A = np.sort(self.attack_dice[self.attack_dice > 0])
-        if manager.current_event is not None:
-            event = manager.current_event
-            A = A + event.attack_bonus(engine, attack_from) - event.dice_penalty(engine, player)
-            D = D - event.dice_penalty(engine, defence.owner)
-        if len(A) > 0:
-            A[-1] += self.active_tanks
-        if len(D) > 0:
-            D[-1] += self._defending_tanks()
+        A, D = self._effective_dice()
         player.oil -= self._attack_oil_cost()
         self.plane_fee_paid = True
         # The army's tank payment now covers this target (and is gone for
@@ -2037,6 +2236,7 @@ class AttackPhase(Phase):
         attack_from.units = total_units - defence.units
 
         if manager.current_event is not None:
+            manager.current_event.on_troops_moved(engine, player, attack_from, defence, "conquest")
             manager.current_event.on_conquest(engine, player, defence, previous_owner)
 
     def _post_conquest(self):
@@ -2261,12 +2461,16 @@ class MovementPhase(Phase):
     def _select_origin(self):
         engine = self.engine
         player = self.player
-        if player.repositioned_this_turn:
-            if self.io.left_pressed and self.io.hover_country is not None:
-                sounds.play("error")
-            return
         hover = self.io.hover_country
-        if self.io.left_pressed and hover is not None and engine.countries[hover].owner == player:
+        if not (self.io.left_pressed and hover is not None):
+            return
+        if player.repositioned_this_turn and not (
+                engine.countries[hover].owner == player and self._redistribute_offered(hover)):
+            # The move is used up; only a country with a rails or airport
+            # button can still be picked (for that button).
+            sounds.play("error")
+            return
+        if engine.countries[hover].owner == player:
             self.origin_country = hover
             self._flood_fill()
             player.subattack = 1
@@ -2350,6 +2554,13 @@ class MovementPhase(Phase):
         if hover == self.origin_country:
             self.origin_country = None
             player.subattack = 0
+        elif player.repositioned_this_turn:
+            # No second move: another country with a rails or airport
+            # button becomes the selection instead.
+            if engine.countries[hover].owner == player and self._redistribute_offered(hover):
+                self.origin_country = hover
+            else:
+                sounds.play("error")
         elif hover in self.finished_list:
             origin = engine.countries[self.origin_country]
             target = engine.countries[hover]
@@ -2543,6 +2754,10 @@ class MovementPhase(Phase):
             # Dragging a country's troops down to 0 mid-adjustment (or
             # cycling past 0 via the wraparound) no longer abandons it on
             # the spot.
+            event = self.manager.current_event
+            if event is not None and origin.units != self.initial_origin:
+                source, dest = (origin, target) if origin.units < self.initial_origin else (target, origin)
+                event.on_troops_moved(engine, self.player, source, dest, "move")
             if origin.units == 0:
                 self.abandon(origin)
             elif target.units == 0:
@@ -3404,7 +3619,8 @@ class EventChoicePhase(OilSharePhase):
         y += 20
         bw, gap = 120, 24
         yes_x = x0 + w // 2 - gap // 2 - bw
-        cost = getattr(event, "YES_COST", None)  # (resource, amount): Yes reads "-amount <sprite>"
+        # (resource, amount): Yes reads "-amount <sprite>"
+        cost = event.yes_cost(self.engine) if hasattr(event, "yes_cost") else getattr(event, "YES_COST", None)
         if cost is None:
             if self._small_button(yes_x, y, bw, 48, t("Yes"), True, row_font):
                 return True
@@ -3451,6 +3667,7 @@ class MouseAttackPhase(Phase):
         self.attack_dice = []
         self.defence_dice = np.zeros(0)
         self.rolled_at = 0
+        self.smash = None  # the thrown dice's DiceSmash (subattack 4)
 
     def update(self):
         event = self.manager.current_event
@@ -3531,13 +3748,14 @@ class MouseAttackPhase(Phase):
         country = self.engine.countries[self.target]
         self.attack_dice = sorted(np.random.randint(1, 7, size=min(self.troops, 3)), reverse=True)
         self.defence_dice = np.zeros(min(country.units, 2))
+        self.smash = None
         self.player.subattack = 3
 
     def _draw_mouse_dice(self):
         mouse = self.engine.default_player
         for i, value in enumerate(self.attack_dice):
             x = self.dice_x(i, self.thrown_columns())
-            Dice(mouse.color, eyes=int(value)).draw(self.view.screen, Position(x + 35, self.THROWN_ATTACK_Y + 35))
+            self._draw_thrown_die(mouse.color, int(value), x, self.THROWN_ATTACK_Y, 0, i)
 
     def _defender_dice(self, country):
         """As in AttackPhase._roll_dice: the defender clicks dice to leave
@@ -3571,25 +3789,32 @@ class MouseAttackPhase(Phase):
         import pygame as pg
         from bot import DICE_MS
         view = self.view
-        self._draw_mouse_dice()
         defence = sorted((int(d) for d in self.defence_dice if d > 0), reverse=True)
-        for i, value in enumerate(defence):
-            x = self.dice_x(i, self.thrown_columns())
-            y = self.THROWN_DEFENCE_Y
-            Dice(country.owner.color, eyes=value).draw(view.screen, Position(x + 35, y + 35))
-            badge = country.fort_lvl + (self.tanks if i == 0 else 0)
-            if badge != 0:
-                self.manager.phases[1]._bonus_badge(x, y, badge)
-        wait = 0 if self.manager.bot.fast else DICE_MS
-        if not self.io.left_pressed and not (country.owner.is_bot and pg.time.get_ticks() - self.rolled_at >= wait):
-            return
-
         A = np.array(sorted(self.attack_dice))
         D = np.sort(np.array(defence)) + country.fort_lvl
         if len(D) > 0:
             D[-1] += self.tanks
         n = min(len(A), len(D))
         attack_loss = [A[-1 - i] <= D[-1 - i] for i in range(n)]
+        if self.smash is None:
+            self.smash = self._start_smash(
+                [(self.engine.default_player.color, int(v)) for v in self.attack_dice],
+                [(country.owner.color, v) for v in defence], attack_loss)
+        self._draw_mouse_dice()
+        for i, value in enumerate(defence):
+            x = self.dice_x(i, self.thrown_columns())
+            y = self.THROWN_DEFENCE_Y
+            shown, dx, dy = self._draw_thrown_die(country.owner.color, value, x, y, 1, i)
+            badge = country.fort_lvl + (self.tanks if i == 0 else 0)
+            if badge != 0 and shown:
+                self.manager.phases[1]._bonus_badge(x + dx, y + dy, badge)
+        if self.smash:
+            self.smash.draw_shards(view.screen)
+        wait = 0 if self.manager.bot.fast else DICE_MS
+        settled = pg.time.get_ticks() - self.rolled_at >= wait and (self.smash is None or self.smash.done())
+        if not self.io.left_pressed and not (country.owner.is_bot and settled):
+            return
+        self.smash = None
         self.troops -= sum(attack_loss)
         country.units -= sum(not lost for lost in attack_loss)
         self.native_losses = getattr(self, "native_losses", 0) + sum(attack_loss)
@@ -3714,7 +3939,9 @@ class TurnManager:
         engine = self.engine
         player = engine.players[engine.turn]
         if self.dialog_active:
-            return player
+            chooser = getattr(self.notices[0], "chooser", None) \
+                if self.event_notice is None and self.notices else None
+            return chooser or player
         if player.attack == 1 and player.subattack in (3, 8):
             # As BotController._human_defending.
             attack = self.phases[1]
@@ -3753,11 +3980,14 @@ class TurnManager:
 
     def animating(self):
         """Something on screen moves by itself (the pirates' wheel, until it
-        has landed), so the game keeps drawing frames without any input
+        has landed; the thrown dice smashing each other), so the game keeps drawing frames without any input
         (runner.play)."""
         player = self.engine.players[self.engine.turn]
         wheel = self.phases[1].wheel
-        return player.attack == 1 and player.subattack == 9 and wheel is not None and not wheel.landed()
+        if player.attack == 1 and player.subattack == 9 and wheel is not None and not wheel.landed():
+            return True
+        smash = self.phases[player.attack].smash if player.attack in (1, 6) else None
+        return player.subattack == 4 and smash is not None and not smash.done()
 
     def open_shop(self):
         player = self.engine.players[self.engine.turn]
@@ -4268,8 +4498,9 @@ class TurnManager:
 
     def _bot_dismisses(self, dialog):
         """On a bot's turn nobody may be there to click OK: a message
-        closes by itself after a while (the bot's notice delay)."""
-        if not self.engine.players[self.engine.turn].is_bot:
+        closes by itself after a while (the bot's notice delay) -- unless
+        it waits for a human's click (a ChooserNotice)."""
+        if not self.acting_player().is_bot:
             self._dialog_shown_at = None
             return False
         import pygame as pg

@@ -152,7 +152,9 @@ menu and move phase once dice are cast.
   `TurnManager._update_event_schedule`. Add one by subclassing `Event` in
   `events.py` and appending it to `EVENTS`; use the hooks (`on_start`,
   `on_end`, `modify_income`, `attack_bonus`, `dice_penalty`,
-  `discount_shop_cost`, `on_turn_start`, `on_abandon`, `panel_lines` (extra
+  `discount_shop_cost`, `on_turn_start`, `on_abandon`, `on_troops_moved`
+  (troops going from one country to another: moving in after a conquest,
+  a move, rails/air; the bot's own moves call it too), `panel_lines` (extra
   lines in the event panel), ...) rather than special-casing
   events in phases.py (or bot.py: bots see an event through those hooks,
   plus the `bot_*` hints for what they can't work out from them).
@@ -164,6 +166,14 @@ menu and move phase once dice are cast.
   accordingly, while `TurnManager.animating` keeps `runner.play` drawing
   frames; once landed a click anywhere closes it (a bot's: after
   `HOLD_MS`).
+- Once both sides have rolled (AttackPhase and MouseAttackPhase subattack
+  4), each winning die smashes the die it beat into shards
+  (`phases.DiceSmash`, made by `Phase._start_smash` from the same
+  effective dice the result uses, `AttackPhase._effective_dice`; dice drawn
+  through `Phase._draw_thrown_die`). A click goes straight on to the result;
+  a bot waits until it's done (`BotController._ready`); `animating()` keeps
+  frames coming; skipped headless (`bot.fast`). Shards use `random`, not
+  `np.random`.
 - A cancelled turn (`TurnManager.skip_turns`, names, saved; "Woke") is
   skipped as the turn starts (`_skip_cancelled`): no income, nothing, and
   no event card is revealed on it.
@@ -382,7 +392,13 @@ differs per process and Python version, and timers use `pg.time.get_ticks()`.)
   (`RemotePointer.view` = `Member.view`, sent with every input message as
   `view: [zoom, x, y]`; `Io.update` uses a source's `view`); the host never
   pans or zooms for a joined pointer (`Engine._remote_pointer`), and a
-  device sends no wheel, stick panning, LB/RB or Start.
+  device sends no wheel, stick panning, LB/RB or Start. Panning and
+  zooming aren't clicks: on every device (the host too) its mouse and
+  controllers always pan and zoom its own map, whoever decides -- unless
+  several human players share that device and one of them is the acting
+  player: then only their controller does, or the mouse when they have
+  none (`Controls.scrollers`; `Engine.scrollers`, `zoom_view`, `pan_view`;
+  a local game keeps the old rule: the mouse and the clicking controllers).
 - **The state** (`HostSession._sync_state`, from `pump`, at most every
   `STATE_MS`): `HostSession.game_state()` is `save_load.game_data` (as a
   save, without the log and the host's display settings) plus `online`:
@@ -450,7 +466,9 @@ differs per process and Python version, and timers use `pg.time.get_ticks()`.)
 - **The chat** (`chat.py`, online only: a local game has none): a button
   under the settings button (`images/chat.png`, a red badge counts unread
   messages) opens a panel to its right; while it's open every key is the
-  chat's (Enter sends, Esc closes). It's each device's own, drawn outside
+  chat's (Enter sends, Esc closes), and a mouse click anywhere outside it
+  closes it and does nothing else (`Chat.taken`/`taking` keep it from the
+  host's game). It's each device's own, drawn outside
   the game's layer: the host's in `Engine.present` after `online.capture`
   (`HostSession.draw_chat`), a device's over its own screen
   (`viewer.py`). Its clicks and keys never reach the game: on the host

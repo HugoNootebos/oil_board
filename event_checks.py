@@ -239,8 +239,9 @@ def _(ev):
 def _(ev):
     a, b, c = reset()
     targets = neighbours("Japan")
-    fortified = sorted(targets)[0]
+    fortified, kept = sorted(targets)[:2]
     own(b, fortified, 3, fort_lvl=2, tanks=1)
+    own(a, kept, 7, fort_lvl=1, tanks=2)  # already the winner's
     own(a, "Sahara", 10)
     own(a, "Madagaskar", 10)
     own(b, "Londen", 10)
@@ -258,7 +259,11 @@ def _(ev):
           ev.panel_lines(app))
     finish()
     check("most conquests claims every country around Japan",
-          all(country(n).owner is a and country(n).units == 1 for n in targets))
+          all(country(n).owner is a and country(n).units == 1 for n in targets if n != kept))
+    check("a country the winner already held is left as it was",
+          country(kept).owner is a and country(kept).units == 7
+          and country(kept).fort_lvl == 1 and country(kept).tanks == 2,
+          (country(kept).units, country(kept).fort_lvl, country(kept).tanks))
     check("claimed countries lose fort and tanks", country(fortified).fort_lvl == 0 and country(fortified).tanks == 0)
 
     a, b, c = reset()
@@ -334,6 +339,17 @@ def _(ev):
     check("... strike credited to them", country("India").bombed_by is b)
     finish()
 
+    a, b, c = reset()
+    a.is_bot = True
+    own(b, "Noord-Korea", 4)
+    activate(ev)
+    check("the owner closes the 'pick a country' message, not the current player",
+          m().notices and m().acting_player() is b, m().acting_player().name)
+    check("... and on a bot's turn it waits for them", not m()._bot_dismisses(m().notices[0]))
+    m().notices.clear()
+    check("... then the owner picks", m().acting_player() is b)
+    finish()
+
 
 def bonus_test(ev, home, other):
     a, b, c = reset()
@@ -351,14 +367,78 @@ def bonus_test(ev, home, other):
     check("after the event: no bonus", country(home).units == 9)
 
 
+def move(frm, to, n):
+    """A confirmed Movement-phase move of `n` troops (through the phase's
+    own confirm, as a human's)."""
+    phase = m().phases[2]
+    player = country(frm).owner
+    app.turn = app.players.index(player)
+    player.attack, player.subattack = 2, 2
+    phase.origin_country, phase.target_country = frm, to
+    phase.initial_origin, phase.initial_target = country(frm).units, country(to).units
+    for key in ("ships", "tanks", "planes"):
+        setattr(phase, "initial_origin_" + key, getattr(country(frm), key))
+        setattr(phase, "initial_target_" + key, getattr(country(to), key))
+    phase.oil_spent_on_planes = 0
+    country(frm).units -= n
+    country(to).units += n
+    confirm, cancel = phase.confirm_button, phase.cancel_button
+    phase.confirm_button = lambda *a, **k: True
+    phase.cancel_button = lambda *a, **k: False
+    try:
+        phase._adjust_units()
+    finally:
+        phase.confirm_button, phase.cancel_button = confirm, cancel
+
+
+def march_test(ev, home, near, far, beyond, outside):
+    """`near` borders `home`, `far` is only reached from `near` through
+    `home`, `beyond` borders `far`; `outside` borders `near` (not `home`)."""
+    a, b, c = reset()
+    own(a, home, 10)
+    own(a, near, 10)
+    own(a, outside, 10)
+    own(b, far, 1)
+    own(b, beyond, 10)
+    activate(ev)
+    fight(home, far, [6], [1])
+    check("{} taken from {}".format(far, home), country(far).owner is a, country(far).owner.name)
+    fight(far, beyond, [3], [3])
+    check("army moved on from {} into {}: +1".format(home, far),
+          country(beyond).units == 9 and country(far).units >= 1)
+    move(near, outside, 3)
+    check("a move from an unmarked country doesn't mark", not ev.is_marked(app, country(outside)))
+    move(home, near, 2)
+    check("moved out of {}: marked".format(home), ev.is_marked(app, country(near)))
+    check("panel lists the marked countries", far in ev.panel_lines(app)[0] and near in ev.panel_lines(app)[0],
+          ev.panel_lines(app))
+    a, b, c = save_and_load()
+    check("save/load keeps the marks", ev.is_marked(app, country(near)) and ev.is_marked(app, country(far)))
+    own(b, far, 5)  # someone else's now
+    check("a marked country taken over loses its mark", not ev.is_marked(app, country(far)))
+    finish()
+    check("after the event: no marks", not ev.is_marked(app, country(near)))
+
+    a, b, c = reset()
+    own(a, near, 10)
+    own(a, home, 2)
+    own(a, far, 1)
+    activate(ev)
+    move(near, far, 4)  # can only go through home
+    check("a move through {}: marked".format(home), ev.is_marked(app, country(far)))
+    finish()
+
+
 @test("JapaneseAggression")
 def _(ev):
     bonus_test(ev, "Japan", "India")
+    march_test(ev, "Japan", "Noord-Korea", "Papoea Nieuw Guinea", "Gold Coast", "China")
 
 
 @test("NaziExpansion")
 def _(ev):
     bonus_test(ev, "Nazi-Duitsland", "Londen")
+    march_test(ev, "Nazi-Duitsland", "Belarus", "Spanje", "Sahara", "Sovjet-Rusland")
 
 
 @test("StormAtSea")
@@ -1073,11 +1153,14 @@ def _(ev):
     own(c, "China", 5, developed=True)
     own(c, "Japan", 5, developed=True, dormant_owner=c)
     own(b, "Maleisië", 3)  # not developed itself: asked all the same
+    country("Sahara").developed = True  # the mouse's: not counted
     b.food = 15
     a.attack, a.subattack = 1, 0
     activate(ev)
     check("the owner is asked (also outside their turn)",
           a.attack == 10 and m().acting_player() is b and b.food == 15)
+    check("the price: 1 food per player's country sent back (not the mouse's, not one developing)",
+          ev.price(app) == 2 and ev.yes_cost(app) == ("food", 2), ev.price(app))
     check("shop and cards blocked meanwhile", m().attack_in_progress())
     phase = m().phases[10]
     phase.update()
@@ -1089,8 +1172,8 @@ def _(ev):
     check("save/load keeps the question", ev.chooser is b and a.attack == 10)
     ev.choose(app, b, True)
     a.attack, a.subattack = ev.return_to
-    check("yes: pays 10 food, nothing else happens",
-          b.food == 5 and country("Londen").dormant_owner is None and country("China").dormant_owner is None)
+    check("yes: pays 2 food, nothing else happens",
+          b.food == 13 and country("Londen").dormant_owner is None and country("China").dormant_owner is None)
     check("... with a notice", len(m().notices) == 1)
     finish()
 
@@ -1101,10 +1184,11 @@ def _(ev):
     country("Sahara").developed = True  # the mouse's
     activate(ev)
     ev.choose(app, b, False)
-    check("no: every developed country back to developing, food kept",
+    check("no: every player's developed country back to developing, food kept",
           country("Londen").dormant_owner is a and country("Maleisië").dormant_owner is b
-          and country("Sahara").dormant_owner is app.default_player and b.food == 1000
-          and all(country(n).developed for n in ("Londen", "Maleisië", "Sahara")))
+          and b.food == 1000 and all(country(n).developed for n in ("Londen", "Maleisië")))
+    check("the mouse's developed country is left alone",
+          country("Sahara").developed and country("Sahara").dormant_owner is None)
     check("one still developing stays so", country("Japan").dormant_owner is c)
     check("undeveloped countries untouched", not country("Canada").developed and country("Canada").dormant_owner is None)
     finish()
@@ -1112,23 +1196,34 @@ def _(ev):
     a, b, c = reset()
     own(a, "Londen", 5, developed=True)
     own(b, "Maleisië", 3)
-    b.food = 9
+    b.food = 0
     activate(ev)
     check("not enough food: still asked", a.attack == 10 and ev.chooser is b)
     m().phases[10].update()
     ev.choose(app, b, True)  # can't actually pay
     check("... paying anyway does nothing: back to developing",
-          country("Londen").dormant_owner is a and b.food == 9)
+          country("Londen").dormant_owner is a and b.food == 0)
     finish()
 
     a, b, c = reset()
     b.is_bot = True
     own(a, "Londen", 5, developed=True)
     own(b, "Maleisië", 3)
-    b.food = 9
+    b.food = 0
     activate(ev)
     check("bot without the food: back to developing at once",
-          a.attack == 0 and country("Londen").dormant_owner is a and b.food == 9)
+          a.attack == 0 and country("Londen").dormant_owner is a and b.food == 0)
+    finish()
+
+    a, b, c = reset()
+    own(b, "Maleisië", 3)
+    country("Sahara").developed = True  # only the mouse's
+    b.food = 0
+    a.attack, a.subattack = 1, 0
+    activate(ev)
+    check("nothing to send back: nobody asked, nothing happens",
+          a.attack == 1 and ev.chooser is None and country("Sahara").dormant_owner is None
+          and len(m().notices) == 1)
     finish()
 
     a, b, c = reset()
@@ -1143,7 +1238,7 @@ def _(ev):
     own(b, "China", 5, developed=True)
     activate(ev)
     check("bot owner decides at once", a.attack == 0 and ev.chooser is None
-          and (b.food == 990) == (country("China").dormant_owner is None))
+          and (b.food == 999) == (country("China").dormant_owner is None))
     finish()
 
 @test("Inflation")
@@ -1179,8 +1274,9 @@ def _(ev):
     own(b, "Spanje", 2)
     activate(ev)
     londen, ijsland = country("Londen"), country("IJsland")
-    check("Western Europe +3 troops each, also the mouse's",
-          londen.units == 8 and londen.immigrants == 3 and ijsland.immigrants == 3
+    check("Western Europe +3 troops each, none for the mouse",
+          londen.units == 8 and londen.immigrants == 3 and country("Spanje").immigrants == 3
+          and ijsland.owner is app.default_player and ijsland.immigrants == 0
           and country("Belarus").immigrants == 0 and country("Sovjet-Rusland").immigrants == 0)
     finish()
     check("they stay after the event", londen.immigrants == 3)
@@ -1308,10 +1404,18 @@ def _(ev):
     own(a, "Londen", 5)
     own(a, "Spanje", 4)
     country("Londen").immigrants = 3
+    country("Londen").ships, country("Londen").planes = 1, 2
+    country("Spanje").tanks, country("Spanje").ships, country("Spanje").fort_lvl = 3, 1, 2
+    country("Arabië").tanks = 1
     EVENT["Pilgrimage"]._apply(app)
     check("bedevaart: the immigrants stay home",
           country("Londen").owner is a and country("Londen").units == 3 and country("Arabië").units == 2 + 2 + 4 + 5
           and country("Spanje").owner is app.default_player, country("Arabië").units)
+    check("bedevaart: ships, tanks and planes go along",
+          (country("Arabië").ships, country("Arabië").tanks, country("Arabië").planes) == (2, 4, 2)
+          and (country("Londen").ships, country("Londen").planes) == (0, 0)
+          and country("Arabië").fort_lvl == 0,
+          (country("Arabië").ships, country("Arabië").tanks, country("Arabië").planes))
 
 
 @test("Woke")

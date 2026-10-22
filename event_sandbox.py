@@ -269,11 +269,16 @@ class Sandbox:
             (pg.Rect(panel.x + 20, panel.y + 45, 340, 32), False),
             (pg.Rect(panel.x + 380, panel.y + 45, 340, 32), True),
         ]
-        rows = (len(EVENTS) + 1) // 2
+        # As many columns as it takes for every event to fit under each other.
+        top, step, gap = panel.y + 95, 39, 20
+        max_rows = (panel.bottom - 10 - top) // step
+        cols = max(2, -(-len(EVENTS) // max_rows))
+        rows = -(-len(EVENTS) // cols)
+        width = (panel.width - 40 - (cols - 1) * gap) // cols
         buttons = []
         for i, event in enumerate(EVENTS):
             col, row = divmod(i, rows)
-            buttons.append((pg.Rect(panel.x + 20 + col * 360, panel.y + 95 + row * 39, 340, 34), event))
+            buttons.append((pg.Rect(panel.x + 20 + col * (width + gap), top + row * step, width, 34), event))
         return panel, timing, buttons
 
     def handle(self, events):
