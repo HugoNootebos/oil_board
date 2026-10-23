@@ -53,6 +53,13 @@ class Event:
         default leaves both unchanged."""
         return player, amounts
 
+    def shown_income(self, engine, country, player, amounts):
+        """What the player's stock panel shows `country` yielding per round
+        while this event is the active one. The default is what
+        modify_income gives; an event that only stops the income for its
+        round can show the usual figures instead."""
+        return self.modify_income(engine, country, player, amounts)
+
     def on_conquest(self, engine, player, country, previous_owner):
         """Called once for every successful conquest -- interactive attack
         or scripted event-attack alike -- while this event is the active
@@ -720,6 +727,10 @@ class NuclearWinter(Event):
 
     def modify_income(self, engine, country, player, amounts):
         amounts["food"] = 0
+        return player, amounts
+
+    def shown_income(self, engine, country, player, amounts):
+        # The panel keeps showing the usual harvest per round.
         return player, amounts
 
 

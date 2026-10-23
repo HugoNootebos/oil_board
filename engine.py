@@ -767,7 +767,8 @@ class Engine:
             # over: online.HostSession.show_hovers.)
             self._draw_country_info(self.io.hover_country)
         player = self.players[self.turn]
-        self.gui.draw_player_stats(self.view, player, self.font, self.STATS_POS, self.production(player))
+        self.gui.draw_player_stats(self.view, player, self.font, self.STATS_POS,
+                                  self.production(player, shown=True))
         self.gui.draw_attack_phase(
             self.view, self.players[self.turn], images=self.hud_images, outline_color=self.colors["outlines"],
             end_turn_enabled=self.turn_manager.can_end_turn(),
@@ -1312,10 +1313,11 @@ class Engine:
         if io.left_pressed:
             io.left_pressed = 0  # nothing behind the panel reacts
 
-    def production(self, player):
+    def production(self, player, shown=False):
         """What `player`'s countries would yield right now: the resources
         as they'd arrive next income (food net of the troops to feed), plus
-        "units": the troops on the board that food has to feed."""
+        "units": the troops on the board that food has to feed. `shown`:
+        the figures for the stock panel (the event's `shown_income`)."""
         from phases import income_multiplier
         totals = dict.fromkeys(("food", "wood", "steel", "oil", "nuclear", "troops", "helmets"), 0)
         units = 0
@@ -1332,7 +1334,8 @@ class Engine:
                 target = player
                 current_event = self.turn_manager.current_event
                 if current_event is not None:
-                    target, amounts = current_event.modify_income(self, country, player, amounts)
+                    hook = current_event.shown_income if shown else current_event.modify_income
+                    target, amounts = hook(self, country, player, amounts)
                 if target is player:
                     for resource, amount in amounts.items():
                         totals[resource] += amount
