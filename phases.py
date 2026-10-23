@@ -4416,10 +4416,11 @@ class TurnManager:
             hint = hint_font.render(t("click anywhere to continue"), True, (90, 50, 50))
             screen.blit(hint, (view.WIDTH * 0.5 - hint.get_width() * 0.5, y + h - 20 - hint.get_height()))
             return bool(io.left_pressed)
-        bx, by, bw, bh = view.WIDTH * 0.5 - 60, y + h - 60, 120, 40
+        img = self.engine.font.render(t(button), True, (0, 0, 0))
+        bw, bh = max(120, img.get_width() + 30), 40  # (as wide as a longer label needs)
+        bx, by = view.WIDTH * 0.5 - bw * 0.5, y + h - 60
         pg.draw.rect(screen, (150, 245, 150), pg.Rect(bx, by, bw, bh))
         pg.draw.rect(screen, (0, 0, 0), pg.Rect(bx, by, bw, bh), 2)
-        img = self.engine.font.render(t(button), True, (0, 0, 0))
         screen.blit(img, (bx + bw * 0.5 - img.get_width() * 0.5, by + 10))
         m = io.mouse_position
         return io.button(("r", bx, by, bw, bh))
@@ -4533,10 +4534,12 @@ class TurnManager:
         if len(alive) <= 1 and len(self.engine.players) > 1:
             self.game_over = True
             lines = [t("{} wins!").format(alive[0].name)] if alive else [t("Nobody survived")]
-            if self._draw_dialog(lines, "Quit", big=True):
-                if getattr(self.engine, "online", None) is not None:
+            tutorial = getattr(self.engine, "tutorial", None) is not None
+            if self._draw_dialog(lines, "Exit to title" if tutorial else "Quit", big=True):
+                if getattr(self.engine, "online", None) is not None or tutorial:
                     # Online, the player who clicks may be on another device:
                     # back to the host's menu (the game ends for everyone).
+                    # The tutorial goes back to the title screen too.
                     self.engine.pending_quit = True
                 else:
                     pg.event.post(pg.event.Event(pg.QUIT))

@@ -459,202 +459,232 @@ NL = {
     "South America": "Zuid-Amerika",
     "North America": "Noord-Amerika",
     # Tutorial (tutorial.py)
-    "Next": "Volgende",
-    "Skip": "Overslaan",
-    "Play on": "Verder spelen",
-    "End tutorial": "Tutorial stoppen",
     "Welcome to OIL": "Welkom bij OIL",
-    "This tutorial plays your first turn with you, one step at a time. You are the blue player, "
-    "in the south of Africa. Two bots play far away, in North America and Siberia.\n"
+    "You are blue, with 12 troops in {}. Green holds {} and {}; red holds {}, which has a "
+    "fort, and {}. The grey countries belong to the natives. You win by eliminating both "
+    "players.\n"
     "Click Next to begin.":
-        "Deze tutorial speelt je eerste beurt met je mee, stap voor stap. Jij bent de blauwe speler, "
-        "in het zuiden van Afrika. Twee bots spelen ver weg, in Noord-Amerika en Siberië.\n"
+        "Jij bent blauw, met 12 troepen in {}. Groen heeft {} en {}; rood heeft {}, met een fort, "
+        "en {}. De grijze landen zijn van de inboorlingen. Je wint door beide spelers uit te "
+        "schakelen.\n"
         "Klik op Volgende om te beginnen.",
-    "The map": "De kaart",
-    "Every shape is a country, in the colour of its owner. Grey countries belong to nobody yet. "
-    "The number on a country is its troops.\n"
-    "Hold the right mouse button and drag to move the map; scroll to zoom in and out.":
-        "Elke vorm is een land, in de kleur van zijn eigenaar. Grijze landen zijn nog van niemand. "
-        "Het getal op een land is het aantal troepen.\n"
-        "Houd de rechtermuisknop ingedrukt en sleep om de kaart te verschuiven; scroll om in en uit "
-        "te zoomen.",
-    "Routes": "Routes",
-    "Countries are connected by routes: solid lines over land, dotted lines over sea. You can "
-    "only attack and move along a route. To cross the sea you need a ship or a plane.":
-        "Landen zijn verbonden door routes: doorgetrokken lijnen over land, stippellijnen over zee. "
-        "Je kunt alleen langs een route aanvallen en verplaatsen. Om de zee over te steken heb je een "
-        "schip of een vliegtuig nodig.",
-    "Country info": "Landinfo",
-    "Point at a country, for example {}. The panel at the top right shows what it gives its "
-    "owner every turn: food, wood, steel, oil, nuclear and helmets. It also shows an airport "
-    "or fort, if it has one.":
-        "Wijs een land aan, bijvoorbeeld {}. Het paneel rechtsboven toont wat het zijn eigenaar elke "
-        "beurt oplevert: voedsel, hout, staal, olie, nucleair en helmen. Ook een luchthaven of fort "
-        "staat erbij, als het die heeft.",
     "Your stock": "Je voorraad",
-    "The panel on the left shows your stock. The number in brackets next to it is what "
-    "comes in at your next turn.\n"
-    "At the start of every turn each troop eats 1 food (the red number); the green number is "
-    "your harvest. Troops you can't feed starve.":
-        "Het paneel links toont je voorraad. Het getal tussen haakjes ernaast is wat er bij je "
-        "volgende beurt bijkomt.\n"
-        "Aan het begin van elke beurt eet elke troep 1 voedsel (het rode getal); het groene getal is "
-        "je oogst. Troepen die je niet kunt voeden, verhongeren.",
-    "New troops": "Nieuwe troepen",
-    "The helmets are the troop production of your countries. Every turn you get a third of "
-    "your helmets plus 3 as new troops.":
-        "De helmen zijn de troepenproductie van je landen. Elke beurt krijg je een derde van je "
-        "helmen plus 3 als nieuwe troepen.",
-    "The phases": "De fases",
-    "Every turn has three phases: deploying troops (yellow), attacking (red) and moving "
-    "(orange). The bright button is the phase you're in. End turn ends your turn.":
-        "Elke beurt heeft drie fases: troepen plaatsen (geel), aanvallen (rood) en verplaatsen "
-        "(oranje). De heldere knop is de fase waarin je zit. Met Einde beurt sluit je je beurt af.",
-    "The buttons": "De knoppen",
-    "At the top left: the settings (save, exit, display), the shop, your cards and the world "
-    "event. You'll use the shop and the cards in a moment.":
-        "Linksboven: de instellingen (opslaan, stoppen, weergave), de winkel, je kaarten en de "
-        "wereldgebeurtenis. De winkel en de kaarten gebruik je zo meteen.",
-    "Cards": "Kaarten",
-    "You hold three cards. Three of a kind, or one of each, make a set, which you can trade "
-    "for troops or resources, but only while deploying troops.\n"
-    "Open your cards.":
-        "Je hebt drie kaarten. Drie dezelfde, of van elk één, vormen een set die je kunt inruilen "
-        "voor troepen of grondstoffen, maar alleen tijdens het plaatsen van troepen.\n"
-        "Open je kaarten.",
-    "Trade a set": "Een set inruilen",
-    "Your three cards are already selected. Click the green button to trade them, then pick a "
-    "reward. One of each is worth 10 troops (or 25 food, 30 wood, 20 steel, 20 oil or 10 "
-    "nuclear).":
-        "Je drie kaarten zijn al geselecteerd. Klik op de groene knop om ze in te ruilen en kies dan "
-        "een beloning. Van elk één is 10 troepen waard (of 25 voedsel, 30 hout, 20 staal, 20 olie of "
-        "10 nucleair).",
-    "Getting cards": "Kaarten krijgen",
-    "You get a card at the end of every turn in which you conquered a country of another "
-    "player, and cards for holding a whole continent. Holding more than 4 cards forces you "
-    "to trade.":
-        "Je krijgt een kaart aan het eind van elke beurt waarin je een land van een andere speler "
-        "veroverde, en kaarten voor het bezit van een heel continent. Met meer dan 4 kaarten moet je "
-        "ruilen.",
-    "Deploy your troops": "Plaats je troepen",
-    "The number on the soldier at the left is how many new troops you can place. Left-click "
-    "one of your countries to put a troop there, right-click to take it back.\n"
-    "Put them in {}: you'll attack from there.":
-        "Het getal op de soldaat links is hoeveel nieuwe troepen je kunt plaatsen. Klik met links op "
-        "een van je landen om er een troep neer te zetten, met rechts haal je hem terug.\n"
-        "Zet ze in {}: daar val je straks vanuit aan.",
-    "The shop": "De winkel",
-    "With wood, steel and nuclear you buy things in the shop: bridges and rails, nukes, and "
-    "(only while deploying) ships, planes, tanks and forts. Ships and planes take troops across "
-    "the sea, a tank adds 1 to your highest attack die, a fort adds to every defence die.":
-        "Met hout, staal en nucleair koop je dingen in de winkel: bruggen en spoorwegen, atoombommen "
-        "en (alleen tijdens het plaatsen) schepen, vliegtuigen, tanks en forten. Schepen en "
-        "vliegtuigen brengen troepen over zee, een tank telt 1 op bij je hoogste aanvalsdobbelsteen, "
-        "een fort bij elke verdedigingsdobbelsteen.",
-    "Buy a ship": "Koop een schip",
-    "Your first ship is free. Open the shop, click the ship, click the green button and then "
-    "click {} to put the ship there.":
-        "Je eerste schip is gratis. Open de winkel, klik op het schip, klik op de groene knop en klik "
-        "dan op {} om het schip daar te zetten.",
+    "The panel on the left shows your stock: food, wood, steel, oil, nuclear and helmets. The "
+    "number in brackets is what comes in at your next turn. Every troop eats 1 food at the "
+    "start of your turn.":
+        "Het paneel links toont je voorraad: voedsel, hout, staal, olie, nucleair en helmen. Het "
+        "getal tussen haakjes is wat er bij je volgende beurt bijkomt. Elke troep eet 1 voedsel "
+        "aan het begin van je beurt.",
+    "Place your troops": "Plaats je troepen",
+    "Every turn brings new troops: 3 this time (the soldier at the bottom left). Left-click "
+    "{} three times to place them.":
+        "Elke beurt brengt nieuwe troepen: deze keer 3 (de soldaat linksonder). Klik drie keer "
+        "met links op {} om ze te plaatsen.",
     "On to the attack": "Op naar de aanval",
-    "Click the red button to go to the attack phase.": "Klik op de rode knop om naar de aanvalsfase te gaan.",
-    "Pick a target": "Kies een doelwit",
+    "Click the red button to go to the attack phase.":
+        "Klik op de rode knop om naar de aanvalsfase te gaan.",
+    "Attack Mexico": "Val Mexico aan",
     "Click {} to attack from it, then {} to attack it.":
         "Klik op {} om ervandaan aan te vallen en dan op {} om dat aan te vallen.",
-    "Rolling the dice": "Dobbelen",
-    "You roll a die for every attacking troop, at most 3 (one troop stays home). The defender "
-    "rolls up to 2. The highest dice are compared in pairs: the higher die wins, a tie goes to "
-    "the defender, and the loser of each pair loses a troop.\n"
-    "Click a die to leave it out, then click the green button to roll.":
-        "Je gooit een dobbelsteen per aanvallende troep, hoogstens 3 (één troep blijft thuis). De "
-        "verdediger gooit er hoogstens 2. De hoogste stenen worden per paar vergeleken: de hoogste "
-        "wint, bij gelijkspel wint de verdediger, en wie een paar verliest, verliest een troep.\n"
-        "Klik op een dobbelsteen om hem weg te laten en klik dan op de groene knop om te gooien.",
-    "Conquer it": "Verover het",
-    "After a roll, click anywhere to count the losses. Keep rolling until {} has no troops "
-    "left: then it's yours. A fort adds to every defence die, an active tank adds 1 to your "
-    "highest die.\n"
-    "Careful: if you roll 1 or 2 dice and lose them all, the ships, tanks and planes you "
-    "brought along are destroyed.":
-        "Klik na een worp ergens om de verliezen te tellen. Blijf gooien tot {} geen troepen meer "
-        "heeft: dan is het van jou. Een fort telt op bij elke verdedigingsdobbelsteen, een actieve "
-        "tank telt 1 op bij je hoogste dobbelsteen.\n"
-        "Opgelet: gooi je met 1 of 2 dobbelstenen en verlies je ze allemaal, dan worden de schepen, "
-        "tanks en vliegtuigen die je meenam vernietigd.",
-    "Move in": "Intrekken",
-    "Your troops move into the conquered country, all but one. Click the country you "
-    "attacked from to keep one more there, or the new country to send one more in. Then click "
-    "the green button.":
-        "Je troepen trekken het veroverde land in, op één na allemaal. Klik op het land waaruit je "
-        "aanviel om er nog één te houden, of op het nieuwe land om er nog één heen te sturen. Klik "
-        "dan op de groene knop.",
-    "Conquests": "Veroveringen",
-    "A conquered country gives you its production from your next turn on. You can attack as "
-    "often as you like in this phase, as long as you have troops to spare.":
-        "Een veroverd land levert je vanaf je volgende beurt zijn productie op. In deze fase kun je "
-        "zo vaak aanvallen als je wilt, zolang je troepen over hebt.",
+    "Roll the dice": "Dobbelen",
+    "You roll a die for every attacking troop, at most 3 (one stays home); the defender rolls "
+    "up to 2. The highest dice are compared in pairs: the higher one wins, a tie goes to the "
+    "defender, and each loser loses a troop.\n"
+    "Click the green button to roll, then click "
+    "anywhere to see the result.":
+        "Je gooit een dobbelsteen per aanvallende troep, hoogstens 3 (één blijft thuis); de "
+        "verdediger gooit er hoogstens 2. De hoogste stenen worden per paar vergeleken: de "
+        "hoogste wint, bij gelijkspel wint de verdediger, en wie een paar verliest, verliest een "
+        "troep.\n"
+        "Klik op de groene knop om te gooien en klik dan ergens om de uitslag te zien.",
+    "Move in 3 troops": "Trek met 3 troepen in",
+    "{} is yours. Your troops move in, all but one, but this time keep most of them home: "
+    "click {} until {} has 3 (or click {} once: past the most it jumps back to the least). "
+    "Then click the green button.":
+        "{} is van jou. Je troepen trekken erin, op één na allemaal, maar hou er deze keer de "
+        "meeste thuis: klik op {} tot {} er 3 heeft (of klik één keer op {}: voorbij het meeste "
+        "springt het terug naar het minste). Klik dan op de groene knop.",
+    "Attack Brazil": "Val Brazilië aan",
+    "Attack {} from {} the same way: click {}, then {}, roll, and click to see the result.":
+        "Val {} op dezelfde manier aan vanuit {}: klik op {}, dan op {}, gooi, en klik om de "
+        "uitslag te zien.",
+    "Everyone in": "Iedereen erin",
+    "This time move all your troops into {}, leaving {} empty: click {} until {} has none "
+    "left. Then click the green button.":
+        "Zet deze keer al je troepen in {} en laat {} leeg: klik op {} tot er in {} niemand meer "
+        "over is. Klik dan op de groene knop.",
+    "The natives": "De inboorlingen",
+    "Nobody holds {} now, so the natives took it back, with its starting troops. Most native "
+    "countries go back to 2 troops; a few are different, you'll find out about those later.":
+        "Niemand heeft {} nu, dus de inboorlingen hebben het teruggenomen, met de troepen van het "
+        "begin. De meeste landen van de inboorlingen krijgen weer 2 troepen; een paar zijn "
+        "anders, daar kom je later wel achter.",
+    "Attack Peru": "Val Peru aan",
+    "Now attack {} from {}: click {}, then {}, roll, and click to see the result.":
+        "Val nu {} aan vanuit {}: klik op {}, dan op {}, gooi, en klik om de uitslag te zien.",
+    "Move in 5 troops": "Trek met 5 troepen in",
+    "Move 5 troops into {}: click {} or {} until {} has 5, then click the green button.":
+        "Zet 5 troepen in {}: klik op {} of {} tot {} er 5 heeft, en klik dan op de groene knop.",
     "On to moving": "Op naar verplaatsen",
     "Click the orange button to go to the move phase.":
         "Klik op de oranje knop om naar de verplaatsfase te gaan.",
-    "Move troops": "Troepen verplaatsen",
-    "Once per turn you can move troops between two of your countries that are connected "
-    "through your own countries. Click {}, then {}. Click a country to move a troop into it, "
-    "then click the green button.":
-        "Eén keer per beurt kun je troepen verplaatsen tussen twee van je landen die via je eigen "
-        "landen verbonden zijn. Klik op {} en dan op {}. Klik op een land om er een troep heen te "
-        "zetten en klik dan op de groene knop.",
-    "Developing": "Ontwikkelen",
-    "In this phase you can also develop one country per turn (the button at the bottom left). "
-    "You pay what the country produces once; it then gives nothing at your next turn, and "
-    "double from then on (right away if you hold its whole continent).":
-        "In deze fase kun je ook één land per beurt ontwikkelen (de knop linksonder). Je betaalt "
-        "eenmalig wat het land oplevert; bij je volgende beurt levert het dan niets op, en daarna "
-        "voorgoed het dubbele (meteen als je het hele continent hebt).",
+    "Move 2 troops": "Verplaats 2 troepen",
+    "Once per turn you can move troops between two of your countries. Click {}, then {}, then "
+    "click {} twice to move 2 troops there, and click the green button.":
+        "Eén keer per beurt kun je troepen verplaatsen tussen twee van je landen. Klik op {}, dan "
+        "op {}, klik dan twee keer op {} om er 2 troepen heen te zetten, en klik op de groene "
+        "knop.",
+    "Cut off": "Afgesneden",
+    "{} and {} are both yours, but you can't move troops between them: moves only go through "
+    "your own countries, and the way runs through {}, which the natives hold now.":
+        "{} en {} zijn allebei van jou, maar je kunt geen troepen tussen ze verplaatsen: "
+        "verplaatsen gaat alleen via je eigen landen, en de weg loopt via {}, dat nu van de "
+        "inboorlingen is.",
     "End your turn": "Beëindig je beurt",
-    "Click End turn. The bots then play their turns.":
-        "Klik op Einde beurt. Daarna spelen de bots hun beurten.",
-    "The others play": "De anderen spelen",
-    "The bots are playing now. Everything that happens appears at the bottom left: click that "
-    "box to read the whole log.":
-        "De bots spelen nu. Alles wat er gebeurt, verschijnt linksonder: klik op dat vak om het hele "
-        "logboek te lezen.",
-    "Your turn again": "Weer jouw beurt",
-    "Your troops have eaten and your countries delivered their production: see your stock on "
-    "the left. The soldier shows your new troops.":
-        "Je troepen hebben gegeten en je landen hebben hun productie geleverd: zie je voorraad "
-        "links. De soldaat toont je nieuwe troepen.",
-    "Turn order": "Beurtvolgorde",
-    "The boxes at the bottom right show the other players in turn order, the next one on top: "
-    "their stock, their cards and who draws the next world event.":
-        "De vakjes rechtsonder tonen de andere spelers in beurtvolgorde, de volgende bovenaan: "
-        "hun voorraad, hun kaarten en wie de volgende wereldgebeurtenis trekt.",
+    "Click End turn. Then the others play.": "Klik op Einde beurt. Daarna spelen de anderen.",
+    "Green's turn": "Groen is aan de beurt",
+    "Green places 3 troops and a ship in {}, crosses the sea to attack {} and moves in, "
+    "leaving 1 troop in {}.":
+        "Groen zet 3 troepen en een schip in {}, steekt de zee over om {} aan te vallen en trekt "
+        "erin, met 1 troep achter in {}.",
+    "Red's turn": "Rood is aan de beurt",
+    "Red adds 3 troops to {} and ends its turn.":
+        "Rood zet 3 troepen bij in {} en beëindigt zijn beurt.",
+    "Over the sea": "Over zee",
+    "The dotted blue lines are sea routes. You can't cross them without something to carry "
+    "your troops over the water: a ship, or a plane.":
+        "De blauwe stippellijnen zijn zeeroutes. Die kun je niet over zonder iets om je troepen "
+        "over het water te brengen: een schip, of een vliegtuig.",
+    "Buy a ship": "Koop een schip",
+    "Your first ship is free. Open the shop, click the ship, click the green button and then "
+    "click {} to put it there.":
+        "Je eerste schip is gratis. Open de winkel, klik op het schip, klik op de groene knop en "
+        "klik dan op {} om het daar te zetten.",
+    "Put your 3 new troops in {} too.": "Zet je 3 nieuwe troepen ook in {}.",
+    "A chance": "Een kans",
+    "Green is spread thin: 1 troop in {}, 1 in {} and 4 in {}. If you bring your troops "
+    "together, you can eliminate green this turn.":
+        "Groen is dun verspreid: 1 troep in {}, 1 in {} en 4 in {}. Als je je troepen "
+        "samenbrengt, kun je groen deze beurt uitschakelen.",
+    "Retake Venezuela": "Herover Venezuela",
+    "First attack {} from {}. When it's yours, move in all your troops but one.":
+        "Val eerst {} aan vanuit {}. Is het van jou, zet er dan al je troepen op één na in.",
+    "Rails": "Spoorwegen",
+    "Rails let your troops ride from country to country in one go. Open the shop, pick the "
+    "rails (2 wood, 1 steel), click the green button, then click {} and {}.":
+        "Over spoorwegen rijden je troepen in één keer van land naar land. Open de winkel, kies "
+        "de spoorweg (2 hout, 1 staal), klik op de groene knop en klik dan op {} en {}.",
+    "More rails": "Meer spoorwegen",
+    "Now lay rails from {} to {} the same way.":
+        "Leg nu op dezelfde manier een spoorweg van {} naar {}.",
+    "Take the train": "Neem de trein",
+    "Click {}, then the train button at the bottom left (1 oil). Right-click {} and {} to "
+    "take their troops out, leaving 1 in each, and left-click {} to put them all there. Then "
+    "click the green button.":
+        "Klik op {} en dan op de treinknop linksonder (1 olie). Klik met rechts op {} en {} om "
+        "hun troepen eruit te halen, met 1 achter in elk, en klik met links op {} om ze daar "
+        "allemaal neer te zetten. Klik dan op de groene knop.",
+    "Across to Cuba": "Over naar Cuba",
+    "Attack {} from {}: your ship carries the troops across. When it's yours, move every "
+    "troop in and leave {} empty: keeping all your troops together gives the best chance to "
+    "eliminate green this turn.":
+        "Val {} aan vanuit {}: je schip brengt de troepen over. Is het van jou, zet er dan elke "
+        "troep in en laat {} leeg: met al je troepen bij elkaar heb je de beste kans om groen "
+        "deze beurt uit te schakelen.",
+    "On to New York": "Op naar New York",
+    "Attack {} from {}, and again move everyone in, leaving {} empty.":
+        "Val {} aan vanuit {} en zet er weer iedereen in, zodat {} leeg blijft.",
+    "Take London": "Neem Londen in",
+    "Attack {}, green's last country, from {}. Roll until it's yours, then click the green "
+    "button to move in.":
+        "Val {}, het laatste land van groen, aan vanuit {}. Gooi tot het van jou is en klik dan "
+        "op de groene knop om erin te trekken.",
+    "Green is out": "Groen ligt eruit",
+    "Taking a player's last country eliminates them, and you get their cards, wood, steel, "
+    "oil and nuclear: 3 cards, 40 steel, 4 oil and 10 wood.":
+        "Wie het laatste land van een speler verovert, schakelt die uit en krijgt zijn kaarten, "
+        "hout, staal, olie en nucleair: 3 kaarten, 40 staal, 4 olie en 10 hout.",
+    "Sail back": "Vaar terug",
+    "Move your ship and troops back to {}: click {}, then {}, and click {} until {} has 1 "
+    "left. Then pick the ship at the top, click {} once and click the green button.":
+        "Breng je schip en troepen terug naar {}: klik op {}, dan op {}, en klik op {} tot {} er "
+        "nog 1 heeft. Kies dan bovenaan het schip, klik één keer op {} en klik op de groene knop.",
+    "Click End turn.": "Klik op Einde beurt.",
+    "Red adds 3 more troops to {}: 12 now, behind its fort.":
+        "Rood zet nog 3 troepen bij in {}: nu 12, achter zijn fort.",
+    "A new card": "Een nieuwe kaart",
+    "Conquering a country of another player earns you a card at the end of your turn. With "
+    "green's 3 cards you now hold 4.":
+        "Wie een land van een andere speler verovert, krijgt aan het eind van zijn beurt een "
+        "kaart. Met de 3 kaarten van groen heb je er nu 4.",
+    "Put your 3 new troops in {}.": "Zet je 3 nieuwe troepen in {}.",
+    "Buy a plane": "Koop een vliegtuig",
+    "A plane carries troops across the sea, for 1 oil per attack, and makes its country an "
+    "airport. Buy one (10 steel) and put it in {}.":
+        "Een vliegtuig brengt troepen over zee, voor 1 olie per aanval, en maakt van zijn land "
+        "een luchthaven. Koop er een (10 staal) en zet het in {}.",
+    "Buy a tank": "Koop een tank",
+    "A tank adds 1 to your highest die when you attack, for 1 oil per attack. Buy one (20 "
+    "steel) and put it in {}.":
+        "Een tank telt 1 op bij je hoogste dobbelsteen als je aanvalt, voor 1 olie per aanval. "
+        "Koop er een (20 staal) en zet hem in {}.",
+    "Trade cards": "Ruil kaarten",
+    "Three different cards make a set worth 10. Open your cards (the set is selected), click "
+    "the green button and take 10 nuclear: you'll need it later.":
+        "Drie verschillende kaarten vormen een set van 10. Open je kaarten (de set is al "
+        "geselecteerd), klik op de groene knop en neem 10 nucleair: dat heb je straks nodig.",
+    "The fort": "Het fort",
+    "{} has a fort: it adds 1 to every die red defends with, and 12 troops stand behind it. "
+    "That will be a hard fight.":
+        "{} heeft een fort: het telt 1 op bij elke dobbelsteen waarmee rood verdedigt, en er "
+        "staan 12 troepen achter. Dat wordt een zware strijd.",
+    "Gather by rail": "Verzamel per trein",
+    "First bring your troops in South America together: click {}, then the train button, "
+    "right-click {} and left-click {}. Then click the green button.":
+        "Breng eerst je troepen in Zuid-Amerika samen: klik op {}, dan op de treinknop, klik met "
+        "rechts op {} en met links op {}. Klik dan op de groene knop.",
+    "Fly to London": "Vlieg naar Londen",
+    "Planes link your airports, {} and {}. Click {}, then the plane button (1 oil). "
+    "Right-click {} until it's empty, pick the tank at the top and right-click {} again; then "
+    "left-click {} for both, and click the green button.":
+        "Vliegtuigen verbinden je luchthavens, {} en {}. Klik op {} en dan op de vliegtuigknop (1 "
+        "olie). Klik met rechts op {} tot het leeg is, kies bovenaan de tank en klik weer met "
+        "rechts op {}; klik dan voor allebei met links op {}, en klik op de groene knop.",
+    "Nuke Viking": "Bombardeer Viking",
+    "A nuke kills half the troops of a country next to yours. Buy one in the shop (5 nuclear) "
+    "and click {}. Then do it once more.":
+        "Een atoombom doodt de helft van de troepen van een land naast het jouwe. Koop er een in "
+        "de winkel (5 nucleair) en klik op {}. Doe het daarna nog een keer.",
+    "Fallout": "Neerslag",
+    "Two nukes brought {} from 12 troops down to 3. And while it's radioactive (3 turns per "
+    "nuke) it produces nothing.":
+        "Twee atoombommen brachten {} van 12 troepen terug naar 3. En zolang het radioactief is "
+        "(3 beurten per bom) levert het niets op.",
+    "Attack Viking": "Val Viking aan",
+    "Attack {} from {}: the plane carries your troops across (1 oil) and the tank adds 1 to "
+    "your highest die (1 oil). Roll until it's yours, then move all your troops in.":
+        "Val {} aan vanuit {}: het vliegtuig brengt je troepen over (1 olie) en de tank telt 1 op "
+        "bij je hoogste dobbelsteen (1 olie). Gooi tot het van jou is en zet er dan al je troepen "
+        "in.",
+    "Out of oil": "Geen olie meer",
+    "Red's last country, {}, lies across the sea, and your oil is gone: the plane can't take "
+    "your troops over.":
+        "Het laatste land van rood, {}, ligt aan de overkant van de zee, en je olie is op: het "
+        "vliegtuig kan je troepen niet overbrengen.",
+    "Build a bridge": "Bouw een brug",
+    "A bridge turns a sea route into a land route. Buy one (10 wood), then click {} and {}.":
+        "Een brug maakt van een zeeroute een landroute. Koop er een (10 hout) en klik dan op {} "
+        "en {}.",
+    "Eliminate red": "Schakel rood uit",
+    "Attack {} from {} over your bridge, and win the game!":
+        "Val {} aan vanuit {}, over je brug, en win het spel!",
+    "Next": "Volgende",
+    "End tutorial": "Tutorial stoppen",
+    "Part {} of {}": "Deel {} van {}",
+    "Exit to title": "Naar titelscherm",
+    " placed {} troops in {}": " zette {} troepen in {}",
+    # (used outside the tutorial)
     "skips": "slaat over",
-    "World events": "Wereldgebeurtenissen",
-    "Every few turns a world event is drawn: a card that changes the rules for a full round, "
-    "such as income, attacks or prices. The event button shows the active one and when the "
-    "next one comes. In this tutorial they were held back.":
-        "Om de paar beurten wordt een wereldgebeurtenis getrokken: een kaart die een volle ronde de "
-        "regels verandert, zoals de inkomsten, aanvallen of prijzen. De gebeurtenisknop toont de "
-        "actieve en wanneer de volgende komt. In deze tutorial werden ze tegengehouden.",
-    "More to discover": "Meer te ontdekken",
-    "Rails let your troops travel far through your own countries. A bridge turns a sea route "
-    "into a land route. Planes cross the sea for 1 oil, and give their country an airport. A "
-    "nuke halves the troops of a country next to yours, which then produces nothing for 3 "
-    "turns.":
-        "Over spoorwegen reizen je troepen ver door je eigen landen. Een brug maakt van een zeeroute "
-        "een landroute. Vliegtuigen steken de zee over voor 1 olie en geven hun land een luchthaven. "
-        "Een atoombom halveert de troepen van een land naast het jouwe, dat daarna 3 beurten niets "
-        "oplevert.",
-    "Winning": "Winnen",
-    "Take a player's last country and they're out: you get their wood, steel, oil, nuclear "
-    "and cards. The last player left wins the game.":
-        "Verover het laatste land van een speler en die ligt eruit: jij krijgt zijn hout, staal, "
-        "olie, nucleair en kaarten. De laatste speler die overblijft, wint.",
-    "That's it!": "Dat was het!",
-    "You know the basics. Play on against the two bots in this game; world events are on from "
-    "now. You can leave through the settings (top left): Exit Game.":
-        "Je kent nu de basis. Speel verder tegen de twee bots in dit spel; vanaf nu doen "
-        "wereldgebeurtenissen mee. Stoppen kan via de instellingen (linksboven): Spel verlaten.",
 }
 
 
