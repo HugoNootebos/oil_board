@@ -273,7 +273,7 @@ NL = {
     "wood": "hout",
     "steel": "staal",
     "oil": "olie",
-    "nuclear": "nucleair",
+    "nuclear": "uranium",
     "troops": "troepen",
     "cards": "kaarten",
     "ships": "schepen",
@@ -466,16 +466,28 @@ NL = {
         "van de inboorlingen. Je wint door beide andere spelers uit te schakelen.",
     "Your stock": "Je voorraad",
     "The panel on the left shows your stock: food, wood, steel, oil, uranium and troop "
-    "production. The number in brackets is what comes in at your next turn. Every troop eats "
-    "1 food at the start of your turn.":
+    "production. The number in brackets is what you produce at the start of every turn. Food "
+    "has two brackets: one for how much your army consumes every turn (= size of your army) "
+    "and one for how much you produce.\n"
+    "Be careful because in this game you have to feed your troops before you receive your "
+    "production, so if you end your turn with less food than you have units on the board "
+    "some of them will starve at the start of your next turn.":
         "Het paneel links toont je voorraad: voedsel, hout, staal, olie, uranium en "
-        "troepenproductie. Het getal tussen haakjes is wat er bij je volgende beurt bijkomt. Elke "
-        "troep eet 1 voedsel aan het begin van je beurt.",
+        "troepenproductie. Het getal tussen haakjes is wat je aan het begin van elke beurt "
+        "produceert. Voedsel heeft twee getallen tussen haakjes: een voor hoeveel je leger elke "
+        "beurt eet (= de grootte van je leger) en een voor hoeveel je produceert.\n"
+        "Let op: in dit spel voed je eerst je troepen en krijg je pas daarna je productie. Eindig "
+        "je je beurt met minder voedsel dan je troepen op het bord hebt, dan verhongeren er een "
+        "paar aan het begin van je volgende beurt.",
     "Place your troops": "Plaats je troepen",
-    "Every turn brings new troops: 3 this time (the soldier at the bottom left). Left-click "
-    "{} three times to place them.":
-        "Elke beurt brengt nieuwe troepen: deze keer 3 (de soldaat linksonder). Klik drie keer "
-        "met links op {} om ze te plaatsen.",
+    "After feeding your troops you receive new ones. How many you get is determined by the "
+    "total number of helmets your countries provide, with every helmet being 1/3 troop. On top "
+    "of that everyone always gets 3 bonus troops every round, so even if you have less than 3 "
+    "helmets you still get fresh armies. Left-click {} three times to place your recruits.":
+        "Nadat je troepen gegeten hebben, krijg je er nieuwe bij. Hoeveel, hangt af van het totale "
+        "aantal helmen dat je landen opleveren: elke helm is 1/3 troep. Daarbovenop krijgt "
+        "iedereen elke ronde altijd 3 extra troepen, dus ook met minder dan 3 helmen krijg je "
+        "verse legers. Klik drie keer met links op {} om je rekruten te plaatsen.",
     "On to the attack": "Op naar de aanval",
     "Click the red button to go to the attack phase.":
         "Klik op de rode knop om naar de aanvalsfase te gaan.",
@@ -483,21 +495,29 @@ NL = {
     "Click {} to attack from it, then {} to attack it.":
         "Klik op {} om ervandaan aan te vallen en dan op {} om dat aan te vallen.",
     "Roll the dice": "Dobbelen",
-    "You roll a die for every attacking troop, at most 3 (one stays home); the defender rolls "
-    "up to 2. The highest dice are compared in pairs: the higher one wins, a tie goes to the "
-    "defender, and each loser loses a troop.\n"
-    "Click the green button to roll, then click "
-    "anywhere to see the result.":
-        "Je gooit een dobbelsteen per aanvallende troep, hoogstens 3 (één blijft thuis); de "
-        "verdediger gooit er hoogstens 2. De hoogste stenen worden per paar vergeleken: de "
-        "hoogste wint, bij gelijkspel wint de verdediger, en wie een paar verliest, verliest een "
-        "troep.\n"
-        "Klik op de groene knop om te gooien en klik dan ergens om de uitslag te zien.",
-    "Move in 3 troops": "Trek met 3 troepen in",
-    "{} is yours. Now you get to choose how many troops to move in. Click on {} or {} until "
+    "For every unit in the country you are attacking from you can roll a die (at most 3). The "
+    "defender has the same but can only roll up to 2 dice. The highest attack die is compared "
+    "to the highest defense die and the highest one wins. Ties are won by the defense. The "
+    "same is done for the second highest dice (if possible). Each die that loses reduces the "
+    "army by one.\n"
+    "Select how many dice you want to roll in this battle (3 is the smartest in this case but "
+    "feel free to play around) and then click the green button.":
+        "Voor elke troep in het land waaruit je aanvalt, mag je een dobbelsteen gooien "
+        "(hoogstens 3). De verdediger ook, maar die gooit er hoogstens 2. De hoogste "
+        "aanvalssteen wordt vergeleken met de hoogste verdedigingssteen en de hoogste wint. Bij "
+        "gelijkspel wint de verdediging. Hetzelfde gebeurt met de op één na hoogste stenen (als "
+        "dat kan). Elke steen die verliest, kost zijn leger één troep.\n"
+        "Kies met hoeveel dobbelstenen je in dit gevecht wilt gooien (3 is hier het slimst, maar "
+        "probeer gerust wat uit) en klik dan op de groene knop.",
+    "Move into Mexico": "Trek Mexico in",
+    "{} is yours. Now you get to choose how many troops to move in. {} Click on {} or {} until "
     "only 3 troops move into {}, then click the green button to confirm.":
-        "{} is van jou. Nu kies je hoeveel troepen erin trekken. Klik op {} of {} tot er nog maar "
-        "3 troepen {} in trekken, en klik dan op de groene knop om te bevestigen.",
+        "{} is van jou. Nu kies je hoeveel troepen erin trekken. {} Klik op {} of {} tot er nog "
+        "maar 3 troepen {} in trekken, en klik dan op de groene knop om te bevestigen.",
+    "Since you rolled with 1 die, you must move in at least 1 troop.":
+        "Omdat je met 1 dobbelsteen gooide, moet je er minstens 1 troep in zetten.",
+    "Since you rolled with {} dice, you must move in at least {} troops.":
+        "Omdat je met {} dobbelstenen gooide, moet je er minstens {} troepen in zetten.",
     "Attack Brazil": "Val Brazilië aan",
     "Attack {} from {} the same way: click {}, then {}, roll, and click to see the result.":
         "Val {} op dezelfde manier aan vanuit {}: klik op {}, dan op {}, gooi, en klik om de "
@@ -509,9 +529,15 @@ NL = {
         "over is. Klik dan op de groene knop.",
     "The natives": "De inboorlingen",
     "Nobody holds {} now, so the natives took it back. Most native countries go back to 2 "
-    "troops; a few are different, you'll find out about those later.":
+    "troops; a few are different. Countries that produce 3 or less resources have only 1 "
+    "native defender.\n"
+    "Have a look around the map to see for yourself. When you hover your mouse over a "
+    "country you will see a panel appear on the top right with the resources it produces.":
         "Niemand heeft {} nu, dus de inboorlingen hebben het teruggenomen. De meeste landen van de "
-        "inboorlingen krijgen weer 2 troepen; een paar zijn anders, daar kom je later wel achter.",
+        "inboorlingen krijgen weer 2 troepen; een paar zijn anders. Landen die 3 of minder "
+        "grondstoffen opleveren, hebben maar 1 inboorling als verdediger.\n"
+        "Kijk zelf maar eens rond op de kaart. Als je met je muis boven een land hangt, verschijnt "
+        "rechtsboven een paneel met de grondstoffen die het oplevert.",
     "Attack Peru": "Val Peru aan",
     "Now attack {} from {}: click {}, then {}, roll, and click to see the result.":
         "Val nu {} aan vanuit {}: klik op {}, dan op {}, gooi, en klik om de uitslag te zien.",
@@ -594,10 +620,9 @@ NL = {
         "op de groene knop om erin te trekken.",
     "Green is out": "Groen ligt eruit",
     "Taking a player's last country eliminates them, and you get their cards, wood, steel, "
-    "oil and uranium, but not their food: 3 cards, 40 steel, 4 oil and 10 wood.":
+    "oil and uranium, but not their food.":
         "Wie het laatste land van een speler verovert, schakelt die uit en krijgt zijn kaarten, "
-        "hout, staal, olie en uranium, maar niet zijn voedsel: 3 kaarten, 40 staal, 4 olie en 10 "
-        "hout.",
+        "hout, staal, olie en uranium, maar niet zijn voedsel.",
     "Sail back": "Vaar terug",
     "Move your ship and troops back to {}: click {}, then {}, and click {} until {} has 1 "
     "left. Then pick the ship at the top, click {} once and click the green button.":
@@ -659,10 +684,10 @@ NL = {
         "eens met rechts op {} om ook de tank weg te halen. Klik met links op {} om de tank en de "
         "troepen neer te zetten.",
     "Nuke Viking": "Bombardeer Viking",
-    "A nuke kills half the troops of a country adjacent to yours. Buy one in the shop (5 nuclear) "
+    "A nuke kills half the troops of a country adjacent to yours. Buy one in the shop (5 uranium) "
     "and click {}. Then do it once more.":
         "Een atoombom doodt de helft van de troepen van een land dat aan het jouwe grenst. Koop er "
-        "een in de winkel (5 nucleair) en klik op {}. Doe het daarna nog een keer.",
+        "een in de winkel (5 uranium) en klik op {}. Doe het daarna nog een keer.",
     "Fallout": "Neerslag",
     "Two nukes brought {} from 12 troops down to 3. And while it's radioactive (3 turns per "
     "nuke) it produces nothing.":
@@ -688,16 +713,21 @@ NL = {
     "Before you roll, the button at the top with a ship, a plane and a tank lets you choose "
     "which of them come along into the fight. What you bring moves into the country you "
     "conquer, but it's destroyed if you roll 1 or 2 dice and lose them all. Without oil your "
-    "tank adds nothing to your dice, so you could leave it at home.":
+    "tank adds nothing to your dice, so leave it at home: click {}, then {}, then that button "
+    "at the top.":
         "Voor je gooit, kies je met de knop bovenaan met een schip, een vliegtuig en een tank "
         "welke ervan meegaan in het gevecht. Wat je meeneemt, trekt mee het veroverde land in, "
         "maar gaat verloren als je met 1 of 2 dobbelstenen gooit en ze allemaal verliest. Zonder "
-        "olie telt je tank niets op bij je dobbelstenen, dus je kunt hem ook thuislaten.",
+        "olie telt je tank niets op bij je dobbelstenen, dus laat hem thuis: klik op {}, dan op "
+        "{} en dan op die knop bovenaan.",
+    "Leave the tank": "Laat de tank thuis",
+    "Click the red minus next to the tank until it says 0, then click anywhere to close this "
+    "panel.":
+        "Klik op het rode min-teken naast de tank tot er 0 staat en klik dan ergens om dit "
+        "paneel te sluiten.",
     "Attack {} from {} by crossing your bridge, and win the game!":
         "Val {} aan vanuit {} door over je brug te gaan, en win het spel!",
     "Next": "Volgende",
-    "End tutorial": "Tutorial stoppen",
-    "Part {} of {}": "Deel {} van {}",
     "Exit to title": "Naar titelscherm",
     " placed {} troops in {}": " zette {} troepen in {}",
     # (used outside the tutorial)
@@ -710,6 +740,9 @@ NL = {
 EN = {
     # Menus
     "De 3 Neven": "The 3 Cousins",
+
+    # The resource "nuclear" (its name in the code) is called uranium on screen.
+    "nuclear": "uranium",
 
     # Cards
     "Menneke": "Soldier",

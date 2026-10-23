@@ -17,9 +17,8 @@ unless it asks for them. So that the story always goes the same way, the
 player's attacks always win (`_rig_dice`), and green and red are played by
 the tutorial itself (`_npc_update` stands in for the bot's update).
 
-World events are held back while the tutorial runs. End tutorial goes
-back to the title screen. Its autosaves go to a temporary file, so the
-player's own autosave stays as it was.
+World events are held back while the tutorial runs. Its autosaves go to
+a temporary file, so the player's own autosave stays as it was.
 
 runner.play calls `handle_input` right after `Engine.io_handle` and `draw`
 right before `Engine.present`.
@@ -71,6 +70,7 @@ FOCUS = {
     "route": (185, 225, 1.6),
     "atlantic": (205, 215, 1.6, (313, 400)),  # (left of the panel)
     "europe": (300, 140, 2.0),
+    "europe_left": (300, 140, 2.0, (313, 400)),  # (left of a tall panel)
 }
 
 PANEL_COLOR = (255, 248, 225)
@@ -121,8 +121,9 @@ def _set_board(app):
 class Step:
     """One page of the tutorial, in part `part` (1-9): a title and a text
     (English source, through t(); "{}" in it are the country names `names`,
-    translated). `done(tu)`: the step waits until it returns True (None: a
-    page to read, with a Next button). `marks`: what's ringed on the screen,
+    translated; a function of the Tutorial there gives its own text).
+    `done(tu)`: the step waits until it returns True (None: a page to read,
+    with a Next button). `marks`: what's ringed on the screen,
     keys of Tutorial._shapes or country names, or a function of the Tutorial
     returning them. `hold(tu, point)`: True for a click the step holds back
     (see _hold). `phases`/`end_turn`: whether the phase buttons / End turn
@@ -179,6 +180,14 @@ def _won(target):
 def _moved_in(target):
     """`target` is conquered and moving in has been confirmed."""
     return lambda tu: _mine(tu, target) and not (tu.player.attack == 1 and tu.player.subattack == 5)
+
+
+def _least_in(tu):
+    """The sentence on how many troops must move in: as many as the dice
+    of the roll that conquered the country (AttackPhase.conquest_units)."""
+    dice = tu.app.turn_manager.phases[1].conquest_units
+    return t("Since you rolled with 1 die, you must move in at least 1 troop." if dice == 1
+             else "Since you rolled with {} dice, you must move in at least {} troops.").format(dice, dice)
 
 
 def _phase(n):
@@ -284,6 +293,30 @@ def _transfer_marks(origin, button, countries, tank=False):
     return marks
 
 
+def _tank_left(tu):
+    """The attack on Sovjet-Rusland is lined up with the tank left at home."""
+    attack = tu.app.turn_manager.phases[1]
+    return (tu.player.attack == 1 and tu.player.subattack == 2 and attack.defence_country == SOV
+            and attack.selected_tanks == 0)
+
+
+def _tank_hold(tu, point):
+    """As _hold(only=[VIK, SOV]), and the roll waits until the tank stays home."""
+    attack = tu.app.turn_manager.phases[1]
+    if tu.player.attack == 1 and tu.player.subattack == 2 and attack.selected_tanks > 0             and pg.Rect(*image_button_shape(Phase.CONFIRM_X, Phase.ROW_Y)[1:]).collidepoint(point):
+        return True
+    return _hold(only=[VIK, SOV])(tu, point)
+
+
+def _tank_marks(tu):
+    sub = tu.player.subattack if tu.player.attack == 1 else None
+    if sub == 2:
+        return ["assets_button"]
+    if sub == 6:
+        return ["tank_minus"] if tu.app.turn_manager.phases[1].selected_tanks > 0 else []
+    return _attack_marks(VIK, SOV)(tu)
+
+
 def _card_marks(tu):
     menu = tu.app.card_menu
     if menu.trade_mode:
@@ -299,12 +332,18 @@ STEPS = [
          marks=[VEN, CUBA, NY, VIK, SOV], focus="all"),
     Step(1, "Your stock",
          "The panel on the left shows your stock: food, wood, steel, oil, uranium and troop "
-         "production. The number in brackets is what comes in at your next turn. Every troop eats "
-         "1 food at the start of your turn.",
+         "production. The number in brackets is what you produce at the start of every turn. Food "
+         "has two brackets: one for how much your army consumes every turn (= size of your army) "
+         "and one for how much you produce.\n"
+         "Be careful because in this game you have to feed your troops before you receive your "
+         "production, so if you end your turn with less food than you have units on the board "
+         "some of them will starve at the start of your next turn.",
          marks=["player_panel"], focus="south"),
     Step(1, "Place your troops",
-         "Every turn brings new troops: 3 this time (the soldier at the bottom left). Left-click {} "
-         "three times to place them.",
+         "After feeding your troops you receive new ones. How many you get is determined by the "
+         "total number of helmets your countries provide, with every helmet being 1/3 troop. On top "
+         "of that everyone always gets 3 bonus troops every round, so even if you have less than 3 "
+         "helmets you still get fresh armies. Left-click {} three times to place your recruits.",
          names=[VEN], done=_deployed, hold=_hold(only=[VEN]), marks=["soldier", VEN]),
     Step(1, "On to the attack",
          "Click the red button to go to the attack phase.",
@@ -315,15 +354,18 @@ STEPS = [
          "Click {} to attack from it, then {} to attack it.",
          names=[VEN, MEX], done=_picked(MEX), hold=_hold(only=[VEN, MEX]), marks=_attack_marks(VEN, MEX)),
     Step(2, "Roll the dice",
-         "You roll a die for every attacking troop, at most 3 (one stays home); the defender rolls "
-         "up to 2. The highest dice are compared in pairs: the higher one wins, a tie goes to the "
-         "defender, and each loser loses a troop.\n"
-         "Click the green button to roll, then click anywhere to see the result.",
+         "For every unit in the country you are attacking from you can roll a die (at most 3). The "
+         "defender has the same but can only roll up to 2 dice. The highest attack die is compared "
+         "to the highest defense die and the highest one wins. Ties are won by the defense. The "
+         "same is done for the second highest dice (if possible). Each die that loses reduces the "
+         "army by one.\n"
+         "Select how many dice you want to roll in this battle (3 is the smartest in this case but "
+         "feel free to play around) and then click the green button.",
          done=_won(MEX), hold=_hold(only=[VEN, MEX]), marks=_attack_marks(VEN, MEX)),
-    Step(2, "Move in 3 troops",
-         "{} is yours. Now you get to choose how many troops to move in. Click on {} or {} until "
+    Step(2, "Move into Mexico",
+         "{} is yours. Now you get to choose how many troops to move in. {} Click on {} or {} until "
          "only 3 troops move into {}, then click the green button to confirm.",
-         names=[MEX, VEN, MEX, MEX], done=_moved_in(MEX),
+         names=[MEX, _least_in, VEN, MEX, MEX], done=_moved_in(MEX),
          hold=_hold(only=[VEN, MEX], confirm=lambda tu: _units(MEX)(tu) == 3), marks=_attack_marks(VEN, MEX)),
     Step(2, "Attack Brazil",
          "Attack {} from {} the same way: click {}, then {}, roll, and click to see the result.",
@@ -336,7 +378,10 @@ STEPS = [
          hold=_hold(only=[VEN, BRA], confirm=lambda tu: _units(VEN)(tu) == 0), marks=_attack_marks(VEN, BRA)),
     Step(2, "The natives",
          "Nobody holds {} now, so the natives took it back. Most native countries go back to 2 "
-         "troops; a few are different, you'll find out about those later.",
+         "troops; a few are different. Countries that produce 3 or less resources have only 1 "
+         "native defender.\n"
+         "Have a look around the map to see for yourself. When you hover your mouse over a "
+         "country you will see a panel appear on the top right with the resources it produces.",
          names=[VEN], marks=[VEN]),
     Step(2, "Attack Peru",
          "Now attack {} from {}: click {}, then {}, roll, and click to see the result.",
@@ -431,7 +476,7 @@ STEPS = [
          hold=_hold(only=[NY, LON], confirm=lambda tu: _units(NY)(tu) >= 1), marks=_attack_marks(NY, LON)),
     Step(6, "Green is out",
          "Taking a player's last country eliminates them, and you get their cards, wood, steel, oil "
-         "and uranium, but not their food: 3 cards, 40 steel, 4 oil and 10 wood.",
+         "and uranium, but not their food.",
          marks=["player_panel"]),
     Step(6, "On to moving",
          "Click the orange button to go to the move phase.",
@@ -504,7 +549,7 @@ STEPS = [
                     and tu.app.countries[VEN].tanks == 0),
          marks=_transfer_marks(VEN, "plane_button", [VEN, LON], tank=True)),
     Step(9, "Nuke Viking",
-         "A nuke kills half the troops of a country adjacent to yours. Buy one in the shop (5 nuclear) "
+         "A nuke kills half the troops of a country adjacent to yours. Buy one in the shop (5 uranium) "
          "and click {}. Then do it once more.",
          names=[VIK], done=lambda tu: tu.app.countries[VIK].radioactive >= 6 and tu.player.attack != 3,
          hold=_hold(only=[VIK]), marks=_shop_marks("nuke_card", VIK), focus="europe"),
@@ -530,14 +575,19 @@ STEPS = [
          "Before you roll, the button at the top with a ship, a plane and a tank lets you choose "
          "which of them come along into the fight. What you bring moves into the country you "
          "conquer, but it's destroyed if you roll 1 or 2 dice and lose them all. Without oil your "
-         "tank adds nothing to your dice, so you could leave it at home.",
-         marks=[VIK]),
+         "tank adds nothing to your dice, so leave it at home: click {}, then {}, then that button "
+         "at the top.",
+         names=[VIK, SOV], done=lambda tu: _tank_left(tu) or (tu.player.attack == 1 and tu.player.subattack == 6),
+         hold=_tank_hold, marks=_tank_marks, focus="europe_left"),
+    Step(9, "Leave the tank",
+         "Click the red minus next to the tank until it says 0, then click anywhere to close this "
+         "panel.",
+         done=_tank_left, hold=_tank_hold, marks=_tank_marks),
     Step(9, "Eliminate red",
          "Attack {} from {} by crossing your bridge, and win the game!",
          names=[SOV, VIK], done=lambda tu: tu.app.turn_manager.game_over,
          hold=_hold(only=[VIK, SOV]), marks=_attack_marks(VIK, SOV)),
 ]
-PARTS = 9
 
 
 class Tutorial:
@@ -559,7 +609,6 @@ class Tutorial:
         self._npc_turns = {GREEN: 0, RED: 0}
         self.title_font = game_font(24, bold=True)
         self.font = game_font(18)
-        self.small_font = game_font(16)
         manager = app.turn_manager
         # No world events during the tutorial; green and red play the
         # tutorial's script (finish puts both back).
@@ -733,6 +782,10 @@ class Tutorial:
             buttons = app._event_button()
             left = buttons.pos.x + buttons.width + 2 * GAP
             return left, GAP, right - left
+        if player.attack == 1 and player.subattack == 6 and app.players[app.turn] is player:
+            # Right of the attack's asset panel (AttackPhase._select_asset_transport).
+            left = app.view.WIDTH // 2 + 220 + GAP
+            return left, SHOP_SPOT[1], app.view.WIDTH - GAP - left
         if player.attack == 1 and player.subattack == 2 and app.players[app.turn] is player:
             # Below the dice screen's Assets button (AttackPhase._choose_dice_count).
             return right - WIDTH, 12 + Phase.ASSETS_BUTTON_SIZE + GAP, WIDTH
@@ -746,9 +799,8 @@ class Tutorial:
             self._enter()
 
     def finish(self):
-        """The tutorial is over (the game won, or End tutorial, which then goes
-        back to the title screen): the panel goes, and the held-back world
-        events and green's and red's script are undone."""
+        """The tutorial is over (the game is won): the panel goes, and the
+        held-back world events and green's and red's script are undone."""
         self.active = False
         manager = self.app.turn_manager
         manager.__dict__.pop("_update_event_schedule", None)
@@ -792,10 +844,7 @@ class Tutorial:
             io.right_clicked = False
 
     def _press(self, name):
-        if name == "end":
-            self.finish()
-            self.app.pending_quit = True  # back to the title screen (runner.play)
-        elif name == "next":
+        if name == "next":
             self._next()
 
     # --- drawing -------------------------------------------------------------------------
@@ -856,6 +905,13 @@ class Tutorial:
             return [("c", gui.phase_button_center(view, index), gui.phase_button_radius)]
         if key == "end_turn":
             return [("r", gui.end_turn_rect(view))]
+        if key == "assets_button":
+            # AttackPhase._choose_dice_count's Assets button.
+            size = Phase.ASSETS_BUTTON_SIZE
+            return [("r", pg.Rect(view.WIDTH - 350, 12, size, size))]
+        if key == "tank_minus":
+            # The tank row's minus in AttackPhase._select_asset_transport.
+            return [("r", pg.Rect(view.WIDTH // 2 - 220 + 340, view.HEIGHT // 2 - 160 + 50 + 2 * 52, 30, 30))]
         if key == "confirm":
             return [("r", pg.Rect(*image_button_shape(Phase.CONFIRM_X, Phase.ROW_Y)[1:]))]
         if key == "soldier":
@@ -905,21 +961,21 @@ class Tutorial:
         x, y, width = self._panel_spot()
         inner = width - 2 * PAD
 
-        title = TurnManager._wrap_text(t(step.title), self.title_font, inner - 70)
-        text = t(step.text).format(*(t(name) for name in step.names))
+        title = TurnManager._wrap_text(t(step.title), self.title_font, inner)
+        text = t(step.text).format(*(name(self) if callable(name) else t(name) for name in step.names))
         paragraphs = [TurnManager._wrap_text(part, self.font, inner) for part in text.split("\n")]
         line_h = self.font.get_height() + 2
         title_h = len(title) * (self.title_font.get_height() + 2)
         body_h = sum(len(lines) * line_h for lines in paragraphs) + 8 * (len(paragraphs) - 1)
         button_h = 34
-        height = PAD + title_h + 10 + body_h + 16 + button_h + PAD
+        # Next on a page to read (on green's or red's turn: once their moves are done).
+        with_next = step.done is None and (step.npc is None or self.npc_waiting())
+        height = PAD + title_h + 10 + body_h + (16 + button_h if with_next else 0) + PAD - 8
         panel = pg.Rect(x, y, width, height)
         self._panel = panel
 
         pg.draw.rect(screen, PANEL_COLOR, panel, border_radius=8)
         pg.draw.rect(screen, (0, 0, 0), panel, 3, border_radius=8)
-        count = self.small_font.render(t("Part {} of {}").format(step.part, PARTS), True, (120, 110, 90))
-        screen.blit(count, (panel.right - PAD - count.get_width(), y + PAD + 2))
         top = y + PAD
         for line in title:
             screen.blit(self.title_font.render(line, True, (0, 0, 0)), (x + PAD, top))
@@ -931,18 +987,12 @@ class Tutorial:
                 top += line_h
             top += 8
 
-        # Next on a page to read (on green's or red's turn: once their moves
-        # are done); End tutorial always.
         mouse = app.io.mouse_position
         self._buttons = {}
-        end_label = t("End tutorial")
-        end_rect = pg.Rect(x + PAD, panel.bottom - PAD - button_h, self.small_font.size(end_label)[0] + 20, button_h)
-        self._buttons["end"] = end_rect
-        self._button(end_rect, end_label, (235, 225, 200), self.small_font, mouse)
-        if step.done is None and (step.npc is None or self.npc_waiting()):
+        if with_next:
             label = t("Next")
             next_w = max(96, self.font.size(label)[0] + 24)
-            next_rect = pg.Rect(panel.right - PAD - next_w, end_rect.y, next_w, button_h)
+            next_rect = pg.Rect(panel.right - PAD - next_w, panel.bottom - PAD - button_h, next_w, button_h)
             self._buttons["next"] = next_rect
             self._button(next_rect, label, (150, 245, 150), self.font, mouse)
         # The map and buttons under the panel are out of reach (Io.country_at).
