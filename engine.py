@@ -767,8 +767,8 @@ class Engine:
             # over: online.HostSession.show_hovers.)
             self._draw_country_info(self.io.hover_country)
         player = self.players[self.turn]
-        self.gui.draw_player_stats(self.view, player, self.font, self.STATS_POS,
-                                  self.production(player, shown=True))
+        self.gui.draw_player_stats(self.view, player, self.font, self.STATS_POS, self.stats_width(),
+                                   self.production(player, shown=True))
         self.gui.draw_attack_phase(
             self.view, self.players[self.turn], images=self.hud_images, outline_color=self.colors["outlines"],
             end_turn_enabled=self.turn_manager.can_end_turn(),
@@ -849,12 +849,16 @@ class Engine:
         return self.io.country_at(self.view, self.countries.values(), Position(*point), self.io.buttons)
 
     # Top-left row: settings, shop, cards, event card; the chat button
-    # (online) under settings (chat.BUTTON), the current player's stats
-    # under that (also in a local game, where that place stays empty).
+    # (online) under settings (chat.BUTTON). The current player's stock is
+    # a bar right of the row, flush with the top, up to the country info
+    # panel (top right).
     BUTTON_MARGIN = 10
     BUTTON_SIZE = 44
     BUTTON_STEP = 50  # 44 wide + 6 gap
-    STATS_POS = (0, BUTTON_MARGIN + 2 * BUTTON_STEP)  # (flush with the left edge)
+    STATS_POS = (BUTTON_MARGIN + 4 * BUTTON_STEP, 0)
+
+    def stats_width(self):
+        return self.view.WIDTH - self.gui.width - self.BUTTON_MARGIN - self.STATS_POS[0]
 
     @property
     def bot_turn(self):

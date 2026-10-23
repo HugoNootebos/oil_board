@@ -205,7 +205,7 @@ they're made. Bots' `_say` status lines aren't shown and aren't translated.
   in `Engine._render_layer`: a fast 1× version while panning/zooming, then a
   smooth 2× supersampled one. Changes to what it draws must be reflected in
   `Engine._map_keys()` or the cache won't refresh.
-- The map wraps around east-west: `PACIFIC` (300) map units of sea lie
+- The map wraps around east-west: `PACIFIC` (200) map units of sea lie
   between Siberië/Japan and the Americas, and the world repeats every
   `WORLD_WIDTH` (models.py). The map layer and troop markers are drawn once
   per copy on screen (`View.copies` / `View.shifted`, extent
@@ -229,9 +229,14 @@ they're made. Bots' `_say` status lines aren't shown and aren't translated.
 - Mouse's colour is (140, 140, 140).
 - HUD layout: top left a row of 44 px buttons (settings, shop, cards,
   event card; `Engine.BUTTON_*`), online the chat button under settings
-  (`chat.BUTTON`), under that, flush with the left edge, the current
-  player's stock (`Gui.draw_player_stats` at `Engine.STATS_POS`, as wide
-  as its rows need; the same place in a local game). Top right the
+  (`chat.BUTTON`); right of the buttons, flush with the top, the current
+  player's stock as a bar up to the country info panel
+  (`Gui.draw_player_stats` at `Engine.STATS_POS`, `Engine.stats_width`: a
+  name band, then the six resources side by side); things that used to sit
+  at the top go under it (the dice screen's Assets button,
+  `Phase.ASSETS_Y`; the tutorial's panel). The resource picker of the move
+  and rail/air screens is a column at the left edge under the chat button
+  (`Phase._resource_selector`, `SELECTOR_X/TOP/STEP`). Top right the
   country info panel (the country alone, under a band in its owner's
   colour); bottom right the phase buttons and End turn
   (`Gui.draw_attack_phase`, straight on the map) with the turn order above

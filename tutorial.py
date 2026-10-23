@@ -331,7 +331,7 @@ STEPS = [
          "belong to the natives. You win by eliminating both other players.",
          marks=[VEN, CUBA, NY, VIK, SOV], focus="all"),
     Step(1, "Your stock",
-         "The panel on the left shows your stock: food, wood, steel, oil, uranium and troop "
+         "The bar at the top shows your stock: food, wood, steel, oil, uranium and troop "
          "production. The number in brackets is what you produce at the start of every turn. Food "
          "has two brackets: one for how much your army consumes every turn (= size of your army) "
          "and one for how much you produce.\n"
@@ -483,7 +483,7 @@ STEPS = [
          done=_phase(2), hold=_hold(only=[]), marks=["move_phase"], phases=True),
     Step(6, "Sail back",
          "Move your ship and troops back to {}: click {}, then {}, and click {} until {} has 1 "
-         "left. Then pick the ship at the top, click {} once and click the green button.",
+         "left. Then pick the ship on the left, click {} once and click the green button.",
          names=[NY, LON, NY, NY, LON, NY], done=lambda tu: tu.player.repositioned_this_turn,
          hold=_hold(only=[LON, NY], confirm=lambda tu: _units(LON)(tu) == 1 and tu.app.countries[NY].ships > 0),
          marks=_move_marks(LON, NY), focus="north"),
@@ -541,7 +541,7 @@ STEPS = [
          "As long as you have at least one airplane at one of your airports and 1 oil to pay for the "
          "flight, you can reposition troops and tanks between your airports as you like. Click on "
          "the plane button that appears when you have either {} or {} selected. Right-click to "
-         "remove troops from {} until it is empty, then select the tank icon at the top and "
+         "remove troops from {} until it is empty, then select the tank icon on the left and "
          "right-click {} again to remove the tank as well. Left-click on {} to place the tank and "
          "troops.",
          names=[VEN, LON, VEN, VEN, LON], done=_moved_by("air"),
@@ -766,14 +766,15 @@ class Tutorial:
         view.wrap()
 
     def _panel_spot(self):
-        """The panel's (x, y, width): at the top, just left of the country
-        info panel; while the shop is open, in the shop's empty top right;
+        """The panel's (x, y, width): under the stock bar, just left of the
+        country info panel; while the shop is open, in the shop's empty top right;
         while the cards are open, wide and short above them (right of the
         top-left buttons), and right of the rewards once trading; on the dice
         screen below its Assets button."""
         app = self.app
         player = self.player
         right = app.view.WIDTH - app.gui.width - GAP
+        top = app.STATS_POS[1] + app.gui.player_bar_height() + GAP
         if app.players[app.turn] is player and player.attack == 3 and player.subattack < 8:
             return SHOP_SPOT + (WIDTH,)
         if app.card_menu.trade_mode:
@@ -781,15 +782,15 @@ class Tutorial:
         if app.card_menu.show:
             buttons = app._event_button()
             left = buttons.pos.x + buttons.width + 2 * GAP
-            return left, GAP, right - left
+            return left, top, right - left
         if player.attack == 1 and player.subattack == 6 and app.players[app.turn] is player:
             # Right of the attack's asset panel (AttackPhase._select_asset_transport).
             left = app.view.WIDTH // 2 + 220 + GAP
             return left, SHOP_SPOT[1], app.view.WIDTH - GAP - left
         if player.attack == 1 and player.subattack == 2 and app.players[app.turn] is player:
             # Below the dice screen's Assets button (AttackPhase._choose_dice_count).
-            return right - WIDTH, 12 + Phase.ASSETS_BUTTON_SIZE + GAP, WIDTH
-        return right - WIDTH, GAP, WIDTH
+            return right - WIDTH, Phase.ASSETS_Y + Phase.ASSETS_BUTTON_SIZE + GAP, WIDTH
+        return right - WIDTH, top, WIDTH
 
     def _next(self):
         self.index += 1
@@ -908,7 +909,7 @@ class Tutorial:
         if key == "assets_button":
             # AttackPhase._choose_dice_count's Assets button.
             size = Phase.ASSETS_BUTTON_SIZE
-            return [("r", pg.Rect(view.WIDTH - 350, 12, size, size))]
+            return [("r", pg.Rect(view.WIDTH - 350, Phase.ASSETS_Y, size, size))]
         if key == "tank_minus":
             # The tank row's minus in AttackPhase._select_asset_transport.
             return [("r", pg.Rect(view.WIDTH // 2 - 220 + 340, view.HEIGHT // 2 - 160 + 50 + 2 * 52, 30, 30))]
@@ -927,11 +928,7 @@ class Tutorial:
         if key in ("troop_pool", "tank_pool"):
             # The first (troops) or second (tanks) sprite of the redistribute
             # screen's selector (Phase._resource_selector).
-            index = 0 if key == "troop_pool" else 1
-            count = 3 if manager.phases[1]._redistribute_kind == "air" else 2
-            step = Phase.SELECTOR_STEP
-            left = (view.WIDTH - ((count - 1) * step + 80)) // 2
-            return [("r", pg.Rect(left + index * step + 40 - 28, 22, 56, 56))]
+            return [("r", Phase.selector_rect(0 if key == "troop_pool" else 1))]
         if key == "nuclear_option":
             from models import CardMenu
             index = [option[1] for option in CardMenu.TRADE_OPTIONS].index("nuclear")

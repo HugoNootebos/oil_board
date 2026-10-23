@@ -965,7 +965,7 @@ def test_hover():
     check("the host sends no panels (nor draws them in its layer)",
           not [m for _, m in wire.sent if isinstance(m, dict) and m.get("type") == "hover"]
           and s.stream.frame.get_at(corner)[3] == 0)
-    check("not through the game's layer (the HUD)", hovered(900, 600) is None)
+    check("not through the game's layer (the HUD)", hovered(900, 620) is None)  # (End turn)
     check("not through the chat button (its own)", hovered(chat.BUTTON.centerx, chat.BUTTON.centery) is None)
     app.turn_manager.toggle_shop()
     check("not while its player's shop is open", hovered(*at) is None and v.private is not None)
@@ -1151,6 +1151,7 @@ def test_pairing():
         _device_click(app, v, 605, 326)  # Controllers, in its settings
         check("a joined device opens it from its own settings", game.pairing_open and not game.settings_open
               and not app.pairing_open)
+        game._pairing_since = -10 ** 6
         _device_click(app, v, 480, 418)
 
         app.open_pairing()
@@ -1242,12 +1243,14 @@ def test_scrolling():
               pads.scrollers(mine, v._online("acting")) == (True, [pad_a, pad_d]))
 
         def drag():
+            with _Mouse(v, 360, 480):  # (from here, not from wherever the mouse was)
+                _both(app, v, [_event(pg.MOUSEMOTION, pos=_device_pos(v, 360, 480), rel=(1, 1), buttons=(0, 0, 0))])
             before, host = game.view.offset.x, (app.view.offset.x, app.view.zoom)
-            with _Mouse(v, 300, 300, held=(False, True, False)):
-                _both(app, v, [_event(pg.MOUSEMOTION, pos=_device_pos(v, 300, 300), rel=(1, 1), buttons=(0, 1, 0))])
-            with _Mouse(v, 340, 300, held=(False, True, False)):
-                _both(app, v, [_event(pg.MOUSEMOTION, pos=_device_pos(v, 340, 300), rel=(40, 0), buttons=(0, 1, 0))])
-            with _Mouse(v, 340, 300):
+            with _Mouse(v, 360, 480, held=(False, True, False)):
+                _both(app, v, [_event(pg.MOUSEMOTION, pos=_device_pos(v, 360, 480), rel=(1, 1), buttons=(0, 1, 0))])
+            with _Mouse(v, 400, 480, held=(False, True, False)):
+                _both(app, v, [_event(pg.MOUSEMOTION, pos=_device_pos(v, 400, 480), rel=(40, 0), buttons=(0, 1, 0))])
+            with _Mouse(v, 400, 480):
                 _both(app, v)
             return game.view.offset.x != before and (app.view.offset.x, app.view.zoom) == host
 

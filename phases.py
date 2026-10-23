@@ -300,6 +300,7 @@ class Phase:
     CONFIRM_X = CANCEL_X - IMAGE_BUTTON_W - BUTTON_GAP
 
     ASSETS_BUTTON_SIZE = 56
+    ASSETS_Y = 60  # (under the current player's stock bar, Gui.player_bar_height)
 
     def assets_button(self, x, y):
         """Square button with a ship, plane and tank on it, top-left at
@@ -695,22 +696,30 @@ class Phase:
             Phase._glow = surf
         return Phase._glow
 
-    SELECTOR_STEP = 67  # between sprite centres
+    # The resource selector: a column at the left edge, under the top-left
+    # buttons and the (online) chat button under settings.
+    SELECTOR_X = 36    # sprite centres
+    SELECTOR_TOP = 122
+    SELECTOR_STEP = 62  # between sprite centres
 
-    def _resource_selector(self, items, selected, y=22, disabled=()):
-        """Row of resource sprites centred at the top: a glow behind the
-        selected one, a click picks one (returned, else None). Items are
-        (key, sprite, count); a count is drawn on the sprite (dimmed while
-        0) unless it is None. Keys in `disabled` are dimmed and only give
-        the error sound when clicked. The default `y` centres the row on
-        the HUD buttons (cards button: top 20, 60 high)."""
+    @classmethod
+    def selector_rect(cls, index):
+        """Where the selector's `index`th sprite goes (for the tutorial's rings)."""
+        cy = cls.SELECTOR_TOP + index * cls.SELECTOR_STEP + 28
+        return pg.Rect(cls.SELECTOR_X - 28, cy - 28, 56, 56)
+
+    def _resource_selector(self, items, selected, disabled=()):
+        """Column of resource sprites top left: a glow behind the selected
+        one, a click picks one (returned, else None). Items are (key,
+        sprite, count); a count is drawn on the sprite (dimmed while 0)
+        unless it is None. Keys in `disabled` are dimmed and only give the
+        error sound when clicked."""
         screen = self.view.screen
         font = pg.font.Font(None, 30)
         step = self.SELECTOR_STEP
-        left = (self.view.WIDTH - ((len(items) - 1) * step + 80)) // 2
         picked = None
         for i, (key, sprite, count) in enumerate(items):
-            cx, cy = left + i * step + 40, y + 28
+            cx, cy = self.selector_rect(i).center
             if key == selected:
                 glow = self._selector_glow()
                 screen.blit(glow, (cx - glow.get_width() // 2, cy - glow.get_height() // 2))
@@ -727,7 +736,7 @@ class Phase:
                     for dy in (-1, 0, 1):
                         screen.blit(outline, (tx + dx, ty + dy))
                 screen.blit(text, (tx, ty))
-            if self.clicked(cx - step // 2, y, cx + step // 2, y + 56):
+            if self.clicked(cx - 33, cy - step // 2, cx + 33, cy + step // 2):
                 if key in disabled:
                     sounds.play("error")
                 else:
@@ -1744,7 +1753,7 @@ class AttackPhase(Phase):
         roll_clicked = self.confirm_button(self.CONFIRM_X, self.ROW_Y)
         self._draw_oil_cost_above(self.CONFIRM_X, self.ROW_Y, self._attack_oil_cost())
 
-        if self._has_attack_assets() and self.assets_button(WIDTH - 350, 12):
+        if self._has_attack_assets() and self.assets_button(WIDTH - 350, self.ASSETS_Y):
             self.open_popup(6)
             return
 
@@ -2252,7 +2261,7 @@ class AttackPhase(Phase):
         if self.free_claim:
             self._draw_oil_cost_above(self.CONFIRM_X, self.ROW_Y, max(self.selected_planes - self.prepaid_planes, 0))
             # Same Assets button as on the dice screen.
-            if self._has_attack_assets() and self.assets_button(WIDTH - 350, 12):
+            if self._has_attack_assets() and self.assets_button(WIDTH - 350, self.ASSETS_Y):
                 self._free_claim_assets(False)
                 self.open_popup(6)
                 return

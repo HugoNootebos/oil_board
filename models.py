@@ -538,7 +538,7 @@ class Country:
 # between the two, so the world repeats every WORLD_WIDTH. SEAM is a
 # point in that ocean where one copy of the world ends and the next
 # begins: the board itself lies in [SEAM - WORLD_WIDTH, SEAM).
-PACIFIC = 300
+PACIFIC = 200
 WORLD_WIDTH = (631 - 16) + PACIFIC
 SEAM = 700
 # Routes that cross the Pacific: drawn from the eastern country eastwards
@@ -883,8 +883,8 @@ class View:
     MIN_ZOOM = 0.3
     MAX_ZOOM = 6.0
     # How the map is shown when a game starts (Engine; an online device's).
-    START_ZOOM = 1.21
-    START_OFFSET = (-401, -240)
+    START_ZOOM = 1.25
+    START_OFFSET = (-256, -240)
 
     def __init__(self, screen, zoom, offset, WIDTH, HEIGHT):
         self.screen = screen
@@ -1004,8 +1004,8 @@ class Gui:
         self.width = width  # the country info panel and the phase box (bottom right)
         self.outline_color = outline_color
         self.io = io
-        # Where draw_player_stats last drew the current player's panel and
-        # its six rows (food .. helmets), for the tutorial's rings.
+        # Where draw_player_stats last drew the current player's bar and
+        # its six cells (food .. helmets), for the tutorial's rings.
         self.player_rect = None
         self.player_rows = []
 
@@ -1132,14 +1132,14 @@ class Gui:
     OWNER_BAND_H = 26
     OWNER_LINE_COLOR = (90, 90, 90)
 
-    # The current player's panel (left, under the top-left buttons): a name
-    # band, then one row per resource with its amount and, right after it,
-    # what comes in at the next turn. As wide as its widest row needs.
+    # The current player's bar (along the top, right of the top-left
+    # buttons): a name band as wide as the bar, then the resources side by
+    # side, each in its sixth with its amount and, right after it, what
+    # comes in at the next turn.
     PLAYER_HEADER_H = 22
     PLAYER_ROW_H = 28
     PLAYER_ICON = 24
     PLAYER_PAD = 4
-    HELMET_ROW = 5
     PLAYER_ICONS = [("food", (16, 24)), ("wood", None), ("steel", None), ("oil", None), ("nuclear", None),
                     ("troops", None)]
 
@@ -1151,8 +1151,12 @@ class Gui:
                                 for name, size in self.PLAYER_ICONS]
         return self._stat_small, self._stat_bold
 
-    def draw_player_stats(self, view, player, font, pos, production=None):
-        """The current player's stock, top-left corner at `pos` (logical)."""
+    def player_bar_height(self):
+        return self.PLAYER_HEADER_H + self.PLAYER_ROW_H + 4
+
+    def draw_player_stats(self, view, player, font, pos, width, production=None):
+        """The current player's stock: a bar `width` wide, top-left corner
+        at `pos` (logical)."""
         small, bold = self._player_fonts()
         screen = view.screen
         x0, y0 = pos
@@ -1175,38 +1179,41 @@ class Gui:
                 gain = production[key] if index < 5 else production["helmets"] // 3 + 3
                 color = (0, 120, 0) if gain > 0 else (170, 0, 0) if gain < 0 else self.outline_color
                 brackets.append([small.render("({:+d})".format(gain), True, color)])
-        amount_x = pad + self.PLAYER_ICON + pad
-        amount_w = max(font.size(str(amount))[0] for amount in amounts)
-        bracket_x = amount_x + amount_w + 4
-        label = player.name + (" (bot)" if player.is_bot else "")
-        w = max(bracket_x + max((b.get_width() for row in brackets for b in row), default=0) + pad + 1,
-                bold.size(label)[0] + 2 * pad + 4)
-        h = self.PLAYER_HEADER_H + 6 * self.PLAYER_ROW_H + 6
-        self.player_rect = pg.Rect(x0, y0, w, h)
+        self.player_rect = pg.Rect(x0, y0, width, self.player_bar_height())
         self.player_rows = []
         pg.draw.rect(screen, self.gray1, self.player_rect)
-        pg.draw.rect(screen, player.color, pg.Rect(x0, y0, w, self.PLAYER_HEADER_H))
+        pg.draw.rect(screen, player.color, pg.Rect(x0, y0, width, self.PLAYER_HEADER_H))
+        label = player.name + (" (bot)" if player.is_bot else "")
         name = bold.render(label, True, name_text_color(player.color))
-        screen.blit(name, (x0 + (w - name.get_width()) // 2, y0 + (self.PLAYER_HEADER_H - name.get_height()) // 2))
+        screen.blit(name, (x0 + (width - name.get_width()) // 2,
+                           y0 + (self.PLAYER_HEADER_H - name.get_height()) // 2))
+        cell_w = width / len(amounts)
         for index, amount in enumerate(amounts):
-            row = pg.Rect(x0, y0 + self.PLAYER_HEADER_H + 3 + index * self.PLAYER_ROW_H, w, self.PLAYER_ROW_H)
-            self.player_rows.append(row)
-            icon = self._stat_icons[index]
-            iw, ih = icon.image.get_size()
-            icon.draw(screen, Position(x0 + pad + (self.PLAYER_ICON - iw) // 2, row.centery - ih // 2))
+            left = int(x0 + index * cell_w)
+            cell = pg.Rect(left, y0 + self.PLAYER_HEADER_H + 2, int(x0 + (index + 1) * cell_w) - left,
+                           self.PLAYER_ROW_H)
+            self.player_rows.append(cell)
             color = self.outline_color
             if index == 0 and production is not None and production["units"] > amount:
                 color = (200, 0, 0)  # more troops than food in stock: some will starve
             text = font.render(str(amount), True, color)
-            # Amounts are centred in one column so 1- and 2-digit ones line up.
-            screen.blit(text, (x0 + amount_x + (amount_w - text.get_width()) // 2,
-                               row.centery - text.get_height() // 2))
             pieces = brackets[index]
+            bracket_w = max((piece.get_width() for piece in pieces), default=0)
+            total = self.PLAYER_ICON + pad + text.get_width() + (4 + bracket_w if pieces else 0)
+            x = cell.x + (cell.w - total) // 2  # icon, amount and brackets centred in the cell
+            icon = self._stat_icons[index]
+            iw, ih = icon.image.get_size()
+            icon.draw(screen, Position(x + (self.PLAYER_ICON - iw) // 2, cell.centery - ih // 2))
+            x += self.PLAYER_ICON + pad
+            screen.blit(text, (x, cell.centery - text.get_height() // 2))
+            x += text.get_width() + 4
             if len(pieces) == 2:
-                screen.blit(pieces[0], (x0 + bracket_x, row.centery - pieces[0].get_height()))
-                screen.blit(pieces[1], (x0 + bracket_x, row.centery))
+                screen.blit(pieces[0], (x, cell.centery - pieces[0].get_height()))
+                screen.blit(pieces[1], (x, cell.centery))
             elif pieces:
-                screen.blit(pieces[0], (x0 + bracket_x, row.centery - pieces[0].get_height() // 2))
+                screen.blit(pieces[0], (x, cell.centery - pieces[0].get_height() // 2))
+            if index:
+                pg.draw.line(screen, self.gray2, (cell.x, cell.y + 3), (cell.x, cell.bottom - 3))
         pg.draw.rect(screen, self.OWNER_LINE_COLOR, self.player_rect, 2)
 
     # Another player in the turn order (Engine._draw_turn_order): a name band

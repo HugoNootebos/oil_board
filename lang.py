@@ -465,14 +465,14 @@ NL = {
         "Jij bent de blauwe speler en je neemt het op tegen rood en groen. De grijze landen zijn "
         "van de inboorlingen. Je wint door beide andere spelers uit te schakelen.",
     "Your stock": "Je voorraad",
-    "The panel on the left shows your stock: food, wood, steel, oil, uranium and troop "
+    "The bar at the top shows your stock: food, wood, steel, oil, uranium and troop "
     "production. The number in brackets is what you produce at the start of every turn. Food "
     "has two brackets: one for how much your army consumes every turn (= size of your army) "
     "and one for how much you produce.\n"
     "Be careful because in this game you have to feed your troops before you receive your "
     "production, so if you end your turn with less food than you have units on the board "
     "some of them will starve at the start of your next turn.":
-        "Het paneel links toont je voorraad: voedsel, hout, staal, olie, uranium en "
+        "De balk bovenaan toont je voorraad: voedsel, hout, staal, olie, uranium en "
         "troepenproductie. Het getal tussen haakjes is wat je aan het begin van elke beurt "
         "produceert. Voedsel heeft twee getallen tussen haakjes: een voor hoeveel je leger elke "
         "beurt eet (= de grootte van je leger) en een voor hoeveel je produceert.\n"
@@ -625,9 +625,9 @@ NL = {
         "hout, staal, olie en uranium, maar niet zijn voedsel.",
     "Sail back": "Vaar terug",
     "Move your ship and troops back to {}: click {}, then {}, and click {} until {} has 1 "
-    "left. Then pick the ship at the top, click {} once and click the green button.":
+    "left. Then pick the ship on the left, click {} once and click the green button.":
         "Breng je schip en troepen terug naar {}: klik op {}, dan op {}, en klik op {} tot {} er "
-        "nog 1 heeft. Kies dan bovenaan het schip, klik één keer op {} en klik op de groene knop.",
+        "nog 1 heeft. Kies dan links het schip, klik één keer op {} en klik op de groene knop.",
     "Click End turn.": "Klik op Einde beurt.",
     "Red adds 3 more troops to {}: 12 now, behind its fort.":
         "Rood zet nog 3 troepen bij in {}: nu 12, achter zijn fort.",
@@ -673,14 +673,14 @@ NL = {
     "As long as you have at least one airplane at one of your airports and 1 oil to pay for the "
     "flight, you can reposition troops and tanks between your airports as you like. Click on "
     "the plane button that appears when you have either {} or {} selected. Right-click to "
-    "remove troops from {} until it is empty, then select the tank icon at the top and "
+    "remove troops from {} until it is empty, then select the tank icon on the left and "
     "right-click {} again to remove the tank as well. Left-click on {} to place the tank and "
     "troops.":
         "Luchthavens doen hetzelfde als spoorwegen: ze verbinden al je landen met een luchthaven. "
         "Zolang je minstens één vliegtuig op een van je luchthavens hebt en 1 olie om de vlucht te "
         "betalen, kun je troepen en tanks tussen je luchthavens verplaatsen zoals je wilt. Klik op "
         "de vliegtuigknop die verschijnt als je {} of {} geselecteerd hebt. Klik met rechts om "
-        "troepen uit {} weg te halen tot het leeg is, kies dan bovenaan het tankicoon en klik nog "
+        "troepen uit {} weg te halen tot het leeg is, kies dan links het tankicoon en klik nog "
         "eens met rechts op {} om ook de tank weg te halen. Klik met links op {} om de tank en de "
         "troepen neer te zetten.",
     "Nuke Viking": "Bombardeer Viking",
