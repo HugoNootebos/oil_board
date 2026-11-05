@@ -1,0 +1,328 @@
+{
+  ".github/workflows/build-app.yml": {
+    "mtime": 1793905993.2977033,
+    "seen": 1793907918.0115032,
+    "ast_hash": "747572b2c6c5b49728f59dd76b44c261",
+    "semantic_hash": "747572b2c6c5b49728f59dd76b44c261"
+  },
+  "__init__.py": {
+    "mtime": 1789967035.0,
+    "seen": 1793907918.011651,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "board.py": {
+    "mtime": 1793905993.2991269,
+    "seen": 1793907918.0116968,
+    "ast_hash": "d4ad8988b13b21a7ab38fa9f84168de5",
+    "semantic_hash": "d4ad8988b13b21a7ab38fa9f84168de5"
+  },
+  "bot.py": {
+    "mtime": 1793905993.3004415,
+    "seen": 1793907918.011741,
+    "ast_hash": "f7cef8aa2c94004a0b743722616807ba",
+    "semantic_hash": "f7cef8aa2c94004a0b743722616807ba"
+  },
+  "bot_checks.py": {
+    "mtime": 1791549540.448364,
+    "seen": 1793907918.011783,
+    "ast_hash": "569a42e8fbaeac063a714eea2fc9dda9",
+    "semantic_hash": "569a42e8fbaeac063a714eea2fc9dda9"
+  },
+  "bot_fork.py": {
+    "mtime": 1790958168.0830817,
+    "seen": 1793907918.01183,
+    "ast_hash": "d6e3891762fa99ad2155b9683e91115e",
+    "semantic_hash": "d6e3891762fa99ad2155b9683e91115e"
+  },
+  "bot_golden.py": {
+    "mtime": 1791305381.9254336,
+    "seen": 1793907918.011876,
+    "ast_hash": "48a02c78fa25bf9de1670b9e38e54cf0",
+    "semantic_hash": "48a02c78fa25bf9de1670b9e38e54cf0"
+  },
+  "bot_kpi.py": {
+    "mtime": 1791492645.823756,
+    "seen": 1793907918.0119228,
+    "ast_hash": "67df9c7bb95e1d4e7f6a38997974195e",
+    "semantic_hash": "67df9c7bb95e1d4e7f6a38997974195e"
+  },
+  "bot_report.py": {
+    "mtime": 1791492645.8247876,
+    "seen": 1793907918.01197,
+    "ast_hash": "6a292a60fc993d32e74c3d7a4852bc10",
+    "semantic_hash": "6a292a60fc993d32e74c3d7a4852bc10"
+  },
+  "bot_selfplay.py": {
+    "mtime": 1791490422.032142,
+    "seen": 1793907918.012015,
+    "ast_hash": "527db11b76c18a69efd48c54a78bee47",
+    "semantic_hash": "527db11b76c18a69efd48c54a78bee47"
+  },
+  "chat.py": {
+    "mtime": 1793905993.3007379,
+    "seen": 1793907918.0120609,
+    "ast_hash": "c23210135dd598a053db95b269de85b0",
+    "semantic_hash": "c23210135dd598a053db95b269de85b0"
+  },
+  "controls.py": {
+    "mtime": 1793905993.3014307,
+    "seen": 1793907918.012106,
+    "ast_hash": "4c1be2cc43f3d83d8edd4371c2eb90cc",
+    "semantic_hash": "4c1be2cc43f3d83d8edd4371c2eb90cc"
+  },
+  "engine.py": {
+    "mtime": 1793905993.3023174,
+    "seen": 1793907918.012148,
+    "ast_hash": "976c13e5caa2823a69b92195420d7689",
+    "semantic_hash": "976c13e5caa2823a69b92195420d7689"
+  },
+  "event_checks.py": {
+    "mtime": 1793905993.3030093,
+    "seen": 1793907918.0121899,
+    "ast_hash": "731582c36400625ad9cbcb34e64a1aa2",
+    "semantic_hash": "731582c36400625ad9cbcb34e64a1aa2"
+  },
+  "event_sandbox.py": {
+    "mtime": 1793905993.304229,
+    "seen": 1793907918.012233,
+    "ast_hash": "5ee2fc3f74c9f6198b077beafdcbae43",
+    "semantic_hash": "5ee2fc3f74c9f6198b077beafdcbae43"
+  },
+  "events.py": {
+    "mtime": 1793905993.305125,
+    "seen": 1793907918.012277,
+    "ast_hash": "0d5c6962863aa19b48c4366e75e85923",
+    "semantic_hash": "0d5c6962863aa19b48c4366e75e85923"
+  },
+  "fonts.py": {
+    "mtime": 1790662786.7869456,
+    "seen": 1793907918.012319,
+    "ast_hash": "2b1e4b1d5ac9f2536d1de0f16ff4eebd",
+    "semantic_hash": "2b1e4b1d5ac9f2536d1de0f16ff4eebd"
+  },
+  "golden_traces.json": {
+    "mtime": 1793905993.3054903,
+    "seen": 1793907918.012365,
+    "ast_hash": "66daa4c814ddd31ed46fb15815cdfd40",
+    "semantic_hash": "66daa4c814ddd31ed46fb15815cdfd40",
+    "ast_empty": true
+  },
+  "golden_traces_new.json": {
+    "mtime": 1793905993.3059099,
+    "seen": 1793907918.012367,
+    "ast_hash": "5d81d331bab1c6bf10a036b53936e9db",
+    "semantic_hash": "5d81d331bab1c6bf10a036b53936e9db",
+    "ast_empty": true
+  },
+  "landmark_placement.py": {
+    "mtime": 1793905993.3067272,
+    "seen": 1793907918.012369,
+    "ast_hash": "8d1d6b91e4b5570d630524b10a21e014",
+    "semantic_hash": "8d1d6b91e4b5570d630524b10a21e014"
+  },
+  "lang.py": {
+    "mtime": 1793905993.3074126,
+    "seen": 1793907918.0124118,
+    "ast_hash": "bc7b1735c88c4c85bfa46e20cbd97605",
+    "semantic_hash": "bc7b1735c88c4c85bfa46e20cbd97605"
+  },
+  "lobby.py": {
+    "mtime": 1793905993.3079433,
+    "seen": 1793907918.012455,
+    "ast_hash": "c362f6c399be4a13c0d0e17938abe053",
+    "semantic_hash": "c362f6c399be4a13c0d0e17938abe053"
+  },
+  "map_polygons.py": {
+    "mtime": 1791181462.750816,
+    "seen": 1793907918.012498,
+    "ast_hash": "4d883e1f1ec837709353ead58213a395",
+    "semantic_hash": "4d883e1f1ec837709353ead58213a395"
+  },
+  "menu.py": {
+    "mtime": 1793905993.3084974,
+    "seen": 1793907918.012544,
+    "ast_hash": "14be9329a54e80205951fdb65798f699",
+    "semantic_hash": "14be9329a54e80205951fdb65798f699"
+  },
+  "models.py": {
+    "mtime": 1793905993.3094728,
+    "seen": 1793907918.012584,
+    "ast_hash": "9aa1a1026b61e4514317a4fb3c1f430c",
+    "semantic_hash": "9aa1a1026b61e4514317a4fb3c1f430c"
+  },
+  "net.py": {
+    "mtime": 1793905993.3100674,
+    "seen": 1793907918.0126238,
+    "ast_hash": "e25e9eacff8bc1db65a6a0c7b8e67616",
+    "semantic_hash": "e25e9eacff8bc1db65a6a0c7b8e67616"
+  },
+  "online.py": {
+    "mtime": 1793905993.3107991,
+    "seen": 1793907918.0126631,
+    "ast_hash": "38d47281addb8fefadae128cfc6c72c9",
+    "semantic_hash": "38d47281addb8fefadae128cfc6c72c9"
+  },
+  "online_checks.py": {
+    "mtime": 1793905993.311745,
+    "seen": 1793907918.012704,
+    "ast_hash": "1c93e6e4b05da5c0ee451bdbd7c09d13",
+    "semantic_hash": "1c93e6e4b05da5c0ee451bdbd7c09d13"
+  },
+  "outline_smoothing.py": {
+    "mtime": 1790494253.5686035,
+    "seen": 1793907918.012745,
+    "ast_hash": "1ceb25be636e66abf17c071cb63084f7",
+    "semantic_hash": "1ceb25be636e66abf17c071cb63084f7"
+  },
+  "packaging/bootstrap.py": {
+    "mtime": 1791719994.316645,
+    "seen": 1793907918.0127869,
+    "ast_hash": "fbf2374c26d7ebd82fae060f7bfec64f",
+    "semantic_hash": "fbf2374c26d7ebd82fae060f7bfec64f"
+  },
+  "packaging/build.py": {
+    "mtime": 1793905993.3126829,
+    "seen": 1793907918.012836,
+    "ast_hash": "d52b0d0128516cb63db21e9ce2c926e2",
+    "semantic_hash": "d52b0d0128516cb63db21e9ce2c926e2"
+  },
+  "packaging/make_icon.py": {
+    "mtime": 1791719683.086525,
+    "seen": 1793907918.012883,
+    "ast_hash": "59224c72f610c47166071bd5c85a2a2c",
+    "semantic_hash": "59224c72f610c47166071bd5c85a2a2c"
+  },
+  "packaging/relay/install.ps1": {
+    "mtime": 1793905993.3135998,
+    "seen": 1793907918.012944,
+    "ast_hash": "46cbf4cdf027238513a843990e1716c1",
+    "semantic_hash": "46cbf4cdf027238513a843990e1716c1"
+  },
+  "packaging/relay/install.sh": {
+    "mtime": 1791901363.9288893,
+    "seen": 1793907918.0129988,
+    "ast_hash": "a13420bdd53cb2b3ec8734aaa9723b0f",
+    "semantic_hash": "a13420bdd53cb2b3ec8734aaa9723b0f"
+  },
+  "phases.py": {
+    "mtime": 1793905993.3152218,
+    "seen": 1793907918.01305,
+    "ast_hash": "cee8ca23e4e029b9b7df79ff06c4ff4d",
+    "semantic_hash": "cee8ca23e4e029b9b7df79ff06c4ff4d"
+  },
+  "player_colors.py": {
+    "mtime": 1790712137.984714,
+    "seen": 1793907918.0130901,
+    "ast_hash": "7e3a42e4e37157894f6eb587c3616d34",
+    "semantic_hash": "7e3a42e4e37157894f6eb587c3616d34"
+  },
+  "relay.py": {
+    "mtime": 1791901482.8382933,
+    "seen": 1793907918.01314,
+    "ast_hash": "347ff1f8a3060c86e4a62220894a1d25",
+    "semantic_hash": "347ff1f8a3060c86e4a62220894a1d25"
+  },
+  "runner.py": {
+    "mtime": 1793905993.3175533,
+    "seen": 1793907918.0131788,
+    "ast_hash": "d6c11e90038d56960d1a165756026b6f",
+    "semantic_hash": "d6c11e90038d56960d1a165756026b6f"
+  },
+  "save_load.py": {
+    "mtime": 1793905993.3182669,
+    "seen": 1793907918.013219,
+    "ast_hash": "6e17dbd656b05ceebd15b6f664d1ba20",
+    "semantic_hash": "6e17dbd656b05ceebd15b6f664d1ba20"
+  },
+  "sounds.py": {
+    "mtime": 1793905993.3189838,
+    "seen": 1793907918.013259,
+    "ast_hash": "3c2a4ce3813710d726a9cf509dd38298",
+    "semantic_hash": "3c2a4ce3813710d726a9cf509dd38298"
+  },
+  "tutorial.py": {
+    "mtime": 1793905993.3192184,
+    "seen": 1793907918.013299,
+    "ast_hash": "a6c6ee89a863acd6023d14974e2443c2",
+    "semantic_hash": "a6c6ee89a863acd6023d14974e2443c2"
+  },
+  "updater.py": {
+    "mtime": 1793905993.3200877,
+    "seen": 1793907918.0133388,
+    "ast_hash": "b2c0e3cc0d3a007c187d6424ab2cb818",
+    "semantic_hash": "b2c0e3cc0d3a007c187d6424ab2cb818"
+  },
+  "viewer.py": {
+    "mtime": 1793905993.3204923,
+    "seen": 1793907918.013393,
+    "ast_hash": "5ea19cf213f2637a7b2642186015b7b3",
+    "semantic_hash": "5ea19cf213f2637a7b2642186015b7b3"
+  },
+  "sounds/abomb.mp3": {
+    "mtime": 1790712338.0,
+    "seen": 1793907918.01344,
+    "ast_hash": "f1506714282aab3770d16d1bf2280ac9",
+    "semantic_hash": "f1506714282aab3770d16d1bf2280ac9"
+  },
+  "sounds/background.mp3": {
+    "mtime": 1790712147.0,
+    "seen": 1793907918.013493,
+    "ast_hash": "187dbbe2a326880d0ed3cd002a9e4471",
+    "semantic_hash": "187dbbe2a326880d0ed3cd002a9e4471"
+  },
+  "sounds/background2.mp3": {
+    "mtime": 1790712045.0,
+    "seen": 1793907918.013546,
+    "ast_hash": "064f1d94748a609cf0e1b75cb53a7f8e",
+    "semantic_hash": "064f1d94748a609cf0e1b75cb53a7f8e"
+  },
+  "sounds/click.mp3": {
+    "mtime": 1790712783.0,
+    "seen": 1793907918.013592,
+    "ast_hash": "7f90c47fcc5f15e0c0e94b3bfb6467f7",
+    "semantic_hash": "7f90c47fcc5f15e0c0e94b3bfb6467f7"
+  },
+  "sounds/conquer_country.mp3": {
+    "mtime": 1790711778.0,
+    "seen": 1793907918.013655,
+    "ast_hash": "f04c4419bda6f251c7da50cb518de6df",
+    "semantic_hash": "f04c4419bda6f251c7da50cb518de6df"
+  },
+  "sounds/error.mp3": {
+    "mtime": 1790712705.0,
+    "seen": 1793907918.013702,
+    "ast_hash": "ee1774664a7feeec0aad059d4753dc1a",
+    "semantic_hash": "ee1774664a7feeec0aad059d4753dc1a"
+  },
+  "sounds/freesound_community-koto-hit-106066.mp3": {
+    "mtime": 1790712605.0,
+    "seen": 1793907918.0137532,
+    "ast_hash": "6347cedcebe8c1864f0bb730c72dd9ec",
+    "semantic_hash": "6347cedcebe8c1864f0bb730c72dd9ec"
+  },
+  "sounds/horse.mp3": {
+    "mtime": 1790712256.0,
+    "seen": 1793907918.013803,
+    "ast_hash": "5fa074c3872c5f537d5bde39f3a7563d",
+    "semantic_hash": "5fa074c3872c5f537d5bde39f3a7563d"
+  },
+  "sounds/mouse.mp3": {
+    "mtime": 1790712936.0,
+    "seen": 1793907918.01387,
+    "ast_hash": "44ac135dffcbdace8c18db0a31b2c0cf",
+    "semantic_hash": "44ac135dffcbdace8c18db0a31b2c0cf"
+  },
+  "sounds/pagoda.mp3": {
+    "mtime": 1790712416.0,
+    "seen": 1793907918.0139399,
+    "ast_hash": "e28e4d4e442dd43da804c228ee211859",
+    "semantic_hash": "e28e4d4e442dd43da804c228ee211859"
+  },
+  "sounds/torii.mp3": {
+    "mtime": 1790712537.0,
+    "seen": 1793907918.0139892,
+    "ast_hash": "42a08e2f1aaf6c01abaf702aeb6e9643",
+    "semantic_hash": "42a08e2f1aaf6c01abaf702aeb6e9643"
+  }
+}
